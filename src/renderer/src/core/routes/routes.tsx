@@ -1,6 +1,6 @@
 import { RouteObject } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import DashboardPage from '../../features/dashboard';
+import InspectorPage from '../../features/inspector/InspectorPage';
 
 export const routes: RouteObject[] = [
   {
@@ -9,7 +9,7 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: '',
-        element: <DashboardPage />,
+        element: <InspectorPage />,
       },
       {
         path: 'analytics',

@@ -1,7 +1,11 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
+import { ProxyServer } from './proxy/ProxyServer';
+import { spawn } from 'child_process';
+
+const proxyServer = new ProxyServer();
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -15,10 +19,42 @@ app.whenReady().then(() => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
+    proxyServer.setWindow(window);
   });
 
   // Setup IPC event handlers
   setupEventHandlers();
+
+  // Proxy IPC
+  ipcMain.handle('proxy:start', async (_, port: number) => {
+    proxyServer.start(port);
+    return true;
+  });
+
+  ipcMain.handle('proxy:stop', async () => {
+    proxyServer.stop();
+    return true;
+  });
+
+  // App Launcher IPC
+  ipcMain.handle('app:launch', async (_, appName: string, proxyUrl: string) => {
+    if (appName === 'vscode') {
+      console.log('Launching VS Code with proxy:', proxyUrl);
+      // Using 'code' command assuming it's in PATH
+      const child = spawn(
+        'code',
+        ['--proxy-server=' + proxyUrl, '--ignore-certificate-errors', '.'],
+        {
+          detached: true,
+          stdio: 'ignore',
+          shell: true, // For Windows/Linux compatibility with command resolution
+        },
+      );
+      child.unref();
+      return true;
+    }
+    return false;
+  });
 
   // Create main window
   windowManager.createMainWindow();
@@ -36,6 +72,7 @@ app.whenReady().then(() => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
+  proxyServer.stop();
   if (process.platform !== 'darwin') {
     app.quit();
   }
