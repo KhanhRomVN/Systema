@@ -36,7 +36,7 @@ export function TabPanel({ onSelectSession, onOpenHistory, onOpenSettings }: Tab
               messageCount: 0,
               preview: 'Ready for analysis',
               status: 'free',
-              provider: 'Systema',
+              provider: 'deepseek',
               containerName: 'Container #01',
             };
             setSessions([newSession]);
@@ -74,7 +74,7 @@ export function TabPanel({ onSelectSession, onOpenHistory, onOpenSettings }: Tab
       messageCount: 0,
       preview: 'Start analyzing network traffic...',
       status: 'free',
-      provider: 'Systema',
+      provider: 'deepseek',
       containerName: 'Container #01',
     };
     setSessions([newSession, ...sessions]);

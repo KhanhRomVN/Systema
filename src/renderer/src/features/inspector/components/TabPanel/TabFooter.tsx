@@ -10,7 +10,10 @@ export default function TabFooter({ onModelChange }: TabFooterProps) {
   const availableModels = [
     { id: 'deepseek-web', provider: 'deepseek', name: 'DeepSeek' },
     { id: 'chatgpt-web', provider: 'chatgpt', name: 'ChatGPT' },
+    { id: 'grok-web', provider: 'grok', name: 'Grok' },
     { id: 'claude-web', provider: 'claude', name: 'Claude' },
+    { id: 'claude-cli-web', provider: 'claude-cli', name: 'Claude(CLI)' },
+    { id: 'gemini-web', provider: 'gemini', name: 'Gemini' },
   ];
 
   const [selectedModels, setSelectedModels] = useState<string[]>(['deepseek-web']);
@@ -49,7 +52,7 @@ export default function TabFooter({ onModelChange }: TabFooterProps) {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 w-full bg-muted/40 border-t border-border z-50">
+    <div className="absolute bottom-0 left-0 right-0 w-full bg-muted/40 border-t border-border z-10">
       <div className="flex flex-wrap gap-1.5 p-2 items-center justify-center">
         {availableModels.map((model) => {
           const config = getProviderConfig(model.provider);
