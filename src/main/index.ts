@@ -3,7 +3,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
 import { ProxyServer } from './proxy/ProxyServer';
-import { spawn, ChildProcess, exec } from 'child_process';
+import { spawn, ChildProcess, exec, execSync } from 'child_process';
 
 const proxyServer = new ProxyServer();
 let activeChildProcess: ChildProcess | null = null;
@@ -122,12 +122,32 @@ app.whenReady().then(() => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
+const cleanup = () => {
   proxyServer.stop();
   if (activeChildProcess) {
     activeChildProcess.kill();
     activeChildProcess = null;
   }
+  if (activeProxyUrl) {
+    // Attempt to kill VS Code launched with this specific proxy
+    try {
+      execSync(`pkill -f -- "--proxy-server=${activeProxyUrl}"`);
+    } catch (e) {
+      console.error('Failed to pkill VS Code during cleanup:', e);
+    }
+    activeProxyUrl = null;
+  }
+};
+
+app.on('before-quit', () => {
+  cleanup();
+});
+
+// Quit when all windows are closed, except on macOS. There, it's common
+// for applications and their menu bar to stay active until the user quits
+// explicitly with Cmd + Q.
+app.on('window-all-closed', () => {
+  cleanup();
   if (process.platform !== 'darwin') {
     app.quit();
   }
