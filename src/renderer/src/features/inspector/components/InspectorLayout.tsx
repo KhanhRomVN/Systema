@@ -2,7 +2,7 @@ import { ResizableSplit } from '../../../components/ResizableSplit';
 import { RequestList } from './RequestList';
 import { RequestDetails } from './RequestDetails';
 import { FilterPanel, initialFilterState, InspectorFilter } from './FilterPanel';
-import { ChatPanel } from './ChatPanel';
+import { ChatContainer } from './ChatContainer';
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
 
@@ -146,7 +146,7 @@ export function InspectorLayout({ onBack, requests }: InspectorLayoutProps) {
             </ResizableSplit>
           </ResizableSplit>
 
-          <ChatPanel />
+          <ChatContainer />
         </ResizableSplit>
       </div>
     </div>

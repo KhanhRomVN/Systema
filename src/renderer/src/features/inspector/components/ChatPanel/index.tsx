@@ -1,15 +1,30 @@
 import { useState } from 'react';
-import { Send, Bot, User, Paperclip } from 'lucide-react';
+import { Send, Bot, User, Paperclip, ChevronLeft } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils'; // Assuming this exists, based on other files
 
-export function ChatPanel() {
+interface ChatPanelProps {
+  sessionId: string;
+  onBack: () => void;
+}
+
+export function ChatPanel({ sessionId, onBack }: ChatPanelProps) {
   const [input, setInput] = useState('');
 
   return (
     <div className="flex flex-col h-full bg-background border-l border-border">
-      {/* Header */}
-      <div className="h-10 flex items-center px-4 border-b border-border bg-muted/40">
-        <span className="font-semibold text-sm">Systema Assistant</span>
+      {/* Navigation Header */}
+      <div className="h-10 flex items-center px-2 border-b border-border bg-muted/40 gap-2">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
+        >
+          <ChevronLeft className="w-3 h-3" />
+          Back
+        </button>
+        <div className="h-4 w-px bg-border/50" />
+        <span className="text-xs text-muted-foreground truncate flex-1">
+          Session: <span className="text-foreground font-mono">{sessionId}</span>
+        </span>
       </div>
 
       {/* Chat Area */}

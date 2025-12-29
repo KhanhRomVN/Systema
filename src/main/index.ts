@@ -3,16 +3,21 @@ import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
 import { ProxyServer } from './proxy/ProxyServer';
+import { SingletonWSManager } from './server/SingletonWSManager';
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 
 const proxyServer = new ProxyServer();
+const wsManager = SingletonWSManager.getInstance();
 let activeChildProcess: ChildProcess | null = null;
 let activeProxyUrl: string | null = null;
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Initialize WS Server
+  await wsManager.initialize();
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron');
 
@@ -22,6 +27,7 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
     proxyServer.setWindow(window);
+    wsManager.setWindow(window);
   });
 
   // Setup IPC event handlers
@@ -105,6 +111,11 @@ app.whenReady().then(() => {
       return true;
     }
     return false;
+  });
+
+  // WebSocket Port IPC
+  ipcMain.handle('ws:get-port', () => {
+    return wsManager.getPort();
   });
 
   // Create main window
