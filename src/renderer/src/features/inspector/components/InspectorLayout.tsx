@@ -2,6 +2,7 @@ import { Group, Panel, Separator } from 'react-resizable-panels';
 import { RequestList } from './RequestList';
 import { RequestDetails } from './RequestDetails';
 import { ParsedInspector } from './ParsedInspector';
+import { ChatPanel } from './ChatPanel';
 import { useState } from 'react';
 import { NetworkRequest } from '../types';
 
@@ -30,25 +31,35 @@ export function InspectorLayout({ onBack, requests }: InspectorLayoutProps) {
         <div className="ml-auto text-xs text-muted-foreground">{requests.length} requests</div>
       </div>
 
-      <Group orientation="vertical" className="flex-1">
-        <Panel defaultSize={50} minSize={20}>
-          <RequestList requests={requests} selectedId={selectedId} onSelect={setSelectedId} />
-        </Panel>
-
-        <Separator className="h-px bg-border hover:bg-primary transition-colors cursor-row-resize" />
-
-        <Panel defaultSize={50} minSize={20}>
-          <Group orientation="horizontal">
-            <Panel defaultSize={65} minSize={30}>
-              <RequestDetails request={selectedRequest} />
+      <Group orientation="horizontal" className="flex-1">
+        <Panel defaultSize={75} minSize={30}>
+          <Group orientation="vertical" className="h-full">
+            <Panel defaultSize={50} minSize={20}>
+              <RequestList requests={requests} selectedId={selectedId} onSelect={setSelectedId} />
             </Panel>
 
-            <Separator className="w-px bg-border hover:bg-primary transition-colors cursor-col-resize" />
+            <Separator className="h-px bg-border hover:bg-primary transition-colors cursor-row-resize" />
 
-            <Panel defaultSize={35} minSize={20}>
-              <ParsedInspector request={selectedRequest} />
+            <Panel defaultSize={50} minSize={20}>
+              <Group orientation="horizontal">
+                <Panel defaultSize={65} minSize={30}>
+                  <RequestDetails request={selectedRequest} />
+                </Panel>
+
+                <Separator className="w-px bg-border hover:bg-primary transition-colors cursor-col-resize" />
+
+                <Panel defaultSize={35} minSize={20}>
+                  <ParsedInspector request={selectedRequest} />
+                </Panel>
+              </Group>
             </Panel>
           </Group>
+        </Panel>
+
+        <Separator className="w-px bg-border hover:bg-primary transition-colors cursor-col-resize" />
+
+        <Panel defaultSize={25} minSize={20} maxSize={50}>
+          <ChatPanel />
         </Panel>
       </Group>
     </div>

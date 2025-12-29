@@ -91,6 +91,8 @@ const columns: ColumnDef<NetworkRequest>[] = [
 export function RequestList({ requests, selectedId, onSelect }: RequestListProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
+  const [globalFilter, setGlobalFilter] = useState('');
+
   const table = useReactTable({
     data: requests,
     columns,
@@ -99,57 +101,78 @@ export function RequestList({ requests, selectedId, onSelect }: RequestListProps
     getSortedRowModel: getSortedRowModel(),
     state: {
       sorting,
+      globalFilter,
+    },
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: (row, columnId, filterValue) => {
+      const value = row.getValue(columnId) as string;
+      return String(value).toLowerCase().includes(String(filterValue).toLowerCase());
     },
   });
 
   return (
-    <div className="h-full w-full overflow-auto bg-background/50 text-sm">
-      <table className="w-full text-left border-collapse">
-        <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-sm">
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="border-b border-border/50">
-              {headerGroup.headers.map((header) => (
-                <th
-                  key={header.id}
-                  className="h-8 px-4 font-medium text-muted-foreground select-none"
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
-                className={cn(
-                  'border-b border-border/20 hover:bg-muted/50 transition-colors cursor-pointer text-xs',
-                  row.original.id === selectedId &&
-                    'bg-accent text-accent-foreground hover:bg-accent',
-                )}
-                onClick={() => onSelect(row.original.id)}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
+    <div className="h-full w-full flex flex-col bg-background/50 text-sm overflow-hidden">
+      {/* Filter Bar */}
+      <div className="p-2 border-b border-border flex gap-2 bg-muted/20">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Filter requests..."
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="w-full bg-background border border-border rounded px-3 py-1 text-sm focus:outline-none focus:border-primary transition-colors"
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-sm">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id} className="border-b border-border/50">
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    className="h-8 px-4 font-medium text-muted-foreground select-none"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </th>
                 ))}
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                No requests recorded.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <tr
+                  key={row.id}
+                  data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
+                  className={cn(
+                    'border-b border-border/20 hover:bg-muted/50 transition-colors cursor-pointer text-xs',
+                    row.original.id === selectedId &&
+                      'bg-accent text-accent-foreground hover:bg-accent',
+                  )}
+                  onClick={() => onSelect(row.original.id)}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                  No requests recorded.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

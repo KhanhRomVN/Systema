@@ -28,8 +28,12 @@ export class WindowManager {
     });
 
     this.mainWindow.on('ready-to-show', () => {
-      this.mainWindow?.maximize();
       this.mainWindow?.show();
+      // Linux workaround: Wait for window to map before maximizing
+      setTimeout(() => {
+        this.mainWindow?.maximize();
+      }, 150);
+
       if (is.dev) {
         // keep window maximized in dev
       }
