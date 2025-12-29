@@ -28,6 +28,7 @@ export class WindowManager {
     });
 
     this.mainWindow.on('ready-to-show', () => {
+      this.mainWindow?.maximize();
       this.mainWindow?.show();
       if (is.dev) {
         // keep window maximized in dev

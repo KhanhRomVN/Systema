@@ -61,6 +61,8 @@ export default function InspectorPage() {
     return () => {
       window.api.off('proxy:request', handleRequest);
       window.api.off('proxy:response', handleResponse);
+      // Ensure app is terminated if component unmounts while scanning
+      window.api.invoke('app:terminate');
     };
   }, [isScanning]);
 
@@ -82,6 +84,7 @@ export default function InspectorPage() {
   const handleBack = async () => {
     try {
       await window.api.invoke('proxy:stop');
+      await window.api.invoke('app:terminate');
     } catch (error) {
       console.error('Error stopping proxy:', error);
     }

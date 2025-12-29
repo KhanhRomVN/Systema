@@ -3,9 +3,11 @@ import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
 import { ProxyServer } from './proxy/ProxyServer';
-import { spawn } from 'child_process';
+import { spawn, ChildProcess, exec } from 'child_process';
 
 const proxyServer = new ProxyServer();
+let activeChildProcess: ChildProcess | null = null;
+let activeProxyUrl: string | null = null;
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -33,6 +35,36 @@ app.whenReady().then(() => {
 
   ipcMain.handle('proxy:stop', async () => {
     proxyServer.stop();
+    if (activeChildProcess) {
+      activeChildProcess.kill();
+      activeChildProcess = null;
+    }
+    if (activeProxyUrl) {
+      console.log(`Terminating VS Code instance with proxy: ${activeProxyUrl}`);
+      // Security note: activeProxyUrl is internally generated, but good to be aware of injection if user controlled.
+      // Here it comes from our internal logic (localhost).
+      exec(`pkill -f -- "--proxy-server=${activeProxyUrl}"`, (error) => {
+        if (error) {
+          console.error(`Failed to pkill VS Code: ${error.message}`);
+        } else {
+          console.log('Successfully terminated VS Code window via pkill');
+        }
+      });
+      activeProxyUrl = null;
+    }
+    return true;
+  });
+
+  ipcMain.handle('app:terminate', async () => {
+    if (activeChildProcess) {
+      activeChildProcess.kill();
+      activeChildProcess = null;
+    }
+    if (activeProxyUrl) {
+      exec(`pkill -f -- "--proxy-server=${activeProxyUrl}"`);
+      activeProxyUrl = null;
+    }
+    console.log('Terminated active child process');
     return true;
   });
 
@@ -40,16 +72,35 @@ app.whenReady().then(() => {
   ipcMain.handle('app:launch', async (_, appName: string, proxyUrl: string) => {
     if (appName === 'vscode') {
       console.log('Launching VS Code with proxy:', proxyUrl);
+      activeProxyUrl = proxyUrl;
       // Using 'code' command assuming it's in PATH
       const child = spawn(
         'code',
-        ['--proxy-server=' + proxyUrl, '--ignore-certificate-errors', '.'],
+        [
+          '--wait',
+          '--new-window',
+          '--proxy-server=' + proxyUrl,
+          '--ignore-certificate-errors',
+          '.',
+        ],
         {
           detached: true,
           stdio: 'ignore',
           shell: true, // For Windows/Linux compatibility with command resolution
         },
       );
+      activeChildProcess = child;
+
+      child.on('exit', (code) => {
+        console.log(`Child process exited with code ${code}`);
+        if (activeChildProcess === child) {
+          activeChildProcess = null;
+          // Don't clear activeProxyUrl here immediately, as we might want to ensure cleanup on explicit stop
+          // But effectively if it exits, it's gone.
+          activeProxyUrl = null;
+        }
+      });
+
       child.unref();
       return true;
     }
@@ -73,6 +124,10 @@ app.whenReady().then(() => {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   proxyServer.stop();
+  if (activeChildProcess) {
+    activeChildProcess.kill();
+    activeChildProcess = null;
+  }
   if (process.platform !== 'darwin') {
     app.quit();
   }
