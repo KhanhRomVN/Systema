@@ -7,6 +7,7 @@ import { parseAIResponse, ToolAction } from '../../../../services/ResponseParser
 import { executeTool } from './services/ToolExecutor';
 import { ChatStorage } from '../../../../services/ChatStorage';
 import { combinePrompts } from '../../components/SettingsPanel/prompts'; // Import Systema Prompts
+import { AgentOptionDrawer, ToolPermission } from './components/AgentOptionDrawer';
 
 interface ChatPanelProps {
   sessionId: string;
@@ -29,6 +30,10 @@ export function ChatPanel({
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef(isProcessing);
+
+  // Agent Options
+  const [showAgentOptions, setShowAgentOptions] = useState(false);
+  const [toolPermissions, setToolPermissions] = useState<Record<string, ToolPermission>>({});
 
   // Sync ref
   useEffect(() => {
@@ -86,19 +91,36 @@ export function ChatPanel({
     const ipc = window.electron?.ipcRenderer;
     if (!ipc) return;
 
-    const removeListener = ipc.on('ws:event', (_: any, { type, data }: any) => {
+    const handleWsEvent = (_: any, { type, data }: any) => {
       // Handle Zen-compatible message types
       if (type === 'message') {
         const wsData = data;
 
         // 1. Conversation Heartbeat
         if (wsData.type === 'conversationPing') {
-          ipc.invoke('ws:send', { type: 'conversationPong', timestamp: Date.now() });
+          // Echo back the data to keep session alive
+          ipc.invoke('ws:send', {
+            type: 'conversationPong',
+            timestamp: Date.now(),
+            tabId: wsData.tabId,
+            conversationId: wsData.conversationId,
+            requestId: wsData.requestId,
+            folderPath: wsData.folderPath,
+          });
           return;
         }
 
         // 2. Prompt Response
         if (wsData.type === 'promptResponse') {
+          // Validate input request ID to ensure we are processing the correct response
+          if (currentRequestIdRef.current && wsData.requestId !== currentRequestIdRef.current) {
+            console.warn('[ChatPanel] Mismatched requestId. Ignoring.', {
+              expected: currentRequestIdRef.current,
+              received: wsData.requestId,
+            });
+            return;
+          }
+
           // Guard: Only process if we are expecting a response
           if (!isProcessingRef.current) {
             console.warn(
@@ -108,6 +130,8 @@ export function ChatPanel({
             return;
           }
 
+          // IMPORTANT: Update ref IMMEDIATELY to prevent race condition if second event comes fast
+          isProcessingRef.current = false;
           setIsProcessing(false);
 
           // Clear Timeout
@@ -119,6 +143,7 @@ export function ChatPanel({
             // Try parsing if it looks like JSON from OpenAI format
             try {
               const parsed = JSON.parse(wsData.response);
+              // Handle both direct content and OpenAI choices format
               content = parsed.content || parsed.choices?.[0]?.delta?.content || wsData.response;
             } catch (e) {
               content = wsData.response;
@@ -133,38 +158,38 @@ export function ChatPanel({
               content: content,
               parsed: parsedContent,
               timestamp: Date.now(),
+              // Systema extras
               timestampStr: new Date().toLocaleTimeString(),
             };
             setMessages((prev) => [...prev, aiMsg]);
 
             // Auto-Execute Tools
             parsedContent.actions.forEach(async (action: ToolAction) => {
-              // Add to executed set logic removed for now
+              // Permission Check
+              const permission = toolPermissions[action.type] || 'off'; // Default 'off'
 
-              const result = await executeTool(action, inspectorContext);
+              if (permission === 'always') {
+                const result = await executeTool(action, inspectorContext);
+                const toolOutput = `Tool Output [${action.type}]:\n${result}`;
 
-              const toolOutput = `Tool Output [${action.type}]:\n${result}`;
+                // Add result message to UI
+                const toolMsg: Message = {
+                  id: `msg-${Date.now()}-tool-${action.type}`,
+                  role: 'system',
+                  content: toolOutput,
+                  timestamp: Date.now(),
+                  timestampStr: new Date().toLocaleTimeString(),
+                };
+                setMessages((prev) => [...prev, toolMsg]);
 
-              // Buffer proper tool result for next turn
-              // We need to associate this result with the message ID?
-              // Or just keep a running buffer? Zen uses `toolResultsBufferRef`.
-
-              // Add result message to UI
-              const toolMsg: Message = {
-                id: `msg-${Date.now()}-tool-${action.type}`,
-                role: 'system',
-                content: toolOutput,
-                timestamp: Date.now(),
-                timestampStr: new Date().toLocaleTimeString(),
-              };
-              setMessages((prev) => [...prev, toolMsg]);
-
-              // Let's implement basic buffering
-              const msgId = aiMsg.id;
-              if (!toolResultsBufferRef.current[msgId]) {
-                toolResultsBufferRef.current[msgId] = [];
+                // Basic buffering
+                const msgId = aiMsg.id;
+                if (!toolResultsBufferRef.current[msgId]) {
+                  toolResultsBufferRef.current[msgId] = [];
+                }
+                toolResultsBufferRef.current[msgId].push(toolOutput);
               }
-              toolResultsBufferRef.current[msgId].push(toolOutput);
+              // If OFF or AUTO, do nothing. User will execute manually via UI.
             });
           } else {
             // Error case
@@ -179,12 +204,14 @@ export function ChatPanel({
           }
         }
       }
-    });
+    };
+
+    const removeListener = ipc.on('ws:event', handleWsEvent);
 
     return () => {
       removeListener();
     };
-  }, [inspectorContext]);
+  }, [inspectorContext, toolPermissions]);
 
   const handleSend = useCallback(
     async (
@@ -192,20 +219,12 @@ export function ChatPanel({
       files?: any[],
       skippedActionIds?: string[], // Future proofing
     ) => {
-      // 1. Validation and Prep
-      if (!content.trim() && (!files || files.length === 0)) return;
-      if (isProcessing) return;
-
-      const requestId = `req-${Date.now()}`;
-      currentRequestIdRef.current = requestId;
-
+      // 1. Prepare Content & Consume Buffer
       let finalContent = content;
-      let systemPrompt: string | null = null;
-      const originalUserMessage = content;
+      const bufferedContent: string[] = [];
 
-      // 1.5 Consume Buffered Tool Results (Partial Execution)
+      // Check if we have buffered tool outputs
       if (!isFirstRequest && !skippedActionIds) {
-        const bufferedContent: string[] = [];
         Object.entries(toolResultsBufferRef.current).forEach(([msgId, results]) => {
           if (results && results.length > 0) {
             bufferedContent.push(...results);
@@ -216,14 +235,25 @@ export function ChatPanel({
 
         if (bufferedContent.length > 0) {
           const toolOutput = bufferedContent.join('\n\n');
-          finalContent = `${toolOutput}\n\n${finalContent}`;
+          finalContent = content ? `${toolOutput}\n\n${content}` : toolOutput;
         }
       }
+
+      // 2. Validation
+      // Allow if content exists OR we have buffered tool output
+      if (!finalContent.trim() && (!files || files.length === 0)) return;
+      if (isProcessing) return;
+
+      const requestId = `req-${Date.now()}`;
+      currentRequestIdRef.current = requestId;
+
+      let systemPrompt: string | null = null;
+      const originalUserMessage = content; // UI displays only what user typed (could be empty for auto-tool)
 
       // 2. Strict Prompt Construction (First Request)
       if (isFirstRequest) {
         try {
-          systemPrompt = combinePrompts();
+          systemPrompt = combinePrompts(provider);
           console.log('[ChatPanel] Loaded System Prompt size:', systemPrompt.length);
         } catch (e) {
           console.error('[ChatPanel] Failed to load system prompt:', e);
@@ -261,19 +291,6 @@ export function ChatPanel({
       }
 
       // 4. Update UI
-      const userMsg: Message = {
-        id: Date.now().toString(),
-        role: 'user',
-        content: originalUserMessage, // Display what user typed
-        timestamp: Date.now(),
-        // Systema extras
-        timestampStr: new Date().toLocaleTimeString(),
-      };
-
-      setMessages((prev) => [...prev, userMsg]);
-      setInput('');
-      setIsProcessing(true);
-
       // 5. Construct Payload
       // We explicitly construct the full prompt string here
       let fullPromptForAI = finalContent;
@@ -284,6 +301,21 @@ export function ChatPanel({
         // Subsequent requests: just content + context if any
         fullPromptForAI = contextString ? `${finalContent}\n\n${contextString}` : finalContent;
       }
+
+      // 4. Update UI
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: originalUserMessage, // Display what user typed
+        fullPrompt: fullPromptForAI, // 🆕 Attach Full Prompt
+        timestamp: Date.now(),
+        // Systema extras
+        timestampStr: new Date().toLocaleTimeString(),
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setInput('');
+      setIsProcessing(true);
 
       const sendPromptMessage = {
         type: 'sendPrompt',
@@ -330,11 +362,58 @@ export function ChatPanel({
       // Actually, standard way:
       (window as any).__chatTimeoutId = timeoutId;
     },
-    [inspectorContext, isFirstRequest, sessionId, currentConversationId, isProcessing],
+    [
+      inspectorContext,
+      isFirstRequest,
+      sessionId,
+      currentConversationId,
+      isProcessing,
+      toolPermissions,
+    ],
+  );
+
+  const handleManualExecute = useCallback(
+    async (action: ToolAction) => {
+      // Execute tool manually
+      // We reuse logic from auto-execution but without permission check (since user clicked it)
+
+      // Add a small "Processing..." indicator via temporary message?
+      // Or just wait. executeTool is async.
+
+      try {
+        const result = await executeTool(action, inspectorContext);
+        const toolOutput = `Tool Output [${action.type}]:\n${result}`;
+
+        const manualKey = 'manual-execution';
+        if (!toolResultsBufferRef.current[manualKey]) {
+          toolResultsBufferRef.current[manualKey] = [];
+        }
+        toolResultsBufferRef.current[manualKey].push(toolOutput);
+
+        handleSend('');
+      } catch (e) {
+        console.error('Manual tool execution failed', e);
+      }
+    },
+    [inspectorContext, handleSend], // Added handleSend dependency
+  );
+
+  const handlePreviewExecute = useCallback(
+    async (action: ToolAction): Promise<string | null> => {
+      try {
+        // Just execute and return result, don't add to chat history
+        const result = await executeTool(action, inspectorContext);
+        return result;
+      } catch (e) {
+        console.error('Preview execution failed', e);
+        return `Error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    },
+    [inspectorContext],
   );
 
   return (
-    <div className="flex flex-col h-full bg-background border-l border-border transition-all duration-300">
+    <div className="relative flex flex-col h-full bg-background border-l border-border transition-all duration-300">
       <ChatHeader
         sessionId={sessionId}
         title={title}
@@ -343,13 +422,26 @@ export function ChatPanel({
         onClearChat={() => setMessages([])}
       />
 
-      <ChatBody messages={messages} isProcessing={isProcessing} />
+      <ChatBody
+        messages={messages}
+        isProcessing={isProcessing}
+        onExecuteTool={handleManualExecute}
+        onPreviewTool={handlePreviewExecute}
+      />
 
       <ChatFooter
         input={input}
         setInput={setInput}
         onSend={() => handleSend(input)}
         isProcessing={isProcessing}
+        onOpenAgentOptions={() => setShowAgentOptions(true)}
+      />
+
+      <AgentOptionDrawer
+        isOpen={showAgentOptions}
+        onClose={() => setShowAgentOptions(false)}
+        permissions={toolPermissions}
+        onPermissionChange={(tool, val) => setToolPermissions((prev) => ({ ...prev, [tool]: val }))}
       />
     </div>
   );

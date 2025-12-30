@@ -5,6 +5,9 @@ import { setupEventHandlers } from './core/events';
 import { ProxyServer } from './proxy/ProxyServer';
 import { SingletonWSManager } from './server/SingletonWSManager';
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 const proxyServer = new ProxyServer();
 const wsManager = SingletonWSManager.getInstance();
@@ -99,6 +102,61 @@ app.whenReady().then(async () => {
           // Don't clear activeProxyUrl here immediately, as we might want to ensure cleanup on explicit stop
           // But effectively if it exits, it's gone.
           activeProxyUrl = null;
+        }
+      });
+
+      child.unref();
+      return true;
+    }
+    if (appName === 'deepseek-web') {
+      activeProxyUrl = proxyUrl;
+      const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'systema-browser-'));
+
+      // Find browser (Linux)
+      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
+      let executable = '';
+      for (const b of browsers) {
+        try {
+          execSync(`which ${b}`);
+          executable = b;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!executable) {
+        console.error('No supported browser found');
+        return false;
+      }
+
+      const child = spawn(
+        executable,
+        [
+          '--proxy-server=' + proxyUrl,
+          '--ignore-certificate-errors',
+          '--disable-blink-features=AutomationControlled',
+          '--no-first-run',
+          '--no-default-browser-check',
+          `--user-data-dir=${userDataDir}`,
+          'https://chat.deepseek.com',
+        ],
+        {
+          detached: true,
+          stdio: 'ignore',
+        },
+      );
+      activeChildProcess = child;
+
+      child.on('exit', () => {
+        if (activeChildProcess === child) {
+          activeChildProcess = null;
+          activeProxyUrl = null;
+          try {
+            fs.rmSync(userDataDir, { recursive: true, force: true });
+          } catch (e) {
+            console.error('Failed to cleanup tmp dir', e);
+          }
         }
       });
 

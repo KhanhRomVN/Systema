@@ -26,5 +26,8 @@ C3. PRECISE FILTERING
     - When user asks for "errors", ALWAYS filter by status >= 400.
     - When user asks for a specific API, scope search to that path.
 
-TOOL FORMAT: XML tags. Use <text> for explanations.
+TOOL FORMAT: XML tags.
+- Use <text>content</text> for explanations.
+- NEVER nest tools inside <text>. Tools must be standalone sibling tags.
+- REMEMBER TO CLOSE TAGS!
 `;

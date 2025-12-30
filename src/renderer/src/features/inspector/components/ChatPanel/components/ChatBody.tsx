@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Bot, User, Terminal, CheckCircle2, PlayCircle } from 'lucide-react';
+import { Bot, User, Terminal, CheckCircle2, PlayCircle, Eye, EyeOff } from 'lucide-react';
 import { ParsedResponse, ContentBlock } from '../../../../../services/ResponseParser';
 
 export interface Message {
@@ -7,6 +7,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string; // Keep raw for fallback
   parsed?: ParsedResponse; // New parsed structure
+  fullPrompt?: string; // 🆕 Full Prompt debug data
   timestamp: number;
   timestampStr?: string;
 }
@@ -14,9 +15,24 @@ export interface Message {
 interface ChatBodyProps {
   messages: Message[];
   isProcessing?: boolean;
+  onExecuteTool?: (action: any) => void;
+  onPreviewTool?: (action: any) => Promise<string | null>;
 }
 
-const RenderBlock = ({ block }: { block: ContentBlock }) => {
+const RenderBlock = ({
+  block,
+  onExecuteTool,
+  onPreviewTool,
+}: {
+  block: ContentBlock;
+  onExecuteTool?: (action: any) => void;
+  onPreviewTool?: (action: any) => Promise<string | null>;
+}) => {
+  const [executed, setExecuted] = React.useState(false);
+  const [showPreview, setShowPreview] = React.useState(false);
+  const [previewData, setPreviewData] = React.useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = React.useState(false);
+
   if (block.type === 'text') {
     return <div className="whitespace-pre-wrap">{block.content}</div>;
   }
@@ -36,31 +52,158 @@ const RenderBlock = ({ block }: { block: ContentBlock }) => {
   }
   if (block.type === 'tool') {
     const { action } = block;
+
+    // Check if this tool looks like it has already been "finished" or if it is just a proposal
+    // Since we don't have linking to results yet, we just provide the button.
+
+    const handleRun = () => {
+      if (onExecuteTool) {
+        setExecuted(true);
+        onExecuteTool(action);
+      }
+    };
+
+    const handlePreview = async () => {
+      if (showPreview) {
+        setShowPreview(false);
+        return;
+      }
+
+      if (previewData) {
+        setShowPreview(true);
+        return;
+      }
+
+      if (onPreviewTool) {
+        setIsLoadingPreview(true);
+        try {
+          const result = await onPreviewTool(action);
+          if (result) {
+            setPreviewData(result);
+            setShowPreview(true);
+          }
+        } catch (e) {
+          console.error('Preview failed', e);
+        } finally {
+          setIsLoadingPreview(false);
+        }
+      }
+    };
+
     return (
-      <div className="my-2 p-3 bg-muted/30 rounded-lg border border-primary/20 flex flex-col gap-2">
-        <div className="flex items-center gap-2 text-primary">
-          <Terminal className="w-4 h-4" />
-          <span className="text-xs font-semibold uppercase">{action.type}</span>
+      <div className="relative my-2 bg-muted/30 rounded-lg border border-primary/20 flex flex-col overflow-hidden group">
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-2 bg-primary/5 border-b border-primary/10">
+          <div className="flex items-center gap-2 text-primary">
+            <Terminal className="w-4 h-4" />
+            <span className="text-xs font-semibold uppercase tracking-wider">{action.type}</span>
+          </div>
+
+          {/* Actions (Top Right) */}
+          <div className="absolute top-1.5 right-2 flex items-center gap-1 opacity-100 transition-opacity">
+            {/* Preview Button (Only for list_requests) */}
+            {action.type === 'list_requests' && onPreviewTool && (
+              <button
+                onClick={handlePreview}
+                disabled={isLoadingPreview}
+                className={`p-1 rounded hover:bg-muted/50 transition-colors ${showPreview ? 'text-primary' : 'text-muted-foreground'}`}
+                title="Preview Output"
+              >
+                {isLoadingPreview ? (
+                  <span className="w-4 h-4 block rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                ) : showPreview ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            )}
+
+            {/* Execute Button */}
+            <button
+              onClick={handleRun}
+              disabled={executed}
+              className={`p-1 rounded transition-all ${
+                executed
+                  ? 'text-green-500 cursor-not-allowed'
+                  : 'text-primary hover:bg-primary/10 hover:scale-105 active:scale-95'
+              }`}
+              title={executed ? 'Executed' : 'Execute Tool'}
+            >
+              {executed ? <CheckCircle2 className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
-        <div className="text-xs font-mono bg-background/50 p-2 rounded border border-border/50 overflow-x-auto whitespace-pre-wrap">
-          {JSON.stringify(action.params, null, 2)}
-        </div>
+
+        {/* Body (Params) */}
+        {!showPreview && (
+          <div className="p-3 text-xs font-mono bg-background/50 overflow-x-auto whitespace-pre-wrap text-foreground/80">
+            {JSON.stringify(action.params, null, 2)}
+          </div>
+        )}
+
+        {/* Preview Area */}
+        {showPreview && (
+          <div className="border-t border-border/50">
+            <div className="bg-background/80 p-3 text-xs font-mono overflow-auto max-h-[300px] whitespace-pre-wrap animate-in slide-in-from-top-2 duration-200">
+              {previewData || 'No output available.'}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
   if (block.type === 'table') {
+    // Explicit table parser or passed data structure
+    // Since we updated ResponseParser, `block` might have `data: { headers, rows }`
+    // We need to extend the type definition in this file or cast it.
+    const tableBlock = block as any;
+    const { headers, rows } = tableBlock.data || { headers: [], rows: [] };
+
+    if (!headers.length && !rows.length) {
+      // Fallback for raw content
+      return (
+        <div className="my-2 overflow-x-auto border border-border rounded-lg bg-background/50">
+          <pre className="text-xs p-2 whitespace-pre text-foreground/80 font-mono">
+            {block.content}
+          </pre>
+        </div>
+      );
+    }
+
     return (
-      <div className="my-2 overflow-x-auto border border-border rounded-lg bg-background/50">
-        <pre className="text-xs p-2 whitespace-pre text-foreground/80 font-mono">
-          {block.content}
-        </pre>
+      <div className="my-2 overflow-hidden border border-border rounded-lg bg-background/50 shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-muted/40 text-muted-foreground font-medium border-b border-border/50">
+              <tr>
+                {headers.map((h: string, i: number) => (
+                  <th key={i} className="px-3 py-2 whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30 text-foreground/80">
+              {rows.map((row: string[], i: number) => (
+                <tr key={i} className="hover:bg-muted/20 transition-colors">
+                  {row.map((cell: string, j: number) => (
+                    <td key={j} className="px-3 py-2 whitespace-nowrap">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
   return null;
 };
 
-export function ChatBody({ messages, isProcessing }: ChatBodyProps) {
+export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool }: ChatBodyProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   let requestCount = 0;
 
@@ -92,12 +235,24 @@ export function ChatBody({ messages, isProcessing }: ChatBodyProps) {
           <div key={msg.id} className="flex flex-col w-full animate-in fade-in duration-300">
             {/* Request Divider for User Messages */}
             {isUser && (
-              <div className="flex items-center gap-3 mt-6 mb-3 select-none">
-                <div className="h-px bg-border/40 flex-1" />
-                <span className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest">
-                  Request {String(requestCount).padStart(2, '0')}
-                </span>
-                <div className="h-px bg-border/40 flex-1" />
+              <div className="flex flex-col gap-1 mt-6 mb-3 select-none animate-in slide-in-from-left-2 fade-in duration-300">
+                <div className="flex items-center gap-3">
+                  <div className="h-px bg-border/40 flex-1" />
+                  <span className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest">
+                    Request {String(requestCount).padStart(2, '0')}
+                  </span>
+                  <div className="h-px bg-border/40 flex-1" />
+                </div>
+                {msg.fullPrompt && (
+                  <details className="group">
+                    <summary className="cursor-pointer text-[10px] text-muted-foreground/40 hover:text-primary/70 transition-colors flex items-center justify-center gap-1">
+                      PROMPT REQUEST
+                    </summary>
+                    <div className="mt-2 p-2 bg-black/50 border border-border/30 rounded text-[10px] font-mono text-muted-foreground whitespace-pre-wrap overflow-x-auto max-h-[300px]">
+                      {msg.fullPrompt}
+                    </div>
+                  </details>
+                )}
               </div>
             )}
 
@@ -109,7 +264,12 @@ export function ChatBody({ messages, isProcessing }: ChatBodyProps) {
                 {msg.parsed ? (
                   <div className="flex flex-col gap-2">
                     {msg.parsed.contentBlocks.map((block, idx) => (
-                      <RenderBlock key={idx} block={block} />
+                      <RenderBlock
+                        key={idx}
+                        block={block}
+                        onExecuteTool={onExecuteTool}
+                        onPreviewTool={onPreviewTool}
+                      />
                     ))}
                   </div>
                 ) : (

@@ -2,18 +2,34 @@ export const TOOLS = `TOOLS REFERENCE
 
 NETWORK OPERATIONS
 
-list_requests(limit?) - List recent requests (default limit: 10)
-search_requests(query) - Search/Filter requests by path or keyword in real-time
-get_request_details(requestId) - Get full headers/body for a specific request
-set_filter(type, value) - Apply active filters
-    - type: "method" | "status" | "reset"
-    - value: "GET"/"POST" etc OR "error"/"success" OR null (for reset)
+<list_requests>
+  <!-- Optional: Filter criteria -->
+  <field>method</field><value>POST</value>
+  <limit>10</limit>
+  <!-- Optional: Show extra columns (Size, Time) -->
+  <show_all_columns>true</show_all_columns>
+</list_requests>
+- Returns: ID | Method | Host | Path | Status | Type (and Size | Time if requested)
 
-DATA EXPORT
+<get_request_details><requestId>req-123</requestId></get_request_details> 
+- Get full details (headers, body, timings)
 
-export_har(requestIds?) - Export requests to HAR file format (Mock)
+<set_filter>
+  <field>method</field><value>POST</value>
+  <field>status</field><value>error</value>
+</set_filter>
+- Set active filters. Use 'reset' as field to clear all.
 
 COMMUNICATION
 
-ask_followup_question(question, options?) - Ask user for clarification
-attempt_completion(result) - Finalize the analysis task`;
+<ask_followup_question><question>...</question><options>["Opt1"]</options></ask_followup_question>
+
+<attempt_completion><result>Final answer</result></attempt_completion>
+
+<table>
+  <headers>Col1, Col2</headers>
+  <rows>
+    <row>Val1a, Val2a</row>
+    <row>Val1b, Val2b</row>
+  </rows>
+</table>`;

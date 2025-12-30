@@ -30,15 +30,24 @@ export const AppSelector: React.FC<AppSelectorProps> = ({ onSelect }) => {
           </div>
         </div>
 
-        {/* Placeholder for others */}
-        <div className="bg-gray-800 rounded-lg p-6 opacity-50 border border-gray-700">
+        {/* DeepSeek (Web) Card */}
+        <div
+          className="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition cursor-pointer border border-gray-700 hover:border-blue-500"
+          onClick={() => onSelect('deepseek-web', 'http://127.0.0.1:8081')}
+        >
           <div className="flex items-center space-x-4 mb-4">
-            <div className="w-12 h-12 bg-gray-600 rounded flex items-center justify-center text-xl font-bold">
-              ?
+            <div className="w-12 h-12 bg-blue-500 rounded flex items-center justify-center text-xl font-bold">
+              DS
             </div>
-            <h2 className="text-xl font-semibold">Custom App</h2>
+            <h2 className="text-xl font-semibold">DeepSeek (Web)</h2>
           </div>
-          <p className="text-gray-400">Coming soon...</p>
+          <p className="text-gray-400 mb-4">
+            Launches a trusted browser pointing to DeepSeek Chat. Intercepts HTTPS traffic.
+          </p>
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <span>Proxy: :8081</span>
+            <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Ready</span>
+          </div>
         </div>
       </div>
     </div>

@@ -1,14 +1,21 @@
 import React, { useRef, useEffect } from 'react';
-import { Send, Paperclip, X } from 'lucide-react';
+import { Send, Paperclip, X, Shield } from 'lucide-react';
 
 interface ChatFooterProps {
   input: string;
   setInput: (val: string) => void;
   onSend: () => void;
   isProcessing?: boolean;
+  onOpenAgentOptions?: () => void;
 }
 
-export function ChatFooter({ input, setInput, onSend, isProcessing }: ChatFooterProps) {
+export function ChatFooter({
+  input,
+  setInput,
+  onSend,
+  isProcessing,
+  onOpenAgentOptions,
+}: ChatFooterProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -48,6 +55,14 @@ export function ChatFooter({ input, setInput, onSend, isProcessing }: ChatFooter
               disabled={isProcessing}
             >
               <Paperclip className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onOpenAgentOptions}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+              title="Agent Capabilities"
+              disabled={isProcessing}
+            >
+              <Shield className="w-4 h-4" />
             </button>
           </div>
 

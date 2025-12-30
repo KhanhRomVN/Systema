@@ -7,109 +7,150 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
 
   switch (action.type) {
     case 'set_filter': {
-      const { type, value } = action.params;
-      const currentFilter = context.filter;
-      const newFilter = { ...currentFilter };
+      // Expecting params.filters array = [{field, value}]
+      // Fallback to single type/value if parser fallback kicked in
+      const filters = action.params.filters || [];
 
-      // Example: <set_filter type="method" value="POST" />
-      // Example: <set_filter type="status" value="success" />
-      if (type === 'method') {
-        const allowedMethods: Array<keyof InspectorFilter['methods']> = [
-          'GET',
-          'POST',
-          'PUT',
-          'DELETE',
-          'OPTIONAL',
-        ];
-        // Cast to unknown first if needed, or just string to specific key
-        const methodValue = value as keyof InspectorFilter['methods'];
+      if (filters.length === 0) return 'No filters provided.';
 
-        if (allowedMethods.includes(methodValue)) {
-          // Reset all methods to false
-          (Object.keys(newFilter.methods) as Array<keyof InspectorFilter['methods']>).forEach(
-            (k) => (newFilter.methods[k] = false),
-          );
-          // Set selected method to true
-          newFilter.methods[methodValue] = true;
+      const newFilter = { ...context.filter };
+      const updates: string[] = [];
+
+      for (const { field, value } of filters) {
+        if (field === 'reset') {
+          newFilter.host.whitelist = [];
+          newFilter.host.blacklist = [];
+          newFilter.path.whitelist = [];
+          newFilter.path.blacklist = [];
+          newFilter.methods = { ...initialFilterState.methods };
+          newFilter.status = { ...initialFilterState.status };
+          newFilter.type = { ...initialFilterState.type };
+          updates.push('Reset all filters');
+          continue;
         }
-      } else if (type === 'status') {
-        const statusValue = value as keyof InspectorFilter['status'];
-        const validStatuses = Object.keys(initialFilterState.status);
 
-        if (validStatuses.includes(value)) {
-          (Object.keys(newFilter.status) as Array<keyof InspectorFilter['status']>).forEach(
-            (k) => (newFilter.status[k] = false),
-          );
-          newFilter.status[statusValue] = true;
+        if (field === 'method') {
+          const allowedMethods: Array<keyof InspectorFilter['methods']> = [
+            'GET',
+            'POST',
+            'PUT',
+            'DELETE',
+            'OPTIONAL',
+          ];
+          const val = value as keyof InspectorFilter['methods'];
+          if (allowedMethods.includes(val)) {
+            // Reset methods first if we want exclusive selection?
+            // Or additive?
+            // User usage usually implies "Show me POST".
+            // If they do <field>method</field><value>POST</value> <field>method</field><value>GET</value>
+            // Then we should enable both.
+            // But let's assume additive for this session if multi-field.
+            // BUT for single field logic, we often cleared others.
+            // Let's implement additive logic for multi-field:
+            // Actually, safer to clear all methods IF it's the first method in this batch?
+            // No, simply set to true.
+
+            // If we want exact match, user might want to clear others.
+            // For now, let's just SET to true.
+            newFilter.methods[val] = true;
+            updates.push(`Method ${val}`);
+          }
+        } else if (field === 'status') {
+          const validStatuses = Object.keys(initialFilterState.status);
+          if (validStatuses.includes(value)) {
+            newFilter.status[value as keyof InspectorFilter['status']] = true;
+            updates.push(`Status ${value}`);
+          }
         }
-      } else if (type === 'reset') {
-        newFilter.host.whitelist = [];
-        newFilter.host.blacklist = [];
-        newFilter.path.whitelist = [];
-        newFilter.path.blacklist = [];
-        newFilter.methods = { ...initialFilterState.methods };
-        newFilter.status = { ...initialFilterState.status };
-        newFilter.type = { ...initialFilterState.type };
       }
 
       context.onSetFilter(newFilter);
-      return `Filter updated: Set ${type} to ${value}`;
-    }
-
-    case 'search_requests': {
-      const { query } = action.params;
-      // Search usually implies filtering by path/host?
-      // Or if we have a search bar.
-      // Let's implement as "filter path whitelist" or similar.
-      const currentFilter = context.filter;
-      const newFilter = { ...currentFilter };
-      // Add to whitelist? Or just log.
-      // If we had a 'text search' field in filter, we'd set it.
-      // Assuming path whitelist for now effectively searches.
-      if (query) {
-        newFilter.path.whitelist = [query];
-        context.onSetFilter(newFilter);
-        return `Searching requests for '${query}'`;
-      }
-      return 'No query provided';
+      return `Filters updated: ${updates.join(', ')}`;
     }
 
     case 'list_requests': {
-      // Return list of requests formatted as table
-      // We can grab them from context.requests
+      // Unified listing and searching
+      const criteria: { field: string; value: string }[] = action.params.criteria || [];
       const limit = action.params.limit ? parseInt(action.params.limit) : 10;
-      const subset = context.requests.slice(0, limit);
+      const showAllColumns = action.params.showAllColumns === true;
 
-      const header = '| ID | Method | URL | Status | Size | Time |\n|---|---|---|---|---|---|';
+      let subset = context.requests;
+
+      // Apply filtering if criteria exists
+      if (criteria.length > 0) {
+        subset = subset.filter((req) => {
+          return criteria.every((c) => {
+            const field = c.field.toLowerCase();
+            const rawVal = c.value.toLowerCase();
+            if (!rawVal) return true;
+
+            // Support comma-separated values (OR logic)
+            const values = rawVal
+              .split(',')
+              .map((v) => v.trim())
+              .filter(Boolean);
+            if (values.length === 0) return true;
+
+            if (field === 'method') {
+              return values.includes(req.method.toLowerCase());
+            }
+            if (field === 'status') {
+              return values.includes(String(req.status));
+            }
+            if (field === 'host') {
+              return values.some((v: string) => req.host.toLowerCase().includes(v));
+            }
+            if (field === 'path') {
+              return values.some((v: string) => req.path.toLowerCase().includes(v));
+            }
+            if (field === 'type') {
+              return values.includes((req.type || '').toLowerCase());
+            }
+            if (field === 'size') {
+              return values.some((v: string) => String(req.size).includes(v));
+            }
+            if (field === 'text') {
+              return values.some((v: string) => req.host.includes(v) || req.path.includes(v));
+            }
+            return true;
+          });
+        });
+      }
+
+      const totalFound = subset.length;
+      subset = subset.slice(0, limit);
+
+      if (totalFound === 0) return 'No requests found.';
+
       const rows = subset
-        .map(
-          (r) =>
-            `| ${r.id} | ${r.method} | ${r.host}${r.path.substring(0, 20)}... | ${r.status} | ${r.size} | ${r.time} |`,
-        )
+        .map((r, index) => {
+          let row = `${index + 1}. ${r.id} | ${r.method} | ${r.host} | ${r.path} | ${r.status} | ${r.type || 'xhr'}`;
+          if (showAllColumns) {
+            row += ` | ${r.size} | ${r.time}`;
+          }
+          return row;
+        })
         .join('\n');
 
-      return `Here are the top ${subset.length} requests:\n\n${header}\n${rows}`;
+      const title =
+        criteria.length > 0
+          ? `Found ${totalFound} matches. Showing top ${subset.length}:`
+          : `Recent requests (${subset.length}/${totalFound}):`;
+
+      return `${title}\n\n${rows}`;
     }
 
     case 'get_request_details': {
       const { requestId } = action.params;
       const req = context.requests.find((r) => r.id === requestId);
       if (req) {
-        context.onSelectRequest(req.id); // Auto-select in UI
+        context.onSelectRequest(req.id);
         return JSON.stringify(req, null, 2);
       }
       return `Request ${requestId} not found.`;
     }
 
-    case 'export_har': {
-      // In a real implementation we would fetch all requests from context.requests
-      // and convert them to HAR format.
-      return `HAR export generated for ${context.requests.length} requests (Mock).`;
-    }
-
     case 'ask_followup_question': {
-      // Just pass through the question to be displayed?
-      // The AI usually outputs text anyway. This might be for specific UI prompt?
       return `[User Question Required]: ${action.params.question}`;
     }
 

@@ -6,7 +6,6 @@ export interface TaskProgressItem {
 export interface ToolAction {
   type:
     | 'set_filter'
-    | 'search_requests'
     | 'list_requests'
     | 'get_request_details'
     | 'export_har'
@@ -83,39 +82,71 @@ const parseTaskProgress = (content: string): TaskProgressItem[] | null => {
 };
 
 /**
+ * Parse XML-like content to extract multiple parameter values for the same tag
+ */
+const extractParamArray = (content: string, containerTag: string, itemTag: string): string[] => {
+  // Simple regex to find all occurrences of <itemTag>value</itemTag> inside content
+  // But wait, the structure is <tool><field>f1</field><value>v1</value><field>f2</field><value>v2</value></tool>
+  // So we just need to extract all <itemTag> matches from the content.
+
+  const matches = [
+    ...content.matchAll(new RegExp(`<${itemTag}>([\\s\\S]*?)<\\/${itemTag}>`, 'gi')),
+  ];
+  return matches.map((m) => {
+    let value = m[1].trim();
+    value = value.replace(/^```text\s*\n?|\n?```\s*$/g, '');
+    return value;
+  });
+};
+
+/**
  * Extract tool actions from inner content
  */
 const parseToolAction = (toolName: string, innerContent: string, rawXml: string): ToolAction => {
   const params: Record<string, any> = {};
 
   switch (toolName) {
-    case 'set_filter':
-      params.type = extractParamValue(innerContent, 'type');
-      params.value = extractParamValue(innerContent, 'value');
-      break;
+    case 'set_filter': {
+      // New format: <field>...</field><value>...</value> repeating
+      const fields = extractParamArray(innerContent, '', 'field');
+      const values = extractParamArray(innerContent, '', 'value');
 
-    case 'search_requests':
-      params.query = extractParamValue(innerContent, 'query');
-      params.limit = extractParamValue(innerContent, 'limit');
+      // Zip them
+      if (fields.length > 0 && values.length > 0) {
+        params.filters = fields.map((f, i) => ({
+          field: f,
+          value: values[i] || '',
+        }));
+      } else {
+        // Fallback to old single way if needed, or strictly new way
+        const type = extractParamValue(innerContent, 'type');
+        const value = extractParamValue(innerContent, 'value');
+        if (type && value) {
+          params.filters = [{ field: type, value }];
+        }
+      }
       break;
+    }
 
-    case 'list_requests':
-      params.sortBy = extractParamValue(innerContent, 'sortBy');
-      params.order = extractParamValue(innerContent, 'order');
-      params.status = extractParamValue(innerContent, 'status');
+    // Unified list_requests handles searching and listing
+    case 'list_requests': {
+      // New format: <field>...</field><value>...</value> repeating + optional <limit> + <show_all_columns>
+      const fields = extractParamArray(innerContent, '', 'field');
+      const values = extractParamArray(innerContent, '', 'value');
+      const limit = extractParamValue(innerContent, 'limit');
+      const showAll = extractParamValue(innerContent, 'show_all_columns');
+
+      params.criteria = fields.map((f, i) => ({
+        field: f,
+        value: values[i] || '',
+      }));
+      params.limit = limit;
+      params.showAllColumns = showAll === 'true';
       break;
+    }
 
     case 'get_request_details':
       params.requestId = extractParamValue(innerContent, 'requestId');
-      break;
-
-    case 'export_har':
-      params.requestIds = extractParamValue(innerContent, 'requestIds');
-      break;
-
-    case 'generate_table':
-      params.data = extractParamValue(innerContent, 'data');
-      params.columns = extractParamValue(innerContent, 'columns');
       break;
 
     case 'ask_followup_question':
@@ -180,7 +211,6 @@ export const parseAIResponse = (content: string): ParsedResponse => {
   // 3. Scan for tools and text blocks
   const toolPatterns = [
     'set_filter',
-    'search_requests',
     'list_requests',
     'get_request_details',
     'export_har',
@@ -245,10 +275,25 @@ export const parseAIResponse = (content: string): ParsedResponse => {
           language: languageFn || 'text',
         });
       } else if (toolName === 'table') {
+        const headersContent = extractParamValue(innerContent, 'headers') || '';
+        const rowsContent = extractParamValue(innerContent, 'rows') || '';
+
+        // Parse rows: <row>...</row>
+        const rowMatches = [...rowsContent.matchAll(/<row>([\s\S]*?)<\/row>/gi)];
+        const rows = rowMatches.map((m) => m[1].trim());
+
+        // Fallback if no <row> tags, assume just lines
+        const finalRows =
+          rows.length > 0 ? rows : rowsContent.split('\n').filter((l) => l.trim().length > 0);
+
         result.contentBlocks.push({
           type: 'table',
-          content: innerContent.trim(),
-        });
+          content: '', // kept for compatibility if needed
+          data: {
+            headers: headersContent.split(',').map((h) => h.trim()),
+            rows: finalRows.map((r) => r.split(',').map((c) => c.trim())),
+          },
+        } as any); // Cast because we are adding structure to content block
       } else {
         const action = parseToolAction(toolName, innerContent, rawXml);
         result.contentBlocks.push({ type: 'tool', action });
