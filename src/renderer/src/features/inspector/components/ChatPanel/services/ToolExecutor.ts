@@ -203,8 +203,12 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
       parts.push(`method: ${getEnabled(f.methods)}`);
       parts.push(`status: ${getStatusEnabled(f.status)}`);
       parts.push(`type: ${getEnabled(f.type)}`);
-      parts.push(`host (exclude):      parts.push(`host (exclude): ${f.host.blacklist.length ? f.host.blacklist.join(',') : 'none'}`);
-      parts.push(`path (exclude): ${f.path.blacklist.length ? f.path.blacklist.join(',') : 'none'}`);
+      parts.push(
+        `host (exclude): ${f.host.blacklist.length ? f.host.blacklist.join(',') : 'none'}`,
+      );
+      parts.push(
+        `path (exclude): ${f.path.blacklist.length ? f.path.blacklist.join(',') : 'none'}`,
+      );
       parts.push(`size: ${f.size.min || f.size.max ? `${f.size.min}-${f.size.max}` : 'any'}`);
       parts.push(`time: ${f.time.min || f.time.max ? `${f.time.min}-${f.time.max}` : 'any'}`);
 
