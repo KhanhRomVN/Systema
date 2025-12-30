@@ -41,15 +41,6 @@ export const AppSelector: React.FC<AppSelectorProps> = ({ onSelect }) => {
           <p className="text-gray-400">Coming soon...</p>
         </div>
       </div>
-      <button
-        className="mt-8 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm text-gray-300 transition"
-        onClick={() => {
-          console.log('Test log from Select Application Page');
-          console.log('Object test:', { foo: 'bar', time: Date.now() });
-        }}
-      >
-        Test Console Log
-      </button>
     </div>
   );
 };

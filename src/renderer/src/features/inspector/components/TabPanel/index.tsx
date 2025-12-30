@@ -1,61 +1,28 @@
 import { RefreshCw, History, Plus, Settings, Check, Copy } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { TabList, ChatSession } from './TabList';
 import TabFooter from './TabFooter';
 
 interface TabPanelProps {
+  sessions: ChatSession[];
+  port: number;
+  wsConnected: boolean;
   onSelectSession: (id: string) => void;
   onOpenHistory: () => void;
   onOpenSettings: () => void;
+  onSessionsChange: (sessions: ChatSession[]) => void;
 }
 
-export function TabPanel({ onSelectSession, onOpenHistory, onOpenSettings }: TabPanelProps) {
-  const [port, setPort] = useState(3000);
+export function TabPanel({
+  sessions,
+  port,
+  wsConnected,
+  onSelectSession,
+  onOpenHistory,
+  onOpenSettings,
+  onSessionsChange,
+}: TabPanelProps) {
   const [copiedPort, setCopiedPort] = useState(false);
-  const [sessions, setSessions] = useState<ChatSession[]>([]); // Default empty (waiting for connection)
-  const [wsConnected, setWsConnected] = useState(false); // Default disconnected
-
-  useEffect(() => {
-    // Fetch real port from backend
-    // @ts-ignore
-    const ipc = window.electron?.ipcRenderer;
-    if (ipc) {
-      ipc.invoke('ws:get-port').then((p: number) => setPort(p));
-
-      // Listen for WS events
-      const removeListener = ipc.on('ws:event', (_: any, { type, data }: any) => {
-        console.log('WS Event:', type, data);
-        if (type === 'client-connected') {
-          setWsConnected(true);
-          // Simulate session creation on connection for now
-          if (data.count > 0 && sessions.length === 0) {
-            const newSession: ChatSession = {
-              id: 'client-' + Date.now(),
-              title: 'Connected Client',
-              timestamp: Date.now(),
-              messageCount: 0,
-              preview: 'Ready for analysis',
-              status: 'free',
-              provider: 'deepseek',
-              containerName: 'Container #01',
-            };
-            setSessions([newSession]);
-          }
-        } else if (type === 'client-disconnected') {
-          if (data.count === 0) {
-            setWsConnected(false);
-            setSessions([]);
-          }
-        }
-      });
-
-      return () => {
-        // Cleanup if needed, though ipc.on usually returns disposer in electron-toolkit
-        // If not, we might need ipc.removeListener, but electron-toolkit exposes a wrapped on
-        removeListener();
-      };
-    }
-  }, []);
 
   const handleCopyPort = () => {
     navigator.clipboard.writeText(`localhost:${port}`).then(() => {
@@ -65,7 +32,6 @@ export function TabPanel({ onSelectSession, onOpenHistory, onOpenSettings }: Tab
   };
 
   const handleNewChat = () => {
-    // For now, new chat creates a local session, but in real scenarios implies starting a new analysis context
     const newId = Math.random().toString(36).substr(2, 9);
     const newSession: ChatSession = {
       id: newId,
@@ -77,7 +43,7 @@ export function TabPanel({ onSelectSession, onOpenHistory, onOpenSettings }: Tab
       provider: 'deepseek',
       containerName: 'Container #01',
     };
-    setSessions([newSession, ...sessions]);
+    onSessionsChange([newSession, ...sessions]);
     onSelectSession(newId);
   };
 

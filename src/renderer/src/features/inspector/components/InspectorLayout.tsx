@@ -146,7 +146,15 @@ export function InspectorLayout({ onBack, requests }: InspectorLayoutProps) {
             </ResizableSplit>
           </ResizableSplit>
 
-          <ChatContainer />
+          <ChatContainer
+            inspectorContext={{
+              requests,
+              selectedRequestId: selectedId,
+              filter,
+              onSetFilter: setFilter,
+              onSelectRequest: setSelectedId,
+            }}
+          />
         </ResizableSplit>
       </div>
     </div>

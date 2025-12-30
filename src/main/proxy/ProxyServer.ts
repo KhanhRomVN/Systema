@@ -94,7 +94,6 @@ export class ProxyServer extends EventEmitter {
     this.setupListeners();
 
     this.proxy.listen({ port }, () => {
-      console.log(`Proxy server listening on port ${port}`);
       this.isRunning = true;
       this.emit('started', port);
     });
@@ -104,7 +103,6 @@ export class ProxyServer extends EventEmitter {
     if (!this.isRunning) return;
     this.proxy.close();
     this.isRunning = false;
-    console.log('Proxy server stopped');
   }
 
   private setupListeners() {
@@ -114,7 +112,6 @@ export class ProxyServer extends EventEmitter {
 
       // Suppress common network errors that are usually just noise
       if (code === 'ECONNRESET' || err?.message === 'socket hang up') {
-        // console.log('DEBUG: Suppressing proxy error:', code, err?.message);
         return;
       }
 

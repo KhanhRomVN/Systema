@@ -11,6 +11,7 @@ export interface ChatSession {
   provider?: string;
   requestCount?: number;
   containerName?: string;
+  conversationId?: string;
 }
 
 interface TabListProps {

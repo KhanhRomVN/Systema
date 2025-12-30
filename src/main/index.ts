@@ -46,14 +46,12 @@ app.whenReady().then(async () => {
       activeChildProcess = null;
     }
     if (activeProxyUrl) {
-      console.log(`Terminating VS Code instance with proxy: ${activeProxyUrl}`);
       // Security note: activeProxyUrl is internally generated, but good to be aware of injection if user controlled.
       // Here it comes from our internal logic (localhost).
       exec(`pkill -f -- "--proxy-server=${activeProxyUrl}"`, (error) => {
         if (error) {
           console.error(`Failed to pkill VS Code: ${error.message}`);
         } else {
-          console.log('Successfully terminated VS Code window via pkill');
         }
       });
       activeProxyUrl = null;
@@ -70,14 +68,12 @@ app.whenReady().then(async () => {
       exec(`pkill -f -- "--proxy-server=${activeProxyUrl}"`);
       activeProxyUrl = null;
     }
-    console.log('Terminated active child process');
     return true;
   });
 
   // App Launcher IPC
   ipcMain.handle('app:launch', async (_, appName: string, proxyUrl: string) => {
     if (appName === 'vscode') {
-      console.log('Launching VS Code with proxy:', proxyUrl);
       activeProxyUrl = proxyUrl;
       // Using 'code' command assuming it's in PATH
       const child = spawn(
@@ -98,7 +94,6 @@ app.whenReady().then(async () => {
       activeChildProcess = child;
 
       child.on('exit', (code) => {
-        console.log(`Child process exited with code ${code}`);
         if (activeChildProcess === child) {
           activeChildProcess = null;
           // Don't clear activeProxyUrl here immediately, as we might want to ensure cleanup on explicit stop
@@ -116,6 +111,11 @@ app.whenReady().then(async () => {
   // WebSocket Port IPC
   ipcMain.handle('ws:get-port', () => {
     return wsManager.getPort();
+  });
+
+  ipcMain.handle('ws:send', (_, message: any) => {
+    wsManager.sendToClients(message);
+    return true;
   });
 
   // Create main window

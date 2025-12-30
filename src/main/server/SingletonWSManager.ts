@@ -53,13 +53,10 @@ export class SingletonWSManager {
 
       this._wsServer.on('connection', (ws: WebSocket) => {
         this._clients.add(ws);
-        console.log('[SingletonWSManager] Client connected');
         this.broadcastToRenderer('client-connected', { count: this._clients.size });
 
         ws.on('message', (message: any) => {
           const msgString = message.toString();
-          console.log('[SingletonWSManager] Received:', msgString);
-
           try {
             const parsed = JSON.parse(msgString);
             this.broadcastToRenderer('message', parsed);
@@ -70,7 +67,6 @@ export class SingletonWSManager {
 
         ws.on('close', () => {
           this._clients.delete(ws);
-          console.log('[SingletonWSManager] Client disconnected');
           this.broadcastToRenderer('client-disconnected', { count: this._clients.size });
         });
 
@@ -78,9 +74,6 @@ export class SingletonWSManager {
       });
 
       this._httpServer.listen(SingletonWSManager.FIXED_PORT, () => {
-        console.log(
-          `[SingletonWSManager] WS Server listening on port ${SingletonWSManager.FIXED_PORT}`,
-        );
         resolve();
       });
     });
@@ -88,6 +81,15 @@ export class SingletonWSManager {
 
   public getPort(): number {
     return SingletonWSManager.FIXED_PORT;
+  }
+
+  public sendToClients(message: any): void {
+    const msgString = JSON.stringify(message);
+    this._clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(msgString);
+      }
+    });
   }
 
   public stop(): void {

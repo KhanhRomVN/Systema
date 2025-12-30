@@ -8,9 +8,9 @@ interface RequestDetailsProps {
 }
 
 export function RequestDetails({ request }: RequestDetailsProps) {
-  const [activeTab, setActiveTab] = useState<'headers' | 'payload' | 'response' | 'preview'>(
-    'headers',
-  );
+  const [activeTab, setActiveTab] = useState<
+    'headers' | 'payload' | 'response' | 'preview' | 'parsed'
+  >('headers');
 
   if (!request) {
     return (
