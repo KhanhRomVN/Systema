@@ -60,7 +60,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
                 status: tab.status || 'free',
                 provider: tab.provider || 'deepseek',
                 containerName: tab.containerName,
-                conversationId: tab.conversationId,
+                // conversationId: tab.conversationId, // Always start fresh when selecting from list
               }));
               setSessions(mappedSessions);
             }
@@ -85,18 +85,13 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   if (selectedSessionId) {
     let activeSession = sessions.find((s) => s.id === selectedSessionId);
 
-    // If we have a cached session for this ID, check if we need to polyfill missing info
-    if (activeSession && lastActiveSessionRef.current?.id === selectedSessionId) {
-      if (!activeSession.conversationId && lastActiveSessionRef.current.conversationId) {
-        // Preserve conversationId if missing in update but present in cache
-        activeSession = {
-          ...activeSession,
-          conversationId: lastActiveSessionRef.current.conversationId,
-        };
-      }
-    }
+    // If we rely on the list having NO conversationId, we shouldn't patch it back from cache.
+    // The previous fix (patching conversationId) conflicts with the requirement to "Always start fresh".
+    // However, if we don't cache, we might get flickering if the session drops from the list.
+    // BUT since we want NEW chat, `conversationId` is naturally undefined.
+    // So we just need to ensure `activeSession` exists.
 
-    // Update cache with the (potentially patched) session
+    // Update cache ONLY if we have a valid session object (ignoring conversationId content)
     if (activeSession) {
       lastActiveSessionRef.current = activeSession;
     }

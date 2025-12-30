@@ -62,6 +62,7 @@ const RenderBlock = ({ block }: { block: ContentBlock }) => {
 
 export function ChatBody({ messages, isProcessing }: ChatBodyProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  let requestCount = 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -82,77 +83,73 @@ export function ChatBody({ messages, isProcessing }: ChatBodyProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
-      {messages.map((msg) => (
-        <div
-          key={msg.id}
-          className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-        >
-          {msg.role === 'assistant' && (
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-              <Bot className="w-4 h-4 text-primary" />
-            </div>
-          )}
+    <div className="flex-1 overflow-y-auto p-4 space-y-2 scroll-smooth">
+      {messages.map((msg) => {
+        const isUser = msg.role === 'user';
+        if (isUser) requestCount++;
 
-          <div
-            className={`flex flex-col gap-1 max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-          >
-            <div
-              className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                  : 'bg-muted/80 border border-border rounded-tl-sm text-foreground'
-              }`}
-            >
-              {msg.parsed ? (
-                <div className="flex flex-col gap-1">
-                  {msg.parsed.contentBlocks.map((block, idx) => (
-                    <RenderBlock key={idx} block={block} />
-                  ))}
-                </div>
-              ) : (
-                <div className="whitespace-pre-wrap">{msg.content}</div>
-              )}
+        return (
+          <div key={msg.id} className="flex flex-col w-full animate-in fade-in duration-300">
+            {/* Request Divider for User Messages */}
+            {isUser && (
+              <div className="flex items-center gap-3 mt-6 mb-3 select-none">
+                <div className="h-px bg-border/40 flex-1" />
+                <span className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest">
+                  Request {String(requestCount).padStart(2, '0')}
+                </span>
+                <div className="h-px bg-border/40 flex-1" />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1 w-full pl-1">
+              {/* Message Content */}
+              <div
+                className={`text-sm leading-relaxed ${isUser ? 'font-medium text-foreground/90' : 'text-foreground/80 font-normal'}`}
+              >
+                {msg.parsed ? (
+                  <div className="flex flex-col gap-2">
+                    {msg.parsed.contentBlocks.map((block, idx) => (
+                      <RenderBlock key={idx} block={block} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                )}
+              </div>
+
+              {/* Timestamp */}
+              <span className="text-[10px] text-muted-foreground/40 mt-1 select-none">
+                {new Date(msg.timestamp).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
             </div>
-            <span className="text-[10px] text-muted-foreground/70 px-1">
-              {new Date(msg.timestamp).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
           </div>
-
-          {msg.role === 'user' && (
-            <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0 mt-0.5">
-              <User className="w-4 h-4 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
 
       {isProcessing && (
-        <div className="flex gap-3 justify-start">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-            <Bot className="w-4 h-4 text-primary" />
-          </div>
-          <div className="bg-muted/50 border border-border/50 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2">
+        <div className="flex flex-col w-full gap-2 mt-4 animate-in fade-in">
+          {/* No Avatar, just a loader indicator */}
+          <div className="flex items-center gap-2 pl-1 opacity-50">
             <div
-              className="w-2 h-2 bg-primary/50 rounded-full animate-bounce"
+              className="w-1.5 h-1.5 bg-primary/50 rounded-full animate-bounce"
               style={{ animationDelay: '0ms' }}
             />
             <div
-              className="w-2 h-2 bg-primary/50 rounded-full animate-bounce"
+              className="w-1.5 h-1.5 bg-primary/50 rounded-full animate-bounce"
               style={{ animationDelay: '150ms' }}
             />
             <div
-              className="w-2 h-2 bg-primary/50 rounded-full animate-bounce"
+              className="w-1.5 h-1.5 bg-primary/50 rounded-full animate-bounce"
               style={{ animationDelay: '300ms' }}
             />
           </div>
         </div>
       )}
 
-      <div ref={bottomRef} className="h-1" />
+      <div ref={bottomRef} className="h-4" />
     </div>
   );
 }

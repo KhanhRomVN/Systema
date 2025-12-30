@@ -28,6 +28,13 @@ export function ChatPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(isProcessing);
+
+  // Sync ref
+  useEffect(() => {
+    isProcessingRef.current = isProcessing;
+  }, [isProcessing]);
+
   const [currentConversationId] = useState<string>(initialConversationId || Date.now().toString());
 
   // Zen State Ports
@@ -92,6 +99,15 @@ export function ChatPanel({
 
         // 2. Prompt Response
         if (wsData.type === 'promptResponse') {
+          // Guard: Only process if we are expecting a response
+          if (!isProcessingRef.current) {
+            console.warn(
+              '[ChatPanel] Received promptResponse but not processing. Ignoring duplicate.',
+              wsData,
+            );
+            return;
+          }
+
           setIsProcessing(false);
 
           // Clear Timeout
