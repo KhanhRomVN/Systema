@@ -13,7 +13,7 @@ export default function InspectorPage() {
     const handleRequest = (_: any, data: any) => {
       // data from proxy wrapper is raw, need to map to NetworkRequest
       const newRequest: NetworkRequest = {
-        id: data.id || Math.random().toString(36).substr(2, 9),
+        id: data.id || Math.random().toString(36).substr(2, 9), // Use ID from proxy if available
         method: data.method,
         protocol: data.protocol || 'https', // Assuming HTTPS proxy primarily
         host: new URL(data.url).hostname,
@@ -25,29 +25,67 @@ export default function InspectorPage() {
         timestamp: data.timestamp || Date.now(),
         requestHeaders: data.headers || {},
         responseHeaders: {},
-        requestBody: '', // Body extraction might need more logic
+        requestBody: '',
         responseBody: '',
       };
       setRequests((prev) => [newRequest, ...prev]);
     };
 
+    const handleRequestBody = (_: any, data: any) => {
+      setRequests((prev) =>
+        prev.map((req) => {
+          if (req.id === data.id) {
+            return {
+              ...req,
+              requestBody: data.body,
+            };
+          }
+          return req;
+        }),
+      );
+    };
+
     const handleResponse = (_: any, data: any) => {
       setRequests((prev) =>
         prev.map((req) => {
-          // Heuristic matching: same URL and no status yet
-          // Ideally, the proxy should send a unique ID with both request and response
-          if (
-            req.id === data.id ||
-            (req.path === new URL(data.url).pathname + new URL(data.url).search && req.status === 0)
-          ) {
+          // Use ID for matching if available
+          if (req.id === data.id) {
             return {
               ...req,
               status: data.statusCode,
               type: 'XHR', // Placeholder, refine logic
-              size: '1.2 KB', // Placeholder, need actual size
+              // size and time will be updated in response body or completion
               time: `${Date.now() - req.timestamp}ms`,
               responseHeaders: data.headers || {},
-              responseBody: '', // Need body capturing logic
+            };
+          }
+          // Fallback mechanism (should not be needed with IDs)
+          if (
+            !data.id &&
+            req.path === new URL(data.url).pathname + new URL(data.url).search &&
+            req.status === 0
+          ) {
+            return {
+              ...req,
+              status: data.statusCode,
+              time: `${Date.now() - req.timestamp}ms`,
+              responseHeaders: data.headers || {},
+            };
+          }
+          return req;
+        }),
+      );
+    };
+
+    const handleResponseBody = (_: any, data: any) => {
+      setRequests((prev) =>
+        prev.map((req) => {
+          if (req.id === data.id) {
+            return {
+              ...req,
+              responseBody: data.body,
+              size: data.size || req.size,
+              time: `${Date.now() - req.timestamp}ms`,
             };
           }
           return req;
@@ -56,11 +94,15 @@ export default function InspectorPage() {
     };
 
     window.api.on('proxy:request', handleRequest);
+    window.api.on('proxy:request-body', handleRequestBody);
     window.api.on('proxy:response', handleResponse);
+    window.api.on('proxy:response-body', handleResponseBody);
 
     return () => {
       window.api.off('proxy:request', handleRequest);
+      window.api.off('proxy:request-body', handleRequestBody);
       window.api.off('proxy:response', handleResponse);
+      window.api.off('proxy:response-body', handleResponseBody);
       // Ensure app is terminated if component unmounts while scanning
       window.api.invoke('app:terminate');
     };

@@ -1,7 +1,6 @@
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
 import { useState } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
 
 interface RequestDetailsProps {
   request: NetworkRequest | null;
@@ -9,7 +8,15 @@ interface RequestDetailsProps {
 
 export function RequestDetails({ request }: RequestDetailsProps) {
   const [activeTab, setActiveTab] = useState<
-    'headers' | 'payload' | 'response' | 'preview' | 'parsed'
+    | 'headers'
+    | 'request'
+    | 'payload'
+    | 'response'
+    | 'preview'
+    | 'cookies'
+    | 'timings'
+    | 'stackTrace'
+    | 'security'
   >('headers');
 
   if (!request) {
@@ -22,21 +29,44 @@ export function RequestDetails({ request }: RequestDetailsProps) {
 
   const tabs = [
     { id: 'headers', label: 'Headers' },
+    { id: 'request', label: 'Request' },
     { id: 'payload', label: 'Payload' },
-    { id: 'parsed', label: 'Parsed' },
-    { id: 'response', label: 'Response Body' },
+    { id: 'response', label: 'Response' },
     { id: 'preview', label: 'Preview' },
+    { id: 'cookies', label: 'Cookie' },
+    { id: 'timings', label: 'Timings' },
+    { id: 'stackTrace', label: 'Stack Trace' },
+    { id: 'security', label: 'Security' },
   ] as const;
+
+  const queryParams = new URLSearchParams(request.path.split('?')[1] || {});
+  const queryEntries = Array.from(queryParams.entries());
+
+  const getCookies = (headerValue: string | undefined) => {
+    if (!headerValue) return [];
+    // Simple split by semicolon for cookie string
+    return headerValue
+      .split(';')
+      .map((c) => c.trim())
+      .filter(Boolean);
+  };
+
+  const requestCookies = getCookies(
+    request.requestHeaders['cookie'] || request.requestHeaders['Cookie'],
+  );
+  const responseCookies = getCookies(
+    request.responseHeaders['set-cookie'] || request.responseHeaders['Set-Cookie'],
+  );
 
   return (
     <div className="h-full flex flex-col bg-background/50 border-t border-border/50">
-      <div className="flex items-center border-b border-border/50 px-2 bg-muted/20">
+      <div className="flex items-center border-b border-border/50 px-2 bg-muted/20 overflow-x-auto no-scrollbar">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'px-4 py-2 text-sm font-medium border-b-2 border-transparent transition-colors hover:text-foreground',
+              'px-4 py-2 text-sm font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
               activeTab === tab.id ? 'border-primary text-primary' : 'text-muted-foreground',
             )}
           >
@@ -126,6 +156,30 @@ export function RequestDetails({ request }: RequestDetailsProps) {
           </div>
         )}
 
+        {activeTab === 'request' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                Query Parameters
+              </h3>
+              {queryEntries.length > 0 ? (
+                <div className="grid grid-cols-[1fr_2fr] gap-x-4 gap-y-1">
+                  {queryEntries.map(([key, value]) => (
+                    <div key={key} className="contents">
+                      <div className="text-muted-foreground truncate" title={key}>
+                        {key}:
+                      </div>
+                      <div className="break-all text-foreground/80">{value}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-muted-foreground italic">No query parameters</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'payload' && (
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground">
@@ -169,88 +223,71 @@ export function RequestDetails({ request }: RequestDetailsProps) {
           </div>
         )}
 
-        {activeTab === 'parsed' && <ParsedTabContent request={request} />}
-      </div>
-    </div>
-  );
-}
-
-interface AccordionItemProps {
-  title: string;
-  count?: number;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}
-
-function AccordionItem({ title, count, children, defaultOpen = false }: AccordionItemProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
-    <div className="border-b border-border/50 last:border-0">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium hover:bg-muted/30 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {isOpen ? (
-            <ChevronDown className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5" />
-          )}
-          <span>{title}</span>
-        </div>
-        {count !== undefined && <span className="text-muted-foreground">{count}</span>}
-      </button>
-      {isOpen && <div className="p-3 bg-muted/10 text-xs">{children}</div>}
-    </div>
-  );
-}
-
-function ParsedTabContent({ request }: { request: NetworkRequest }) {
-  const queryParams = new URLSearchParams(request.path.split('?')[1] || {});
-  const queryEntries = Array.from(queryParams.entries());
-
-  return (
-    <div className="h-full overflow-auto space-y-1">
-      <AccordionItem
-        title="Query Parameters"
-        count={queryEntries.length}
-        defaultOpen={queryEntries.length > 0}
-      >
-        {queryEntries.length > 0 ? (
-          <div className="space-y-2">
-            {queryEntries.map(([key, value]) => (
-              <div key={key} className="flex gap-2">
-                <span className="text-blue-400 shrink-0">{key}:</span>
-                <span className="text-foreground/80 break-all">{value}</span>
-              </div>
-            ))}
+        {activeTab === 'cookies' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                Request Cookies
+              </h3>
+              {requestCookies.length > 0 ? (
+                <div className="space-y-1">
+                  {requestCookies.map((cookie, index) => (
+                    <div key={index} className="text-foreground/80 break-all">
+                      {cookie}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-muted-foreground italic">No request cookies</div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                Response Cookies
+              </h3>
+              {responseCookies.length > 0 ? (
+                <div className="space-y-1">
+                  {responseCookies.map((cookie, index) => (
+                    <div key={index} className="text-foreground/80 break-all">
+                      {cookie}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-muted-foreground italic">No response cookies</div>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="text-muted-foreground italic">No query parameters</div>
         )}
-      </AccordionItem>
 
-      <AccordionItem title="Cookies" count={0}>
-        <div className="text-muted-foreground italic">No cookies</div>
-      </AccordionItem>
+        {activeTab === 'timings' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Timing</h3>
+              <div className="grid grid-cols-[120px_1fr] gap-2">
+                <div className="text-muted-foreground">Total Duration</div>
+                <div>{request.time}</div>
+                <div className="text-muted-foreground">Timestamp</div>
+                <div>{new Date(request.timestamp).toLocaleTimeString()}</div>
+                <div className="text-muted-foreground">Size</div>
+                <div>{request.size}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
-      <AccordionItem title="Timing" defaultOpen>
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Total Duration</span>
-            <span>{request.time}</span>
+        {activeTab === 'stackTrace' && (
+          <div className="h-full flex items-center justify-center text-muted-foreground italic">
+            Stack trace not available
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Size</span>
-            <span>{request.size}</span>
+        )}
+
+        {activeTab === 'security' && (
+          <div className="h-full flex items-center justify-center text-muted-foreground italic">
+            Security details not available
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Timestamp</span>
-            <span>{new Date(request.timestamp).toLocaleTimeString()}</span>
-          </div>
-        </div>
-      </AccordionItem>
+        )}
+      </div>
     </div>
   );
 }

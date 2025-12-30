@@ -159,37 +159,6 @@ export function ChatPanel({
               };
               setMessages((prev) => [...prev, toolMsg]);
 
-              // Ideally send tool output back to AI for continuation...
-              // Zen: uses `toolResultsBuffer` to PREPEND to next user message.
-              // We mimic that logic by not auto-sending immediately but waiting for user?
-              // OR if it's `attempt_completion`, we stop?
-              // Zen's `ChatPanel` allows "Auto-Execute" but usually waits for User unless it's a chain?
-              // For Systema, we act as "User" so we let the user trigger next step.
-              // But we should buffer the result.
-
-              // Not fully implementing buffer ref logic here as it's complex state sync.
-              // We rely on "Message History" being sent back.
-              // If we send `toolMsg` as `role: system` or `role: user` with output?
-              // Zen sends tool output as USER message context in next turn if not using specific tool roles.
-              // Systema logic: Add to messages. Next `handleSend` will verify if we need to include it.
-              // Zen pre-pends "tool results" to next prompt.
-              // We will just let `History` handle it?
-              // If `messages` contains the tool output, it should be fine if we send full history?
-              // Currently `sendPromptMessage` constructs prompt from `files` + `prompt` string.
-              // It does NOT send array of messages yet. It sends "Prompt String".
-              // So for the NEXT prompt, proper context is lost unless we maintain history in Backend or re-send history?
-              // Zen implementation: sends Single Prompt String. It assumes Backend/AI maintains history?
-              // NO, Zen sends `conversationId`. The BACKEND (ZenTab) maintains history.
-              // So, as long as backend receives `conversationId`, it knows the context.
-              // We just need to make sure backend receives the Result?
-              // ZenTab backend might not receive result if we just display it.
-              // Zen actually sends `toolResponse` or equivalent?
-
-              // Looking at Zen's `executeSingleAction`, it does NOT send back to backend immediately.
-              // It relies on the User sending the NEXT message which implicitly acknowledges the tool result?
-              // Wait, Zen logic `handleSendMessage` prepends `bufferedContent` to the user message.
-              // So we need to buffer the tool output string.
-
               // Let's implement basic buffering
               const msgId = aiMsg.id;
               if (!toolResultsBufferRef.current[msgId]) {

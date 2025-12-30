@@ -122,18 +122,36 @@ export class ProxyServer extends EventEmitter {
       const req = ctx.clientToProxyRequest;
       const method = req.method;
       const url = (ctx.isSSL ? 'https://' : 'http://') + req.headers.host + req.url;
+      const requestId = Date.now().toString() + Math.random();
+      ctx.requestId = requestId;
 
       this.sendToRenderer('proxy:request', {
-        id: Date.now().toString() + Math.random(), // Simple ID
+        id: requestId,
         method,
         url,
         headers: req.headers,
         timestamp: Date.now(),
       });
 
+      const requestChunks: any[] = [];
       ctx.onRequestData((ctx: any, chunk: any, callback: any) => {
-        // chunk logic if needed, simplify for now to avoid huge IPC
+        requestChunks.push(chunk);
         return callback(null, chunk);
+      });
+
+      ctx.onRequestEnd((ctx: any, callback: any) => {
+        try {
+          const body = Buffer.concat(requestChunks).toString('utf8');
+          if (body) {
+            this.sendToRenderer('proxy:request-body', {
+              id: requestId,
+              body,
+            });
+          }
+        } catch (err) {
+          console.error('Error processing request body:', err);
+        }
+        return callback();
       });
 
       return callback();
@@ -145,10 +163,34 @@ export class ProxyServer extends EventEmitter {
       const url = (ctx.isSSL ? 'https://' : 'http://') + req.headers.host + req.url;
 
       this.sendToRenderer('proxy:response', {
+        id: ctx.requestId,
         url,
         statusCode: res ? res.statusCode : 0,
         headers: res ? res.headers : {},
         timestamp: Date.now(),
+      });
+
+      const responseChunks: any[] = [];
+      ctx.onResponseData((ctx: any, chunk: any, callback: any) => {
+        responseChunks.push(chunk);
+        return callback(null, chunk);
+      });
+
+      ctx.onResponseEnd((ctx: any, callback: any) => {
+        try {
+          const body = Buffer.concat(responseChunks).toString('utf8');
+          // Calculate size from chunks
+          const size = responseChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+
+          this.sendToRenderer('proxy:response-body', {
+            id: ctx.requestId,
+            body,
+            size: size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`,
+          });
+        } catch (err) {
+          console.error('Error processing response body:', err);
+        }
+        return callback();
       });
 
       return callback();
