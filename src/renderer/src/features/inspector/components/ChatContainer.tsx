@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TabPanel } from './TabPanel';
 import { ChatPanel } from './ChatPanel';
 import { HistoryPanel } from './HistoryPanel';
@@ -28,6 +28,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [port, setPort] = useState(3000);
   const [wsConnected, setWsConnected] = useState(false);
+  const lastActiveSessionRef = useRef<ChatSession | null>(null);
 
   useEffect(() => {
     // @ts-ignore
@@ -82,11 +83,39 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   }
 
   if (selectedSessionId) {
-    const activeSession = sessions.find((s) => s.id === selectedSessionId) || {
-      title: 'History Chat',
-      provider: 'Systema',
-      conversationId: undefined,
-    };
+    let activeSession = sessions.find((s) => s.id === selectedSessionId);
+
+    // If we have a cached session for this ID, check if we need to polyfill missing info
+    if (activeSession && lastActiveSessionRef.current?.id === selectedSessionId) {
+      if (!activeSession.conversationId && lastActiveSessionRef.current.conversationId) {
+        // Preserve conversationId if missing in update but present in cache
+        activeSession = {
+          ...activeSession,
+          conversationId: lastActiveSessionRef.current.conversationId,
+        };
+      }
+    }
+
+    // Update cache with the (potentially patched) session
+    if (activeSession) {
+      lastActiveSessionRef.current = activeSession;
+    }
+
+    // Fallback if not found at all
+    if (!activeSession) {
+      activeSession = (lastActiveSessionRef.current?.id === selectedSessionId
+        ? lastActiveSessionRef.current
+        : null) || {
+        id: selectedSessionId,
+        title: 'History Chat',
+        provider: 'Systema',
+        timestamp: Date.now(),
+        messageCount: 0,
+        preview: '',
+        status: 'free',
+        conversationId: undefined,
+      };
+    }
 
     return (
       <ChatPanel
