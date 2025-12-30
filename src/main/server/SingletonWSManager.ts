@@ -55,10 +55,47 @@ export class SingletonWSManager {
         this._clients.add(ws);
         this.broadcastToRenderer('client-connected', { count: this._clients.size });
 
+        // Zen-compatible: Send connection-established
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: 'connection-established',
+                port: SingletonWSManager.FIXED_PORT,
+                connectionStats: {
+                  total: this._clients.size,
+                },
+              }),
+            );
+          }
+        }, 50);
+
+        // Zen-compatible: JSON Ping to keep connection alive (traffic generation)
+        const pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: 'ping',
+                timestamp: Date.now(),
+              }),
+            );
+          } else {
+            clearInterval(pingInterval);
+          }
+        }, 30000); // 30s interval (Zen uses 45s, 30s is safe)
+
         ws.on('message', (message: any) => {
           const msgString = message.toString();
           try {
             const parsed = JSON.parse(msgString);
+
+            // Handle Pong (Keep-alive)
+            if (parsed.type === 'pong') {
+              // Received pong, connection is healthy.
+              // Zen doesn't do anything specific here, just lets traffic flow.
+              return;
+            }
+
             this.broadcastToRenderer('message', parsed);
           } catch (e) {
             this.broadcastToRenderer('message-raw', msgString);
@@ -67,10 +104,14 @@ export class SingletonWSManager {
 
         ws.on('close', () => {
           this._clients.delete(ws);
+          clearInterval(pingInterval);
           this.broadcastToRenderer('client-disconnected', { count: this._clients.size });
         });
 
-        ws.on('error', (e: Error) => console.error('[SingletonWSManager] WS Client Error:', e));
+        ws.on('error', (e: Error) => {
+          console.error('[SingletonWSManager] WS Client Error:', e);
+          clearInterval(pingInterval);
+        });
       });
 
       this._httpServer.listen(SingletonWSManager.FIXED_PORT, () => {
@@ -78,6 +119,8 @@ export class SingletonWSManager {
       });
     });
   }
+
+  // private startHeartbeat() { ... } // Removed in favor of per-socket JSON ping
 
   public getPort(): number {
     return SingletonWSManager.FIXED_PORT;
@@ -93,6 +136,7 @@ export class SingletonWSManager {
   }
 
   public stop(): void {
+    // interval is per-socket now, cleared on close
     this._wsServer?.close();
     this._httpServer?.close();
   }

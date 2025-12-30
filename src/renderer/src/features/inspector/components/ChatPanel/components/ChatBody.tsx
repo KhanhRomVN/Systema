@@ -53,6 +53,19 @@ const RenderBlock = ({
   if (block.type === 'tool') {
     const { action } = block;
 
+    // Special Case: attempt_completion treated as final text message
+    if (action.type === 'attempt_completion') {
+      return (
+        <div className="my-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-foreground/90">
+          <div className="font-semibold text-green-500 flex items-center gap-2 mb-1">
+            <CheckCircle2 className="w-4 h-4" />
+            Task Completed
+          </div>
+          <div className="whitespace-pre-wrap">{action.params.result}</div>
+        </div>
+      );
+    }
+
     // Check if this tool looks like it has already been "finished" or if it is just a proposal
     // Since we don't have linking to results yet, we just provide the button.
 
@@ -89,6 +102,14 @@ const RenderBlock = ({
         }
       }
     };
+
+    const isReset = action.type === 'get_active_filters';
+
+    useEffect(() => {
+      if (isReset && !previewData && onPreviewTool) {
+        handlePreview(); // Auto-trigger preview
+      }
+    }, [action.type]);
 
     return (
       <div className="relative my-2 bg-muted/30 rounded-lg border border-primary/20 flex flex-col overflow-hidden group">
@@ -136,17 +157,21 @@ const RenderBlock = ({
         </div>
 
         {/* Body (Params) */}
-        {!showPreview && (
+        {!showPreview && !isReset && (
           <div className="p-3 text-xs font-mono bg-background/50 overflow-x-auto whitespace-pre-wrap text-foreground/80">
             {JSON.stringify(action.params, null, 2)}
           </div>
         )}
 
-        {/* Preview Area */}
-        {showPreview && (
+        {/* Preview Area (Always show for reset/get_active_filters) */}
+        {(showPreview || isReset) && (
           <div className="border-t border-border/50">
             <div className="bg-background/80 p-3 text-xs font-mono overflow-auto max-h-[300px] whitespace-pre-wrap animate-in slide-in-from-top-2 duration-200">
-              {previewData || 'No output available.'}
+              {isReset && !previewData ? (
+                <span className="text-muted-foreground italic">Fetching filters...</span>
+              ) : (
+                previewData || 'No output available.'
+              )}
             </div>
           </div>
         )}
@@ -276,14 +301,6 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
               </div>
-
-              {/* Timestamp */}
-              <span className="text-[10px] text-muted-foreground/40 mt-1 select-none">
-                {new Date(msg.timestamp).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
             </div>
           </div>
         );

@@ -9,14 +9,23 @@ import { NetworkRequest } from '../types';
 interface InspectorLayoutProps {
   onBack: () => void;
   requests: NetworkRequest[];
+  appName: string;
 }
 
-export function InspectorLayout({ onBack, requests }: InspectorLayoutProps) {
+export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<InspectorFilter>(() => {
     try {
       const saved = localStorage.getItem('inspector-filter-state');
-      return saved ? JSON.parse(saved) : initialFilterState;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed) {
+        // Migration: Remove whitelist if present
+        if ('whitelist' in parsed.host) delete (parsed.host as any).whitelist;
+        if ('whitelist' in parsed.path) delete (parsed.path as any).whitelist;
+        return { ...initialFilterState, ...parsed };
+      }
+      return initialFilterState;
     } catch {
       return initialFilterState;
     }
@@ -44,19 +53,9 @@ export function InspectorLayout({ onBack, requests }: InspectorLayoutProps) {
 
       // Host
       if (filter.host.blacklist.some((blocked) => req.host.includes(blocked))) return false;
-      if (
-        filter.host.whitelist.length > 0 &&
-        !filter.host.whitelist.some((allowed) => req.host.includes(allowed))
-      )
-        return false;
 
       // Path
       if (filter.path.blacklist.some((blocked) => req.path.includes(blocked))) return false;
-      if (
-        filter.path.whitelist.length > 0 &&
-        !filter.path.whitelist.some((allowed) => req.path.includes(allowed))
-      )
-        return false;
 
       // Status
       const status = req.status;
@@ -149,10 +148,12 @@ export function InspectorLayout({ onBack, requests }: InspectorLayoutProps) {
           <ChatContainer
             inspectorContext={{
               requests,
+              filteredRequests, // Pass the filtered list
               selectedRequestId: selectedId,
               filter,
               onSetFilter: setFilter,
               onSelectRequest: setSelectedId,
+              targetApp: appName,
             }}
           />
         </ResizableSplit>

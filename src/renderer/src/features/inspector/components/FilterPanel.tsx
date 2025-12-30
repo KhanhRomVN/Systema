@@ -12,11 +12,9 @@ export interface InspectorFilter {
   };
   host: {
     blacklist: string[];
-    whitelist: string[];
   };
   path: {
     blacklist: string[];
-    whitelist: string[];
   };
   status: {
     success: boolean; // 2xx
@@ -45,8 +43,8 @@ export interface InspectorFilter {
 
 export const initialFilterState: InspectorFilter = {
   methods: { GET: true, POST: true, PUT: true, DELETE: true, OPTIONAL: true },
-  host: { blacklist: [], whitelist: [] },
-  path: { blacklist: [], whitelist: [] },
+  host: { blacklist: [] },
+  path: { blacklist: [] },
   status: { success: true, redirect: true, clientError: true, serverError: true, other: true },
   type: { xhr: true, js: true, css: true, img: true, media: true, other: true },
   size: { min: '', max: '' },
@@ -254,99 +252,57 @@ function ListFilterSection({
   onChange,
 }: {
   title: string;
-  lists: { blacklist: string[]; whitelist: string[] };
-  onChange: (lists: { blacklist: string[]; whitelist: string[] }) => void;
+  lists: { blacklist: string[] };
+  onChange: (lists: { blacklist: string[] }) => void;
 }) {
-  const [blInput, setBlInput] = useState('');
-  const [wlInput, setWlInput] = useState('');
+  const [input, setInput] = useState('');
 
-  const handleAdd = (type: 'blacklist' | 'whitelist', value: string) => {
+  const handleAdd = (value: string) => {
     if (!value.trim()) return;
-    if (lists[type].includes(value.trim())) return;
-    onChange({ ...lists, [type]: [...lists[type], value.trim()] });
+    if (lists.blacklist.includes(value.trim())) return;
+    onChange({ ...lists, blacklist: [...lists.blacklist, value.trim()] });
   };
 
-  const handleRemove = (type: 'blacklist' | 'whitelist', value: string) => {
-    onChange({ ...lists, [type]: lists[type].filter((v) => v !== value) });
+  const handleRemove = (value: string) => {
+    onChange({ ...lists, blacklist: lists.blacklist.filter((v) => v !== value) });
   };
 
   return (
     <section>
       <h3 className="text-xs font-semibold mb-2">{title}</h3>
-      <div className="space-y-3">
-        {/* Blacklist */}
-        <div className="space-y-1.5">
-          <label className="text-[10px] uppercase text-muted-foreground font-bold">Blacklist</label>
-          <div className="flex gap-2">
-            <input
-              className="flex-1 bg-background border border-border/50 rounded px-2 py-1 text-xs focus:border-primary/50 outline-none"
-              value={blInput}
-              onChange={(e) => setBlInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAdd('blacklist', blInput);
-                  setBlInput('');
-                }
-              }}
-              placeholder="Add to blacklist..."
-            />
-          </div>
-          {lists.blacklist.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {lists.blacklist.map((item) => (
-                <span
-                  key={item}
-                  className="inline-flex items-center gap-1 bg-red-400/10 text-red-400 px-1.5 py-0.5 rounded text-[10px] border border-red-400/20 group cursor-default"
-                >
-                  {item}
-                  <button
-                    onClick={() => handleRemove('blacklist', item)}
-                    className="hover:bg-red-400/20 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
+      <div className="space-y-1.5">
+        <div className="flex gap-2">
+          <input
+            className="flex-1 bg-background border border-border/50 rounded px-2 py-1 text-xs focus:border-primary/50 outline-none"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleAdd(input);
+                setInput('');
+              }
+            }}
+            placeholder={`Filter ${title}... (Press Enter to exclude)`}
+          />
         </div>
-
-        {/* Whitelist */}
-        <div className="space-y-1.5">
-          <label className="text-[10px] uppercase text-muted-foreground font-bold">Whitelist</label>
-          <div className="flex gap-2">
-            <input
-              className="flex-1 bg-background border border-border/50 rounded px-2 py-1 text-xs focus:border-primary/50 outline-none"
-              value={wlInput}
-              onChange={(e) => setWlInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAdd('whitelist', wlInput);
-                  setWlInput('');
-                }
-              }}
-              placeholder="Add to whitelist..."
-            />
-          </div>
-          {lists.whitelist.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {lists.whitelist.map((item) => (
-                <span
-                  key={item}
-                  className="inline-flex items-center gap-1 bg-green-400/10 text-green-400 px-1.5 py-0.5 rounded text-[10px] border border-green-400/20 group cursor-default"
+        {lists.blacklist.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {lists.blacklist.map((item) => (
+              <span
+                key={item}
+                className="inline-flex items-center gap-1 bg-red-400/10 text-red-400 px-1.5 py-0.5 rounded text-[10px] border border-red-400/20 group cursor-default"
+              >
+                {item}
+                <button
+                  onClick={() => handleRemove(item)}
+                  className="hover:bg-red-400/20 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  {item}
-                  <button
-                    onClick={() => handleRemove('whitelist', item)}
-                    className="hover:bg-green-400/20 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

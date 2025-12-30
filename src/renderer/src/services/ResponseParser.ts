@@ -8,6 +8,8 @@ export interface ToolAction {
     | 'set_filter'
     | 'list_requests'
     | 'get_request_details'
+    | 'get_values'
+    | 'get_active_filters'
     | 'export_har'
     | 'generate_table'
     | 'ask_followup_question'
@@ -149,6 +151,12 @@ const parseToolAction = (toolName: string, innerContent: string, rawXml: string)
       params.requestId = extractParamValue(innerContent, 'requestId');
       break;
 
+    case 'get_values':
+      params.field = extractParamValue(innerContent, 'field');
+      const ignore = extractParamValue(innerContent, 'ignore_filters');
+      params.ignoreFilters = ignore === 'true';
+      break;
+
     case 'ask_followup_question':
       params.question = extractParamValue(innerContent, 'question');
       const optionsStr = extractParamValue(innerContent, 'options');
@@ -213,6 +221,8 @@ export const parseAIResponse = (content: string): ParsedResponse => {
     'set_filter',
     'list_requests',
     'get_request_details',
+    'get_values',
+    'get_active_filters',
     'export_har',
     'generate_table',
     'ask_followup_question',
@@ -228,7 +238,9 @@ export const parseAIResponse = (content: string): ParsedResponse => {
     let bestTool = '';
 
     for (const toolName of toolPatterns) {
-      const regex = new RegExp(`<${toolName}>([\\s\\S]*?)<\\/${toolName}>`, 'i');
+      // Match either <tool>content</tool> OR <tool /> (self-closing)
+      // We use a non-capturing group for the alternation, but we need to ensure group 1 is content or undefined
+      const regex = new RegExp(`<${toolName}(?:>([\\s\\S]*?)<\\/${toolName}>|\\s*\\/>)`, 'i');
       const match = regex.exec(str);
 
       if (match) {
@@ -254,7 +266,7 @@ export const parseAIResponse = (content: string): ParsedResponse => {
       }
 
       const rawXml = match[0];
-      const innerContent = match[1];
+      const innerContent = match[1] || ''; // If self-closing, match[1] is undefined, default to empty
 
       if (toolName === 'text') {
         if (innerContent.trim()) {

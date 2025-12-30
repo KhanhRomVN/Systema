@@ -5,6 +5,7 @@ import { NetworkRequest } from './types';
 
 export default function InspectorPage() {
   const [isScanning, setIsScanning] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<string>('VSCode');
   const [requests, setRequests] = useState<NetworkRequest[]>([]);
 
   useEffect(() => {
@@ -114,6 +115,7 @@ export default function InspectorPage() {
       const launched = await window.api.invoke('app:launch', appName, proxyUrl);
       if (launched) {
         setIsScanning(true);
+        setSelectedApp(appName);
         setRequests([]); // Clear previous session
       } else {
         console.error('Failed to launch app');
@@ -139,7 +141,7 @@ export default function InspectorPage() {
 
   return (
     <div className="h-screen w-screen bg-background">
-      <InspectorLayout onBack={handleBack} requests={requests} />
+      <InspectorLayout onBack={handleBack} requests={requests} appName={selectedApp} />
     </div>
   );
 }

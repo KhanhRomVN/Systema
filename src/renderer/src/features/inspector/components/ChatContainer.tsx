@@ -9,10 +9,12 @@ import { ChatSession } from './TabPanel/TabList';
 
 export interface InspectorContext {
   requests: NetworkRequest[];
+  filteredRequests?: NetworkRequest[]; // Optional for backward compact
   selectedRequestId: string | null;
   filter: InspectorFilter;
   onSetFilter: (filter: InspectorFilter) => void;
   onSelectRequest: (id: string) => void;
+  targetApp: string;
 }
 
 interface ChatContainerProps {

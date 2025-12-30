@@ -20,6 +20,16 @@ NETWORK OPERATIONS
 </set_filter>
 - Set active filters. Use 'reset' as field to clear all.
 
+<get_active_filters />
+- Returns the current filter configuration.
+
+<get_values>
+  <field>host</field>
+  <!-- Optional: default false (respects current filters) -->
+  <ignore_filters>false</ignore_filters>
+</get_values>
+- Returns unique values for a field (host, method, status, type, path).
+
 COMMUNICATION
 
 <ask_followup_question><question>...</question><options>["Opt1"]</options></ask_followup_question>

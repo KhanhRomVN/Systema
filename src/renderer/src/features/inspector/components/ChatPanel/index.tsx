@@ -40,7 +40,9 @@ export function ChatPanel({
     isProcessingRef.current = isProcessing;
   }, [isProcessing]);
 
-  const [currentConversationId] = useState<string>(initialConversationId || Date.now().toString());
+  const [currentConversationId, setCurrentConversationId] = useState<string>(
+    initialConversationId || Date.now().toString(),
+  );
 
   // Zen State Ports
   const currentRequestIdRef = useRef<string | null>(null);
@@ -253,7 +255,9 @@ export function ChatPanel({
       // 2. Strict Prompt Construction (First Request)
       if (isFirstRequest) {
         try {
-          systemPrompt = combinePrompts(provider);
+          // Use targetApp from context, or fallback to provider if missing (though strictly should be from context now)
+          const targetApp = inspectorContext.targetApp || provider;
+          systemPrompt = combinePrompts(targetApp);
           console.log('[ChatPanel] Loaded System Prompt size:', systemPrompt.length);
         } catch (e) {
           console.error('[ChatPanel] Failed to load system prompt:', e);
@@ -412,6 +416,12 @@ export function ChatPanel({
     [inspectorContext],
   );
 
+  const handleNewChat = useCallback(() => {
+    setMessages([]);
+    setIsFirstRequest(true);
+    setCurrentConversationId(Date.now().toString());
+  }, []);
+
   return (
     <div className="relative flex flex-col h-full bg-background border-l border-border transition-all duration-300">
       <ChatHeader
@@ -419,7 +429,9 @@ export function ChatPanel({
         title={title}
         provider={provider}
         onBack={onBack}
-        onClearChat={() => setMessages([])}
+        onNewChat={handleNewChat}
+        onSettings={() => setShowAgentOptions(true)}
+        onHistory={onBack}
       />
 
       <ChatBody

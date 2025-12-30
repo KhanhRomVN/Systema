@@ -18,9 +18,7 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
 
       for (const { field, value } of filters) {
         if (field === 'reset') {
-          newFilter.host.whitelist = [];
           newFilter.host.blacklist = [];
-          newFilter.path.whitelist = [];
           newFilter.path.blacklist = [];
           newFilter.methods = { ...initialFilterState.methods };
           newFilter.status = { ...initialFilterState.status };
@@ -148,6 +146,69 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
         return JSON.stringify(req, null, 2);
       }
       return `Request ${requestId} not found.`;
+    }
+
+    case 'get_values': {
+      const field = (action.params.field || '').toLowerCase();
+      const ignoreFilters = action.params.ignoreFilters === true;
+
+      if (!field) return 'Field name required for get_values.';
+
+      // Determine source: filteredRequests or all requests
+      // If ignoreFilters is true, use the FULL list (context.requests).
+      // If ignoreFilters is false (default), use the FILTERED list (context.filteredRequests).
+      // Fallback to full list if filtered is not available.
+      const source = ignoreFilters
+        ? context.requests
+        : context.filteredRequests || context.requests;
+
+      const values = new Set<string>();
+      source.forEach((req) => {
+        let val: any = '';
+        if (field === 'host') val = req.host;
+        else if (field === 'path') val = req.path;
+        else if (field === 'method') val = req.method;
+        else if (field === 'status') val = req.status;
+        else if (field === 'type') val = req.type || 'xhr';
+
+        if (val) values.add(String(val));
+      });
+
+      const sorted = Array.from(values).sort().slice(0, 50); // Cap at 50
+      return `Unique values for '${field}' (${sorted.length} found):\n- ${sorted.join('\n- ')}`;
+    }
+
+    case 'get_active_filters': {
+      const f = context.filter;
+      const getEnabled = (obj: Record<string, boolean>) =>
+        Object.keys(obj)
+          .filter((k) => obj[k])
+          .join(',');
+
+      const getStatusEnabled = (obj: Record<string, boolean>) => {
+        const mapping: Record<string, string> = {
+          success: '2xx',
+          redirect: '3xx',
+          clientError: '4xx',
+          serverError: '5xx',
+          other: 'other',
+        };
+        return Object.keys(obj)
+          .filter((k) => obj[k])
+          .map((k) => mapping[k] || k)
+          .join(',');
+      };
+
+      const parts: string[] = [];
+      parts.push(`method: ${getEnabled(f.methods)}`);
+      parts.push(`status: ${getStatusEnabled(f.status)}`);
+      parts.push(`type: ${getEnabled(f.type)}`);
+      parts.push(`host (exclude):      parts.push(`host (exclude): ${f.host.blacklist.length ? f.host.blacklist.join(',') : 'none'}`);
+      parts.push(`path (exclude): ${f.path.blacklist.length ? f.path.blacklist.join(',') : 'none'}`);
+      parts.push(`size: ${f.size.min || f.size.max ? `${f.size.min}-${f.size.max}` : 'any'}`);
+      parts.push(`time: ${f.time.min || f.time.max ? `${f.time.min}-${f.time.max}` : 'any'}`);
+
+      return parts.join('\n');
     }
 
     case 'ask_followup_question': {
