@@ -177,18 +177,75 @@ export class ProxyServer extends EventEmitter {
       });
 
       ctx.onResponseEnd((ctx: any, callback: any) => {
+        const buffer = Buffer.concat(responseChunks);
+        // Calculate size from chunks
+        const size = responseChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+        const sizeStr = size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`;
+
         try {
-          const body = Buffer.concat(responseChunks).toString('utf8');
-          // Calculate size from chunks
-          const size = responseChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+          const encodingHeader = res?.headers['content-encoding'];
+          const contentEncoding = (
+            Array.isArray(encodingHeader) ? encodingHeader[0] : encodingHeader || ''
+          ).toLowerCase();
+          const zlib = require('zlib');
+
+          let body = '';
+          if (contentEncoding === 'gzip') {
+            body = zlib.gunzipSync(buffer).toString('utf8');
+          } else if (contentEncoding === 'br') {
+            body = zlib.brotliDecompressSync(buffer).toString('utf8');
+          } else if (contentEncoding === 'deflate') {
+            body = zlib.inflateSync(buffer).toString('utf8');
+          } else if (!contentEncoding || contentEncoding === 'identity') {
+            // Check for GZIP magic bytes (0x1f 0x8b) even if header is missing
+            if (buffer.length > 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
+              try {
+                body = zlib.gunzipSync(buffer).toString('utf8');
+              } catch (e) {
+                body = `[Systema Error] Detected GZIP magic bytes but failed to decompress.\nError: ${e instanceof Error ? e.message : String(e)}`;
+              }
+            } else {
+              // Binary detection: Check for NULL bytes in the first 1024 bytes
+              const checkLen = Math.min(buffer.length, 1024);
+              let isBinary = false;
+              for (let i = 0; i < checkLen; i++) {
+                if (buffer[i] === 0x00) {
+                  isBinary = true;
+                  break;
+                }
+              }
+
+              if (isBinary) {
+                body = `[Systema Info] Response body appears to be binary data (size: ${sizeStr}). Preview not available.`;
+              } else {
+                body = buffer.toString('utf8');
+                // Double check for mojibake/garbage after toString?
+                // Simple heuristic: if too many replacement characters, it might be an unknown encoding issues.
+                // But generally NULL byte check is sufficient for "binary vs text".
+              }
+            }
+          } else {
+            body = `[Systema Info] Content encoded with '${contentEncoding}' which is currently not supported for preview.`;
+          }
 
           this.sendToRenderer('proxy:response-body', {
             id: ctx.requestId,
             body,
-            size: size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`,
+            size: sizeStr,
           });
         } catch (err) {
           console.error('Error processing response body:', err);
+          // Return valid error message instead of raw binary
+          const encodingHeader = res?.headers['content-encoding'];
+          const contentEncoding = Array.isArray(encodingHeader)
+            ? encodingHeader[0]
+            : encodingHeader || 'unknown';
+
+          this.sendToRenderer('proxy:response-body', {
+            id: ctx.requestId,
+            body: `[Systema Error] Failed to decode response body.\nEncoding: ${contentEncoding}\nError: ${err instanceof Error ? err.message : String(err)}`,
+            size: sizeStr,
+          });
         }
         return callback();
       });

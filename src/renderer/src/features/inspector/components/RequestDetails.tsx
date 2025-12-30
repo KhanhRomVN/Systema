@@ -42,8 +42,19 @@ export function RequestDetails({ request }: RequestDetailsProps) {
   const queryParams = new URLSearchParams(request.path.split('?')[1] || {});
   const queryEntries = Array.from(queryParams.entries());
 
-  const getCookies = (headerValue: string | undefined) => {
+  const getCookies = (headerValue: string | string[] | undefined) => {
     if (!headerValue) return [];
+
+    // If it's an array (common for Set-Cookie), flatten it
+    if (Array.isArray(headerValue)) {
+      return headerValue.flatMap((h) =>
+        h
+          .split(';')
+          .map((c) => c.trim())
+          .filter(Boolean),
+      );
+    }
+
     // Simple split by semicolon for cookie string
     return headerValue
       .split(';')
