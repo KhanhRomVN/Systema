@@ -6,11 +6,18 @@ export class ProxyServer extends EventEmitter {
   private proxy: any;
   private isRunning: boolean = false;
   private window: BrowserWindow | null = null;
+  private zstd: any = null;
 
   constructor() {
     super();
     const { Proxy } = require('http-mitm-proxy');
     this.proxy = new Proxy();
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    try {
+      this.zstd = require('@mongodb-js/zstd');
+    } catch (e) {
+      console.warn('[ProxyServer] Failed to load @mongodb-js/zstd', e);
+    }
 
     // HACK: Monkey-patch http-mitm-proxy to suppress excessive logging of expected network errors.
     // The library unconditionally logs 'ECONNRESET' and 'socket hang up' which are common with VS Code.
@@ -129,6 +136,7 @@ export class ProxyServer extends EventEmitter {
         headers: req.headers,
         timestamp: Date.now(),
       });
+      console.log(`[ProxyServer] Intercepted REQUEST: ${method} ${url}`);
 
       const requestChunks: any[] = [];
       ctx.onRequestData((ctx: any, chunk: any, callback: any) => {
@@ -173,7 +181,7 @@ export class ProxyServer extends EventEmitter {
         return callback(null, chunk);
       });
 
-      ctx.onResponseEnd((ctx: any, callback: any) => {
+      ctx.onResponseEnd(async (ctx: any, callback: any) => {
         const buffer = Buffer.concat(responseChunks);
         // Calculate size from chunks
         const size = responseChunks.reduce((acc, chunk) => acc + chunk.length, 0);
@@ -195,6 +203,12 @@ export class ProxyServer extends EventEmitter {
             body = zlib.brotliDecompressSync(buffer).toString('utf8');
           } else if (contentEncoding === 'deflate') {
             body = zlib.inflateSync(buffer).toString('utf8');
+          } else if (contentEncoding === 'zstd' && this.zstd) {
+            try {
+              body = (await this.zstd.decompress(buffer)).toString('utf8');
+            } catch (e) {
+              body = `[Systema Error] Failed to decompress zstd content: ${e instanceof Error ? e.message : String(e)}`;
+            }
           } else if (!contentEncoding || contentEncoding === 'identity') {
             // Check for GZIP magic bytes (0x1f 0x8b) even if header is missing
             if (buffer.length > 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
@@ -254,7 +268,10 @@ export class ProxyServer extends EventEmitter {
 
   private sendToRenderer(channel: string, data: any) {
     if (this.window && !this.window.isDestroyed()) {
+      // console.log(`[ProxyServer] Sending IO to renderer: ${channel}`);
       this.window.webContents.send(channel, data);
+    } else {
+      console.warn('[ProxyServer] Cannot send to renderer (window destroyed or null)');
     }
   }
 }

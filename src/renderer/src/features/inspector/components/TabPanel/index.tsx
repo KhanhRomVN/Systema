@@ -93,7 +93,7 @@ export function TabPanel({
 
       <TabList sessions={sessions} onSelect={onSelectSession} onNewChat={handleNewChat} />
 
-      <TabFooter />
+      <TabFooter port={port} />
     </div>
   );
 }

@@ -2,7 +2,17 @@ import { app, BrowserWindow, ipcMain, session, globalShortcut, screen, dialog } 
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { isAuthenticated, getOrgId, makeRequest, streamCompletion, stopResponse, generateTitle, store, BASE_URL, prepareAttachmentPayload } from './api/client';
+import {
+  isAuthenticated,
+  getOrgId,
+  makeRequest,
+  streamCompletion,
+  stopResponse,
+  generateTitle,
+  store,
+  BASE_URL,
+  prepareAttachmentPayload,
+} from './api/client';
 import { createStreamState, processSSEChunk, type StreamCallbacks } from './streaming/parser';
 import type { SettingsSchema, AttachmentPayload, UploadFilePayload } from './types';
 
@@ -95,13 +105,15 @@ function createSpotlightWindow() {
     y: 180,
     frame: false,
     transparent: isMac,
-    ...(isMac ? {
-      vibrancy: 'under-window',
-      visualEffectState: 'active',
-      backgroundColor: '#00000000',
-    } : {
-      backgroundColor: '#1a1a1a',
-    }),
+    ...(isMac
+      ? {
+          vibrancy: 'under-window',
+          visualEffectState: 'active',
+          backgroundColor: '#00000000',
+        }
+      : {
+          backgroundColor: '#1a1a1a',
+        }),
     resizable: false,
     movable: true,
     minimizable: false,
@@ -136,16 +148,18 @@ function createMainWindow(): BrowserWindow {
   const newWindow = new BrowserWindow({
     width: 900,
     height: 700,
-    ...(isMac ? {
-      transparent: true,
-      vibrancy: 'under-window',
-      visualEffectState: 'active',
-      backgroundColor: '#00000000',
-      titleBarStyle: 'hiddenInset',
-      trafficLightPosition: { x: 16, y: 16 },
-    } : {
-      backgroundColor: '#1a1a1a',
-    }),
+    ...(isMac
+      ? {
+          transparent: true,
+          vibrancy: 'under-window',
+          visualEffectState: 'active',
+          backgroundColor: '#00000000',
+          titleBarStyle: 'hiddenInset',
+          trafficLightPosition: { x: 16, y: 16 },
+        }
+      : {
+          backgroundColor: '#1a1a1a',
+        }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -185,16 +199,18 @@ function createSettingsWindow() {
     height: 520,
     minWidth: 400,
     minHeight: 400,
-    ...(isMac ? {
-      transparent: true,
-      vibrancy: 'under-window',
-      visualEffectState: 'active',
-      backgroundColor: '#00000000',
-      titleBarStyle: 'hiddenInset',
-      trafficLightPosition: { x: 16, y: 16 },
-    } : {
-      backgroundColor: '#1a1a1a',
-    }),
+    ...(isMac
+      ? {
+          transparent: true,
+          vibrancy: 'under-window',
+          visualEffectState: 'active',
+          backgroundColor: '#00000000',
+          titleBarStyle: 'hiddenInset',
+          trafficLightPosition: { x: 16, y: 16 },
+        }
+      : {
+          backgroundColor: '#1a1a1a',
+        }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -235,7 +251,7 @@ ipcMain.handle('spotlight-send', async (_event, message: string) => {
     const createResult = await makeRequest(
       `${BASE_URL}/api/organizations/${orgId}/chat_conversations`,
       'POST',
-      { name: '', model: 'claude-haiku-4-5-20251001' }
+      { name: '', model: 'claude-haiku-4-5-20251001' },
     );
 
     if (createResult.status !== 201 && createResult.status !== 200) {
@@ -269,7 +285,11 @@ ipcMain.handle('spotlight-send', async (_event, message: string) => {
       spotlightWindow?.webContents.send('spotlight-thinking', { isThinking: false, thinkingText });
     },
     onToolStart: (toolName, msg) => {
-      spotlightWindow?.webContents.send('spotlight-tool', { toolName, isRunning: true, message: msg });
+      spotlightWindow?.webContents.send('spotlight-tool', {
+        toolName,
+        isRunning: true,
+        message: msg,
+      });
     },
     onToolStop: (toolName, input) => {
       spotlightWindow?.webContents.send('spotlight-tool', { toolName, isRunning: false, input });
@@ -281,7 +301,7 @@ ipcMain.handle('spotlight-send', async (_event, message: string) => {
       // Store assistant response
       spotlightMessages.push({ role: 'assistant', text: fullText });
       spotlightWindow?.webContents.send('spotlight-complete', { fullText, messageUuid });
-    }
+    },
   };
 
   await streamCompletion(orgId, conversationId, message, parentMessageUuid, (chunk) => {
@@ -316,7 +336,7 @@ ipcMain.handle('spotlight-get-history', async () => {
   return {
     hasHistory: spotlightMessages.length > 0,
     messages: spotlightMessages,
-    draftInput: spotlightDraftInput
+    draftInput: spotlightDraftInput,
   };
 });
 
@@ -352,8 +372,8 @@ ipcMain.handle('login', async () => {
 
   const checkCookies = async (): Promise<{ success: boolean; error?: string } | null> => {
     const cookies = await session.defaultSession.cookies.get({ domain: '.claude.ai' });
-    const sessionKey = cookies.find(c => c.name === 'sessionKey')?.value;
-    const orgId = cookies.find(c => c.name === 'lastActiveOrg')?.value;
+    const sessionKey = cookies.find((c) => c.name === 'sessionKey')?.value;
+    const orgId = cookies.find((c) => c.name === 'lastActiveOrg')?.value;
 
     if (sessionKey && orgId) {
       console.log('[Auth] Got cookies from webview!');
@@ -403,7 +423,12 @@ ipcMain.handle('create-conversation', async (_event, model?: string) => {
   const conversationId = crypto.randomUUID();
   const url = `${BASE_URL}/api/organizations/${orgId}/chat_conversations`;
 
-  console.log('[API] Creating conversation:', conversationId, 'with model:', model || 'claude-opus-4-5-20251101');
+  console.log(
+    '[API] Creating conversation:',
+    conversationId,
+    'with model:',
+    model || 'claude-opus-4-5-20251101',
+  );
   console.log('[API] URL:', url);
 
   const result = await makeRequest(url, 'POST', {
@@ -411,18 +436,24 @@ ipcMain.handle('create-conversation', async (_event, model?: string) => {
     name: '',
     model: model || 'claude-opus-4-5-20251101',
     project_uuid: null,
-    create_mode: null
+    create_mode: null,
   });
 
   console.log('[API] Create conversation response:', result.status, JSON.stringify(result.data));
 
   if (result.status !== 200 && result.status !== 201) {
-    throw new Error(`Failed to create conversation: ${result.status} - ${JSON.stringify(result.data)}`);
+    throw new Error(
+      `Failed to create conversation: ${result.status} - ${JSON.stringify(result.data)}`,
+    );
   }
 
   // The response includes the conversation data with uuid
   const data = result.data as { uuid?: string };
-  return { conversationId, parentMessageUuid: data.uuid || conversationId, ...(result.data as object) };
+  return {
+    conversationId,
+    parentMessageUuid: data.uuid || conversationId,
+    ...(result.data as object),
+  };
 });
 
 // Get list of conversations
@@ -501,46 +532,55 @@ ipcMain.handle('star-conversation', async (_event, convId: string, isStarred: bo
 });
 
 // Export conversation to Markdown
-ipcMain.handle('export-conversation-markdown', async (event, conversationData: { title: string; messages: Array<{ role: string; content: string; timestamp?: string }> }) => {
-  const { title, messages } = conversationData;
+ipcMain.handle(
+  'export-conversation-markdown',
+  async (
+    event,
+    conversationData: {
+      title: string;
+      messages: Array<{ role: string; content: string; timestamp?: string }>;
+    },
+  ) => {
+    const { title, messages } = conversationData;
 
-  // Get the window that sent this request
-  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+    // Get the window that sent this request
+    const senderWindow = BrowserWindow.fromWebContents(event.sender);
 
-  // Build markdown content
-  let markdown = `# ${title || 'Conversation'}\n\n`;
-  markdown += `_Exported on ${new Date().toLocaleString()}_\n\n---\n\n`;
+    // Build markdown content
+    let markdown = `# ${title || 'Conversation'}\n\n`;
+    markdown += `_Exported on ${new Date().toLocaleString()}_\n\n---\n\n`;
 
-  for (const msg of messages) {
-    const role = msg.role === 'human' ? 'You' : 'Claude';
-    const timestamp = msg.timestamp ? ` _(${new Date(msg.timestamp).toLocaleString()})_` : '';
-    markdown += `## ${role}${timestamp}\n\n`;
-    markdown += `${msg.content}\n\n---\n\n`;
-  }
+    for (const msg of messages) {
+      const role = msg.role === 'human' ? 'You' : 'Claude';
+      const timestamp = msg.timestamp ? ` _(${new Date(msg.timestamp).toLocaleString()})_` : '';
+      markdown += `## ${role}${timestamp}\n\n`;
+      markdown += `${msg.content}\n\n---\n\n`;
+    }
 
-  // Show save dialog
-  const result = await dialog.showSaveDialog(senderWindow || getMainWindow()!, {
-    title: 'Export Conversation',
-    defaultPath: `${title || 'conversation'}.md`,
-    filters: [
-      { name: 'Markdown', extensions: ['md'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
-  });
+    // Show save dialog
+    const result = await dialog.showSaveDialog(senderWindow || getMainWindow()!, {
+      title: 'Export Conversation',
+      defaultPath: `${title || 'conversation'}.md`,
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
 
-  if (result.canceled || !result.filePath) {
-    return { success: false, canceled: true };
-  }
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
 
-  // Write file
-  try {
-    fs.writeFileSync(result.filePath, markdown, 'utf-8');
-    return { success: true, filePath: result.filePath };
-  } catch (error) {
-    console.error('Failed to write file:', error);
-    return { success: false, error: 'Failed to write file' };
-  }
-});
+    // Write file
+    try {
+      fs.writeFileSync(result.filePath, markdown, 'utf-8');
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      console.error('Failed to write file:', error);
+      return { success: false, error: 'Failed to write file' };
+    }
+  },
+);
 
 // Create a new window
 ipcMain.handle('new-window', async () => {
@@ -560,100 +600,146 @@ ipcMain.handle('upload-attachments', async (_event, files: UploadFilePayload[]) 
 });
 
 // Send a message and stream response
-ipcMain.handle('send-message', async (event, conversationId: string, message: string, parentMessageUuid: string, attachments: AttachmentPayload[] = []) => {
-  const orgId = await getOrgId();
-  if (!orgId) throw new Error('Not authenticated');
+ipcMain.handle(
+  'send-message',
+  async (
+    event,
+    conversationId: string,
+    message: string,
+    parentMessageUuid: string,
+    attachments: AttachmentPayload[] = [],
+  ) => {
+    const orgId = await getOrgId();
+    if (!orgId) throw new Error('Not authenticated');
 
-  // Get the window that sent this message
-  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+    // Get the window that sent this message
+    const senderWindow = BrowserWindow.fromWebContents(event.sender);
 
-  console.log('[API] Sending message to conversation:', conversationId);
-  console.log('[API] Parent message UUID:', parentMessageUuid);
-  console.log('[API] Message:', message.substring(0, 50) + '...');
-  if (attachments?.length) {
-    console.log('[API] Attachments:', attachments.map(a => `${a.file_name} (${a.file_size})`).join(', '));
-    console.log('[API] File IDs:', attachments.map(a => a.document_id).join(', '));
-  }
-
-  const state = createStreamState();
-
-  const callbacks: StreamCallbacks = {
-    onTextDelta: (text, fullText, blockIndex) => {
-      senderWindow?.webContents.send('message-stream', { conversationId, blockIndex, text, fullText });
-    },
-    onThinkingStart: (blockIndex) => {
-      senderWindow?.webContents.send('message-thinking', { conversationId, blockIndex, isThinking: true });
-    },
-    onThinkingDelta: (thinking, blockIndex) => {
-      const block = state.contentBlocks.get(blockIndex);
-      senderWindow?.webContents.send('message-thinking-stream', {
-        conversationId,
-        blockIndex,
-        thinking,
-        summaries: block?.summaries
-      });
-    },
-    onThinkingStop: (thinkingText, summaries, blockIndex) => {
-      senderWindow?.webContents.send('message-thinking', {
-        conversationId,
-        blockIndex,
-        isThinking: false,
-        thinkingText,
-        summaries
-      });
-    },
-    onToolStart: (toolName, toolMessage, blockIndex) => {
-      senderWindow?.webContents.send('message-tool-use', {
-        conversationId,
-        blockIndex,
-        toolName,
-        message: toolMessage,
-        isRunning: true
-      });
-    },
-    onToolStop: (toolName, input, blockIndex) => {
-      const block = state.contentBlocks.get(blockIndex);
-      senderWindow?.webContents.send('message-tool-use', {
-        conversationId,
-        blockIndex,
-        toolName,
-        message: block?.toolMessage,
-        input,
-        isRunning: false
-      });
-    },
-    onToolResult: (toolName, result, isError, blockIndex) => {
-      senderWindow?.webContents.send('message-tool-result', {
-        conversationId,
-        blockIndex,
-        toolName,
-        result,
-        isError
-      });
-    },
-    onCitation: (citation, blockIndex) => {
-      senderWindow?.webContents.send('message-citation', { conversationId, blockIndex, citation });
-    },
-    onToolApproval: (toolName, approvalKey, input) => {
-      senderWindow?.webContents.send('message-tool-approval', { conversationId, toolName, approvalKey, input });
-    },
-    onCompaction: (status, compactionMessage) => {
-      senderWindow?.webContents.send('message-compaction', { conversationId, status, message: compactionMessage });
-    },
-    onComplete: (fullText, steps, messageUuid) => {
-      senderWindow?.webContents.send('message-complete', { conversationId, fullText, steps, messageUuid });
+    console.log('[API] Sending message to conversation:', conversationId);
+    console.log('[API] Parent message UUID:', parentMessageUuid);
+    console.log('[API] Message:', message.substring(0, 50) + '...');
+    if (attachments?.length) {
+      console.log(
+        '[API] Attachments:',
+        attachments.map((a) => `${a.file_name} (${a.file_size})`).join(', '),
+      );
+      console.log('[API] File IDs:', attachments.map((a) => a.document_id).join(', '));
     }
-  };
 
-  // Send Claude the uploaded file UUIDs (metadata stays client-side for display)
-  const fileIds = attachments?.map(a => a.document_id).filter(Boolean) || [];
+    const state = createStreamState();
 
-  await streamCompletion(orgId, conversationId, message, parentMessageUuid, (chunk) => {
-    processSSEChunk(chunk, state, callbacks);
-  }, { attachments: [], files: fileIds });
+    const callbacks: StreamCallbacks = {
+      onTextDelta: (text, fullText, blockIndex) => {
+        senderWindow?.webContents.send('message-stream', {
+          conversationId,
+          blockIndex,
+          text,
+          fullText,
+        });
+      },
+      onThinkingStart: (blockIndex) => {
+        senderWindow?.webContents.send('message-thinking', {
+          conversationId,
+          blockIndex,
+          isThinking: true,
+        });
+      },
+      onThinkingDelta: (thinking, blockIndex) => {
+        const block = state.contentBlocks.get(blockIndex);
+        senderWindow?.webContents.send('message-thinking-stream', {
+          conversationId,
+          blockIndex,
+          thinking,
+          summaries: block?.summaries,
+        });
+      },
+      onThinkingStop: (thinkingText, summaries, blockIndex) => {
+        senderWindow?.webContents.send('message-thinking', {
+          conversationId,
+          blockIndex,
+          isThinking: false,
+          thinkingText,
+          summaries,
+        });
+      },
+      onToolStart: (toolName, toolMessage, blockIndex) => {
+        senderWindow?.webContents.send('message-tool-use', {
+          conversationId,
+          blockIndex,
+          toolName,
+          message: toolMessage,
+          isRunning: true,
+        });
+      },
+      onToolStop: (toolName, input, blockIndex) => {
+        const block = state.contentBlocks.get(blockIndex);
+        senderWindow?.webContents.send('message-tool-use', {
+          conversationId,
+          blockIndex,
+          toolName,
+          message: block?.toolMessage,
+          input,
+          isRunning: false,
+        });
+      },
+      onToolResult: (toolName, result, isError, blockIndex) => {
+        senderWindow?.webContents.send('message-tool-result', {
+          conversationId,
+          blockIndex,
+          toolName,
+          result,
+          isError,
+        });
+      },
+      onCitation: (citation, blockIndex) => {
+        senderWindow?.webContents.send('message-citation', {
+          conversationId,
+          blockIndex,
+          citation,
+        });
+      },
+      onToolApproval: (toolName, approvalKey, input) => {
+        senderWindow?.webContents.send('message-tool-approval', {
+          conversationId,
+          toolName,
+          approvalKey,
+          input,
+        });
+      },
+      onCompaction: (status, compactionMessage) => {
+        senderWindow?.webContents.send('message-compaction', {
+          conversationId,
+          status,
+          message: compactionMessage,
+        });
+      },
+      onComplete: (fullText, steps, messageUuid) => {
+        senderWindow?.webContents.send('message-complete', {
+          conversationId,
+          fullText,
+          steps,
+          messageUuid,
+        });
+      },
+    };
 
-  return { text: state.fullResponse, messageUuid: state.lastMessageUuid };
-});
+    // Send Claude the uploaded file UUIDs (metadata stays client-side for display)
+    const fileIds = attachments?.map((a) => a.document_id).filter(Boolean) || [];
+
+    await streamCompletion(
+      orgId,
+      conversationId,
+      message,
+      parentMessageUuid,
+      (chunk) => {
+        processSSEChunk(chunk, state, callbacks);
+      },
+      { attachments: [], files: fileIds },
+    );
+
+    return { text: state.fullResponse, messageUuid: state.lastMessageUuid };
+  },
+);
 
 // Stop a streaming response
 ipcMain.handle('stop-response', async (_event, conversationId: string) => {
@@ -666,14 +752,17 @@ ipcMain.handle('stop-response', async (_event, conversationId: string) => {
 });
 
 // Generate title for a conversation
-ipcMain.handle('generate-title', async (_event, conversationId: string, messageContent: string, recentTitles: string[] = []) => {
-  const orgId = await getOrgId();
-  if (!orgId) throw new Error('Not authenticated');
+ipcMain.handle(
+  'generate-title',
+  async (_event, conversationId: string, messageContent: string, recentTitles: string[] = []) => {
+    const orgId = await getOrgId();
+    if (!orgId) throw new Error('Not authenticated');
 
-  console.log('[API] Generating title for conversation:', conversationId);
-  const result = await generateTitle(orgId, conversationId, messageContent, recentTitles);
-  return result;
-});
+    console.log('[API] Generating title for conversation:', conversationId);
+    const result = await generateTitle(orgId, conversationId, messageContent, recentTitles);
+    return result;
+  },
+);
 
 // Settings IPC handlers
 ipcMain.handle('open-settings', async () => {
@@ -707,7 +796,36 @@ if (!gotTheLock) {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  console.log('[OpenClaude] App Ready');
+  console.log('[OpenClaude] Args:', process.argv);
+  console.log('[OpenClaude] Proxy Env:', {
+    http_proxy: process.env.http_proxy,
+    https_proxy: process.env.https_proxy,
+    no_proxy: process.env.no_proxy,
+  });
+
+  const proxyUrl =
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy;
+  if (proxyUrl) {
+    console.log('[OpenClaude] Forcing proxy configuration to:', proxyUrl);
+    try {
+      await session.defaultSession.setProxy({
+        mode: 'fixed_servers',
+        proxyRules: proxyUrl,
+      });
+      // Force reload of network stack/connections if needed, though setProxy is usually sufficient
+    } catch (e) {
+      console.error('[OpenClaude] Failed to set proxy:', e);
+    }
+  }
+
+  const proxyConfig = await session.defaultSession.resolveProxy('https://claude.ai');
+  console.log('[OpenClaude] Resolved Proxy for claude.ai:', proxyConfig);
+
   createMainWindow();
 
   // Register spotlight shortcut from settings

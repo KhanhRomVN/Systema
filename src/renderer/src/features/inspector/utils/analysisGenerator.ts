@@ -12,7 +12,6 @@ import {
   CookiesAnalysis,
   BodyAnalysis,
   SecurityAnalysis,
-  CertificateChainAnalysis,
   NetworkAnalysis,
   TimingAnalysis,
   IssuesAnalysis,
@@ -299,8 +298,11 @@ function generateHeadersAnalysis(request: NetworkRequest): HeadersAnalysis {
 }
 
 function generateCookiesAnalysis(request: NetworkRequest): CookiesAnalysis {
-  const parseCookieString = (cookieStr: string, isResponse: boolean): CookieItem[] => {
-    if (!cookieStr) return [];
+  const parseCookieString = (
+    cookieStr: string | undefined | null,
+    isResponse: boolean,
+  ): CookieItem[] => {
+    if (typeof cookieStr !== 'string' || !cookieStr) return [];
 
     // Simplistic split for response cookies (might be imperfect for dates with commas)
     // For Request cookies it's usually '; '

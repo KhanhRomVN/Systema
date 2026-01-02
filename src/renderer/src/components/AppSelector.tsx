@@ -49,6 +49,26 @@ export const AppSelector: React.FC<AppSelectorProps> = ({ onSelect }) => {
             <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Ready</span>
           </div>
         </div>
+
+        {/* Open Claude Card */}
+        <div
+          className="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition cursor-pointer border border-gray-700 hover:border-orange-500"
+          onClick={() => onSelect('open-claude', 'http://127.0.0.1:8081')}
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="w-12 h-12 bg-orange-600 rounded flex items-center justify-center text-xl font-bold">
+              OC
+            </div>
+            <h2 className="text-xl font-semibold">Claude (Session)</h2>
+          </div>
+          <p className="text-gray-400 mb-4">
+            Launches Open Claude with proxy settings. Tracks HTTPS traffic via Session & Cookie.
+          </p>
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <span>Proxy: :8081</span>
+            <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Ready</span>
+          </div>
+        </div>
       </div>
     </div>
   );

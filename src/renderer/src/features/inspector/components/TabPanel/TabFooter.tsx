@@ -3,15 +3,17 @@ import { useState } from 'react';
 
 interface TabFooterProps {
   onModelChange?: (modelIds: string[]) => void;
+  port: number;
 }
 
-export default function TabFooter({ onModelChange }: TabFooterProps) {
+export default function TabFooter({ onModelChange, port }: TabFooterProps) {
   // Mock available models for now as we don't have useModels hook
   const availableModels = [
     { id: 'deepseek-web', provider: 'deepseek', name: 'DeepSeek' },
     { id: 'chatgpt-web', provider: 'chatgpt', name: 'ChatGPT' },
     { id: 'grok-web', provider: 'grok', name: 'Grok' },
     { id: 'claude-web', provider: 'claude', name: 'Claude' },
+    { id: 'claude-cookie-web', provider: 'claude-cookie', name: 'Claude(Session&Cookie)' },
     { id: 'claude-cli-web', provider: 'claude-cli', name: 'Claude(CLI)' },
     { id: 'gemini-web', provider: 'gemini', name: 'Gemini' },
   ];
@@ -24,6 +26,7 @@ export default function TabFooter({ onModelChange }: TabFooterProps) {
       chatgpt: { emoji: '💬', color: '#10b981', name: 'ChatGPT' },
       grok: { emoji: '⚡', color: '#f97316', name: 'Grok' },
       claude: { emoji: '🧠', color: '#f59e0b', name: 'Claude' },
+      'claude-cookie': { emoji: '🍪', color: '#d97706', name: 'Claude(Cookie)' },
       'claude-cli': { emoji: '🔧', color: '#8b5cf6', name: 'Claude(CLI)' },
       gemini: { emoji: '✨', color: '#8b5cf6', name: 'Gemini' },
     };
@@ -37,6 +40,12 @@ export default function TabFooter({ onModelChange }: TabFooterProps) {
   };
 
   const handleModelToggle = (modelId: string) => {
+    if (modelId === 'claude-cookie-web') {
+      // @ts-ignore
+      window.api.invoke('app:launch', 'open-claude', 'http://127.0.0.1:' + port);
+      return;
+    }
+
     setSelectedModels((prev) => {
       const newSelection = prev.includes(modelId)
         ? prev.filter((id) => id !== modelId)

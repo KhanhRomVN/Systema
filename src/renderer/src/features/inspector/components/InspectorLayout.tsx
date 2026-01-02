@@ -16,7 +16,7 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<InspectorFilter>(() => {
     try {
-      const saved = localStorage.getItem('inspector-filter-state');
+      const saved = localStorage.getItem(`inspector-filter-state-${appName}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const parsed = saved ? JSON.parse(saved) : null;
       if (parsed) {
@@ -44,15 +44,18 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
   });
 
   useEffect(() => {
-    localStorage.setItem('inspector-filter-state', JSON.stringify(filter));
-  }, [filter]);
+    localStorage.setItem(`inspector-filter-state-${appName}`, JSON.stringify(filter));
+  }, [filter, appName]);
 
   const filteredRequests = useMemo(() => {
-    return requests.filter((req) => {
+    const result = requests.filter((req) => {
       // Method
       if (!filter.methods[req.method as keyof typeof filter.methods]) {
         return false;
       }
+
+      // Pending requests (status 0) should always be visible to show activity
+      if (req.status === 0) return true;
 
       // Host
       // Host (Whitelist)
@@ -66,36 +69,6 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
         return false;
 
       // Status
-      // If status is 0 (Pending), usually we treat it as 'Other' or maybe enable if we want to see pending requests.
-      // For now, let's map 0 to something or check if 'other' is enabled if we can't find it.
-      // But the requirement says "granular status".
-      // If the status is not in our list (e.g. 0), we might default to showing it or check 'other' if we had one (we removed 'other' from status).
-      // Let's assume pending requests (status 0) should be shown if we aren't filtering them out explicitly,
-      // BUT with granular filters, if we select 200, we probably only want 200.
-      // If the user hasn't selected "0" (which isn't an option), maybe pending requests shouldn't show?
-      // Or maybe we treat unknown status as enabled?
-      // Let's check against the map. If the status is in the map, use the value.
-      // If not in the map (like 0 or some obscure code), maybe we want to show it?
-      // Wait, the user wanted specific codes. If we receive 418 (Teapot) and it's not in the list, what happens?
-      // Usually "filter" means "include only these". So if 418 is not in the list, it's hidden.
-      // However, 0 is "pending". Usually we want to see pending requests.
-      // Let's assume pending requests are always visible OR maybe we should map them to a dummy "pending" status if we want to filter them.
-      // For now, let's strictly value the filter. If status is 0, checking filter.status[0] will be undefined.
-      // Let's treat undefined as TRUE for safely showing things not in the list? No, that defeats the purpose of "only show 200".
-      // Let's treat undefined as FALSE, EXCEPT for status 0 (Pending) which we might want to show until it resolves?
-      // Actually, standard behavior: if I click "200", I only want to see 200s. Pending requests (0) are NOT 200s. So they should disappear.
-      // BUT, that makes it hard to see requests in progress.
-      // Let's implement strict filtering. If status is 0, it's hidden if 0 isn't enabled.
-      // Since 0 isn't in the UI, pending requests will effectively be hidden if we strictly filter.
-      // OPTION: Add '0' or 'Pending' to the UI? The user didn't ask for it.
-      // OPTION: Use 'other' status logic? User removed 'other' category from status.
-      // Let's stick to strict filtering. If the code is in the list, check it. If not in the list (including 0), default to false?
-      // That might hide everything pending.
-      // Let's check if the user request implied "status code is one of these".
-      // "liệt kê toàn bộ badge status gồm..." -> "List all badge status including...".
-      // If I only check these, 0 is excluded.
-      // HACK: Let's assume if status is 0, we show it (allow it to pass status filter) so user sees activity.
-      // Once it completes, it gets a real status and then gets filtered.
       if (
         req.status !== 0 &&
         typeof filter.status[req.status] !== 'undefined' &&
@@ -103,11 +76,6 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
       ) {
         return false;
       }
-      // If it is a status code NOT in our list (e.g. 418), and not 0, it falls through here.
-      // If we want strict "white list", we should return false if undefined.
-      // But the UI initializes all known codes to TRUE. So "undefined" means "unknown code".
-      // Let's show unknown codes by default or hide?
-      // Let's show them.
 
       // Type
       const type = req.type.toLowerCase();
@@ -182,6 +150,10 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
 
       return true;
     });
+
+    console.log('[InspectorLayout] Filtered requests:', result.length, 'Total:', requests.length);
+    console.log('[InspectorLayout] Current Filter:', JSON.stringify(filter, null, 2));
+    return result;
   }, [requests, filter]);
 
   const selectedRequest = requests.find((r) => r.id === selectedId) || null;
@@ -206,11 +178,24 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
       <div className="flex-1 overflow-hidden relative">
         <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
           <ResizableSplit direction="vertical" initialSize={50} minSize={20} maxSize={80}>
-            <RequestList
-              requests={filteredRequests}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-            />
+            <div className="h-full flex flex-col">
+              {filteredRequests.length === 0 && requests.length > 0 && (
+                <div className="p-4 bg-yellow-500/10 text-yellow-500 text-xs text-center border-b border-yellow-500/20">
+                  All {requests.length} requests are hidden by filters.
+                  <button
+                    onClick={() => setFilter({ ...initialFilterState })}
+                    className="ml-2 underline hover:text-yellow-400"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              )}
+              <RequestList
+                requests={filteredRequests}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+            </div>
 
             <ResizableSplit direction="horizontal" initialSize={65} minSize={30} maxSize={80}>
               <RequestDetails request={selectedRequest} />

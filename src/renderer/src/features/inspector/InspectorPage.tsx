@@ -13,6 +13,7 @@ export default function InspectorPage() {
     if (!isScanning) return;
 
     const handleRequest = (_: any, data: any) => {
+      console.log('[InspectorPage] Received proxy:request', data.url);
       // data from proxy wrapper is raw, need to map to NetworkRequest
       const newRequest: NetworkRequest = {
         id: data.id || Math.random().toString(36).substr(2, 9), // Use ID from proxy if available
@@ -32,7 +33,14 @@ export default function InspectorPage() {
       };
       // Generate initial analysis
       const analysis = generateRequestAnalysis(newRequest);
-      setRequests((prev) => [{ ...newRequest, analysis }, ...prev]);
+      setRequests((prev) => {
+        // Prevent duplicates if same ID comes through (e.g. IPC echo)
+        if (prev.some((req) => req.id === newRequest.id)) {
+          return prev;
+        }
+        console.log('[InspectorPage] Adding request', newRequest.id, data.url);
+        return [{ ...newRequest, analysis }, ...prev];
+      });
     };
 
     const handleRequestBody = (_: any, data: any) => {
