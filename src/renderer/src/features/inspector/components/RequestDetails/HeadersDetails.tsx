@@ -1,11 +1,14 @@
 import { NetworkRequest } from '../../types';
 import { cn } from '../../../../shared/lib/utils';
 
+import { HighlightText } from './HighlightText';
+
 interface HeadersDetailsProps {
   request: NetworkRequest;
+  searchTerm: string;
 }
 
-export function HeadersDetails({ request }: HeadersDetailsProps) {
+export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
   const analysis = request.analysis;
 
   return (
@@ -32,7 +35,7 @@ export function HeadersDetails({ request }: HeadersDetailsProps) {
                         <div className="w-full sm:w-[140px] flex-shrink-0 p-1.5 sm:border-r border-border/40 bg-muted/10">
                           <div className="flex items-center gap-1.5 mb-1">
                             <span className="font-bold font-mono text-xs break-all text-foreground/90">
-                              {h.name}
+                              <HighlightText text={h.name} searchTerm={searchTerm} />
                             </span>
                             {h.status && (
                               <span
@@ -61,7 +64,7 @@ export function HeadersDetails({ request }: HeadersDetailsProps) {
 
                         <div className="flex-1 p-1.5 min-w-0">
                           <div className="font-mono text-xs text-foreground/80 break-all whitespace-pre-wrap">
-                            {h.value}
+                            <HighlightText text={h.value} searchTerm={searchTerm} />
                           </div>
                           {h.parsed && Object.keys(h.parsed).length > 0 && (
                             <div className="mt-1.5 text-[10px] bg-muted/30 p-1.5 rounded border border-border/20">
@@ -111,7 +114,7 @@ export function HeadersDetails({ request }: HeadersDetailsProps) {
                         <div className="w-full sm:w-[140px] flex-shrink-0 p-1.5 sm:border-r border-border/40 bg-muted/10">
                           <div className="flex items-center gap-1.5 mb-1">
                             <span className="font-bold font-mono text-xs break-all text-foreground/90">
-                              {h.name}
+                              <HighlightText text={h.name} searchTerm={searchTerm} />
                             </span>
                             {h.status && (
                               <span
@@ -140,7 +143,7 @@ export function HeadersDetails({ request }: HeadersDetailsProps) {
 
                         <div className="flex-1 p-1.5 min-w-0">
                           <div className="font-mono text-xs text-foreground/80 break-all whitespace-pre-wrap">
-                            {h.value}
+                            <HighlightText text={h.value} searchTerm={searchTerm} />
                           </div>
                           {h.parsed && Object.keys(h.parsed).length > 0 && (
                             <div className="mt-1.5 text-[10px] bg-muted/30 p-1.5 rounded border border-border/20">

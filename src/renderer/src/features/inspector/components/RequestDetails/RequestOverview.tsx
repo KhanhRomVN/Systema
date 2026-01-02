@@ -2,11 +2,14 @@ import { NetworkRequest } from '../../types';
 import { cn } from '../../../../shared/lib/utils';
 import { CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
 
+import { HighlightText } from './HighlightText';
+
 interface RequestOverviewProps {
   request: NetworkRequest;
+  searchTerm: string;
 }
 
-export function RequestOverview({ request }: RequestOverviewProps) {
+export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
   const analysis = request.analysis;
 
   if (!analysis?.overview) {
@@ -21,11 +24,16 @@ export function RequestOverview({ request }: RequestOverviewProps) {
     <div className="space-y-4">
       <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-muted/20 rounded border border-border/50">
         <div className="text-muted-foreground">URL</div>
-        <div className="break-all">{analysis.overview.url}</div>
+        <div className="text-muted-foreground">URL</div>
+        <div className="break-all">
+          <HighlightText text={analysis.overview.url} searchTerm={searchTerm} />
+        </div>
 
         <div className="text-muted-foreground">Method</div>
         <div className="flex gap-3">
-          <span className="font-bold">{analysis.overview.method}</span>
+          <span className="font-bold">
+            <HighlightText text={analysis.overview.method} searchTerm={searchTerm} />
+          </span>
           <span className="text-muted-foreground">Status:</span>
           <span
             className={cn(
@@ -43,7 +51,9 @@ export function RequestOverview({ request }: RequestOverviewProps) {
 
         <div className="text-muted-foreground">Protocol</div>
         <div className="flex gap-3">
-          <span>{analysis.overview.protocol}</span>
+          <span>
+            <HighlightText text={analysis.overview.protocol} searchTerm={searchTerm} />
+          </span>
           <span className="text-muted-foreground">Version:</span>
           <span>{analysis.overview.httpVersion}</span>
         </div>

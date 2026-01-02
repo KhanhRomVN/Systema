@@ -4,6 +4,7 @@ import { RequestDetails } from './RequestDetails';
 import { FilterPanel, initialFilterState, InspectorFilter } from './FilterPanel';
 import { ChatContainer } from './ChatContainer';
 import { useState, useMemo, useEffect } from 'react';
+import { Filter } from 'lucide-react';
 import { NetworkRequest } from '../types';
 
 interface InspectorLayoutProps {
@@ -14,6 +15,9 @@ interface InspectorLayoutProps {
 
 export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
+  const [detailsTab, setDetailsTab] = useState('overview');
   const [filter, setFilter] = useState<InspectorFilter>(() => {
     try {
       const saved = localStorage.getItem(`inspector-filter-state-${appName}`);
@@ -194,13 +198,21 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
                 requests={filteredRequests}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
               />
             </div>
 
-            <ResizableSplit direction="horizontal" initialSize={65} minSize={30} maxSize={80}>
-              <RequestDetails request={selectedRequest} />
-              <FilterPanel filter={filter} onChange={setFilter} />
-            </ResizableSplit>
+            <RequestDetails
+              request={selectedRequest}
+              searchTerm={searchTerm}
+              activeTab={detailsTab}
+              onTabChange={setDetailsTab}
+              onToggleFilter={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+              isFilterOpen={isFilterPanelOpen}
+              filter={filter}
+              onFilterChange={setFilter}
+            />
           </ResizableSplit>
 
           <ChatContainer

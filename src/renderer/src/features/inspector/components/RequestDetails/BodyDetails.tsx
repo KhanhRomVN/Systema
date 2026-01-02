@@ -1,10 +1,13 @@
 import { NetworkRequest } from '../../types';
 
+import { HighlightText } from './HighlightText';
+
 interface BodyDetailsProps {
   request: NetworkRequest;
+  searchTerm: string;
 }
 
-export function BodyDetails({ request }: BodyDetailsProps) {
+export function BodyDetails({ request, searchTerm }: BodyDetailsProps) {
   const analysis = request.analysis;
 
   return (
@@ -27,11 +30,17 @@ export function BodyDetails({ request }: BodyDetailsProps) {
           <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden flex flex-col">
             {analysis?.body?.request?.formatted ? (
               <pre className="flex-1 p-2 overflow-auto text-xs font-mono language-json">
-                {JSON.stringify(analysis.body.request.formatted, null, 2)}
+                <HighlightText
+                  text={JSON.stringify(analysis.body.request.formatted, null, 2)}
+                  searchTerm={searchTerm}
+                />
               </pre>
             ) : (
               <pre className="flex-1 p-2 overflow-auto text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-                {analysis?.body?.request?.raw || 'No Content'}
+                <HighlightText
+                  text={analysis?.body?.request?.raw || 'No Content'}
+                  searchTerm={searchTerm}
+                />
               </pre>
             )}
           </div>
@@ -59,11 +68,17 @@ export function BodyDetails({ request }: BodyDetailsProps) {
           <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden flex flex-col">
             {analysis?.body?.response?.formatted ? (
               <pre className="flex-1 p-2 overflow-auto text-xs font-mono text-foreground language-json">
-                {JSON.stringify(analysis.body.response.formatted, null, 2)}
+                <HighlightText
+                  text={JSON.stringify(analysis.body.response.formatted, null, 2)}
+                  searchTerm={searchTerm}
+                />
               </pre>
             ) : (
               <pre className="flex-1 p-2 overflow-auto text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-                {analysis?.body?.response?.raw || 'No Content'}
+                <HighlightText
+                  text={analysis?.body?.response?.raw || 'No Content'}
+                  searchTerm={searchTerm}
+                />
               </pre>
             )}
           </div>

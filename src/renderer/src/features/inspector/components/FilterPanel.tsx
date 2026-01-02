@@ -111,19 +111,6 @@ interface FilterPanelProps {
 export function FilterPanel({ filter, onChange }: FilterPanelProps) {
   return (
     <div className="h-full overflow-auto bg-background/50 border-l border-border/50 flex flex-col font-sans select-none">
-      <div className="sticky top-0 z-10 px-2 py-2 text-sm font-bold text-muted-foreground border-b border-border/50 bg-muted/20 flex items-center justify-between backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4" />
-          FILTERS
-        </div>
-        <button
-          onClick={() => onChange(initialFilterState)}
-          className="text-[10px] text-blue-400 hover:text-blue-300 hover:underline px-2 py-0.5"
-        >
-          Reset
-        </button>
-      </div>
-
       <div className="p-4 space-y-6">
         {/* Method */}
         <section>
