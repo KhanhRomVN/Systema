@@ -16,8 +16,8 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
         methods: { ...context.filter.methods },
         status: { ...context.filter.status },
         type: { ...context.filter.type },
-        host: { ...context.filter.host, blacklist: [...context.filter.host.blacklist] },
-        path: { ...context.filter.path, blacklist: [...context.filter.path.blacklist] },
+        host: { ...context.filter.host, whitelist: [...(context.filter.host.whitelist || [])] },
+        path: { ...context.filter.path, whitelist: [...(context.filter.path.whitelist || [])] },
         size: { ...context.filter.size },
         time: { ...context.filter.time },
       };
@@ -36,8 +36,8 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
           .filter(Boolean);
 
         if (field === 'reset') {
-          newFilter.host.blacklist = [];
-          newFilter.path.blacklist = [];
+          newFilter.host.whitelist = [];
+          newFilter.path.whitelist = [];
           newFilter.methods = { ...initialFilterState.methods };
           newFilter.status = { ...initialFilterState.status };
           newFilter.type = { ...initialFilterState.type };
@@ -82,13 +82,42 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
               updates.push(`Type ${typeKey} ${shouldRemove ? 'excluded' : 'included'}`);
             }
           });
+        } else if (field === 'host') {
+          values.forEach((val: string) => {
+            if (shouldRemove) {
+              newFilter.host.whitelist = newFilter.host.whitelist.filter((h) => h !== val);
+              updates.push(`Removed host ${val} from whitelist`);
+            } else {
+              if (!newFilter.host.whitelist.includes(val)) {
+                newFilter.host.whitelist.push(val);
+                updates.push(`Added host ${val} to whitelist`);
+              }
+            }
+          });
+        } else if (field === 'path') {
+          values.forEach((val: string) => {
+            if (shouldRemove) {
+              newFilter.path.whitelist = newFilter.path.whitelist.filter((p) => p !== val);
+              updates.push(`Removed path ${val} from whitelist`);
+            } else {
+              if (!newFilter.path.whitelist.includes(val)) {
+                newFilter.path.whitelist.push(val);
+                updates.push(`Added path ${val} to whitelist`);
+              }
+            }
+          });
+        } else if (field === 'size' || field === 'time') {
+          // Parse range "min - max"
+          const rangeStr = values[0] || '';
+          const [minStr, maxStr] = rangeStr.split('-').map((s: string) => s.trim());
+          const min = minStr && minStr !== 'any' ? Number(minStr) : 0;
+          const max = maxStr && maxStr !== 'any' ? Number(maxStr) : Infinity;
+
+          if (!isNaN(min)) newFilter[field as 'size' | 'time'].min = String(min);
+          if (!isNaN(max)) newFilter[field as 'size' | 'time'].max = String(max);
+          updates.push(`Updated ${field} range`);
         }
       }
-
-      console.log(
-        '[ToolExecutor] Applying new filter state (methods):',
-        JSON.stringify(newFilter.methods, null, 2),
-      );
       context.onSetFilter(newFilter);
       return `Filters updated: ${updates.join(', ')}`;
     }
@@ -223,10 +252,10 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
       parts.push(`status: ${getStatusEnabled(f.status)}`);
       parts.push(`type: ${getEnabled(f.type)}`);
       parts.push(
-        `host (exclude): ${f.host.blacklist.length ? f.host.blacklist.join(',') : 'none'}`,
+        `host (whitelist): ${(f.host.whitelist || []).length ? f.host.whitelist.join(',') : 'all'}`,
       );
       parts.push(
-        `path (exclude): ${f.path.blacklist.length ? f.path.blacklist.join(',') : 'none'}`,
+        `path (whitelist): ${(f.path.whitelist || []).length ? f.path.whitelist.join(',') : 'all'}`,
       );
       parts.push(`size: ${f.size.min || 'any'} - ${f.size.max || 'any'}`);
       parts.push(`time: ${f.time.min || 'any'} - ${f.time.max || 'any'}`);

@@ -280,33 +280,15 @@ export function ChatPanel({
             { type: 'get_active_filters', params: {}, rawXml: '' },
             inspectorContext,
           );
-          contextString += `\n\n[Active Filters]\n${filterConfig}`;
+          contextString += `\n\n## Active Filters\n${filterConfig}`;
         } catch (e) {
           console.warn('Failed to inject active filters', e);
         }
       }
 
-      // Combine for Payload (Zen Logic)
-      // If first request, we send system prompt + context + user message
-      // But we DISPLAY only user message.
-      // The backend (or AI) needs to see the full context under <task>.
-      // Zen sends `prompt: <task>...</task>`.
-
       if (isFirstRequest) {
-        // Zen Style: System Prompt + Context + User
-        // We don't prepend to 'content' var because that's what's displayed.
-        // We prepend in the PAYLOAD.
-        // Wait, Zen logic:
-        // content = `${systemPrompt}\n\n${contextString}\n\nUser Request: ${originalUserMessage}`
-        // Then sends `content`.
-        // And Systema displays `originalUserMessage`?
-        // Systema currently displays `input`.
-        // Let's replicate Zen's payload construction in `sendPromptMessage`.
       }
 
-      // 4. Update UI
-      // 5. Construct Payload
-      // We explicitly construct the full prompt string here
       let fullPromptForAI = finalContent;
 
       if (isFirstRequest) {
@@ -334,7 +316,7 @@ export function ChatPanel({
       const sendPromptMessage = {
         type: 'sendPrompt',
         tabId: parseInt(sessionId, 10) || 1,
-        prompt: `<task>\n${fullPromptForAI}`, // Wrap in <task> as per Zen
+        prompt: fullPromptForAI,
         requestId: requestId,
         isNewTask: isFirstRequest,
         folderPath: null,
@@ -387,29 +369,59 @@ export function ChatPanel({
   );
 
   const handleManualExecute = useCallback(
-    async (action: ToolAction) => {
-      // Execute tool manually
-      // We reuse logic from auto-execution but without permission check (since user clicked it)
-
-      // Add a small "Processing..." indicator via temporary message?
-      // Or just wait. executeTool is async.
-
+    async (action: ToolAction, msgId: string, blockIndex: number) => {
       try {
         const result = await executeTool(action, inspectorContext);
         const toolOutput = `Tool Output [${action.type}]:\n${result}`;
 
-        const manualKey = 'manual-execution';
-        if (!toolResultsBufferRef.current[manualKey]) {
-          toolResultsBufferRef.current[manualKey] = [];
+        // Buffer with message-specific key
+        const bufferKey = `msg-${msgId}`;
+        if (!toolResultsBufferRef.current[bufferKey]) {
+          toolResultsBufferRef.current[bufferKey] = [];
         }
-        toolResultsBufferRef.current[manualKey].push(toolOutput);
+        toolResultsBufferRef.current[bufferKey].push(toolOutput);
 
-        handleSend('');
+        // Update local state to mark tool as executed
+        let isSequenceComplete = false;
+
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id === msgId && m.parsed) {
+              const currentIndices = m.executedToolIndices || [];
+              if (!currentIndices.includes(blockIndex)) {
+                const newIndices = [...currentIndices, blockIndex];
+
+                // Check completeness
+                const totalTools = m.parsed.contentBlocks.filter((b) => b.type === 'tool').length;
+                if (newIndices.length >= totalTools) {
+                  isSequenceComplete = true;
+                }
+
+                return { ...m, executedToolIndices: newIndices };
+              }
+            }
+            return m;
+          }),
+        );
+
+        // Only send if sequence is complete
+        // Note: setMessages is async-like, but we calculated isSequenceComplete based on logic that matches the update.
+        // However, we need to be careful. The `isSequenceComplete` flag inside map might not escape scope easily if we didn't use a var.
+        // Actually, simpler: calculate it from 'messages' (current state) + 1.
+
+        const targetMsg = messages.find((m) => m.id === msgId);
+        if (targetMsg?.parsed) {
+          const totalTools = targetMsg.parsed.contentBlocks.filter((b) => b.type === 'tool').length;
+          const executedCount = (targetMsg.executedToolIndices?.length || 0) + 1; // +1 for current
+          if (executedCount >= totalTools) {
+            handleSend('');
+          }
+        }
       } catch (e) {
         console.error('Manual tool execution failed', e);
       }
     },
-    [inspectorContext, handleSend], // Added handleSend dependency
+    [inspectorContext, handleSend, messages],
   );
 
   const handlePreviewExecute = useCallback(

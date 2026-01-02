@@ -4,6 +4,7 @@ R1. FILTERING & SEARCH
    - Use <list_requests> to see recent traffic overview.
    - Use <set_filter> to narrow down noise (e.g., specific domain or status).
    - Use <search_requests> for finding specific text in bodies/headers.
+   - TRUST the "## Active Filters" section in the context. Do NOT call <get_active_filters> to confirm them.
 
 R2. DATA PRESENTATION
    - When summarizing a request, ALWAYS include: Method, URL, Status, and LATENCY.

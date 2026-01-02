@@ -15,10 +15,10 @@ export interface InspectorFilter {
     CONNECT: boolean;
   };
   host: {
-    blacklist: string[];
+    whitelist: string[];
   };
   path: {
-    blacklist: string[];
+    whitelist: string[];
   };
   status: {
     [key: number]: boolean;
@@ -58,8 +58,8 @@ export const initialFilterState: InspectorFilter = {
     TRACE: false,
     CONNECT: false,
   },
-  host: { blacklist: [] },
-  path: { blacklist: [] },
+  host: { whitelist: [] },
+  path: { whitelist: [] },
   status: {
     200: true,
     201: true,
@@ -109,7 +109,6 @@ interface FilterPanelProps {
 }
 
 export function FilterPanel({ filter, onChange }: FilterPanelProps) {
-  console.log('[FilterPanel] Rendered with methods:', JSON.stringify(filter.methods));
   return (
     <div className="h-full overflow-auto bg-background/50 border-l border-border/50 flex flex-col font-sans select-none">
       <div className="sticky top-0 z-10 px-2 py-2 text-sm font-bold text-muted-foreground border-b border-border/50 bg-muted/20 flex items-center gap-2 backdrop-blur-sm">
@@ -337,19 +336,21 @@ function ListFilterSection({
   onChange,
 }: {
   title: string;
-  lists: { blacklist: string[] };
-  onChange: (lists: { blacklist: string[] }) => void;
+  lists: { whitelist: string[] };
+  onChange: (lists: { whitelist: string[] }) => void;
 }) {
   const [input, setInput] = useState('');
 
   const handleAdd = (value: string) => {
     if (!value.trim()) return;
-    if (lists.blacklist.includes(value.trim())) return;
-    onChange({ ...lists, blacklist: [...lists.blacklist, value.trim()] });
+    const currentList = lists.whitelist || [];
+    if (currentList.includes(value.trim())) return;
+    onChange({ ...lists, whitelist: [...currentList, value.trim()] });
   };
 
   const handleRemove = (value: string) => {
-    onChange({ ...lists, blacklist: lists.blacklist.filter((v) => v !== value) });
+    const currentList = lists.whitelist || [];
+    onChange({ ...lists, whitelist: currentList.filter((v) => v !== value) });
   };
 
   return (
@@ -367,20 +368,20 @@ function ListFilterSection({
                 setInput('');
               }
             }}
-            placeholder={`Filter ${title}... (Press Enter to exclude)`}
+            placeholder={`Filter ${title}... (Press Enter to include)`}
           />
         </div>
-        {lists.blacklist.length > 0 && (
+        {(lists.whitelist || []).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-1">
-            {lists.blacklist.map((item) => (
+            {(lists.whitelist || []).map((item) => (
               <span
                 key={item}
-                className="inline-flex items-center gap-1 bg-red-400/10 text-red-400 px-1.5 py-0.5 rounded text-[10px] border border-red-400/20 group cursor-default"
+                className="inline-flex items-center gap-1 bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px] border border-primary/20 group cursor-default"
               >
                 {item}
                 <button
                   onClick={() => handleRemove(item)}
-                  className="hover:bg-red-400/20 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="hover:bg-primary/20 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>

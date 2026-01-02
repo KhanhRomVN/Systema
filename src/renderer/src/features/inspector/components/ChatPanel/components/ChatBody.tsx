@@ -10,25 +10,33 @@ export interface Message {
   fullPrompt?: string; // 🆕 Full Prompt debug data
   timestamp: number;
   timestampStr?: string;
+  executedToolIndices?: number[]; // Track executed tools
 }
 
 interface ChatBodyProps {
   messages: Message[];
   isProcessing?: boolean;
-  onExecuteTool?: (action: any) => void;
+  onExecuteTool?: (action: any, msgId: string, index: number) => void;
   onPreviewTool?: (action: any) => Promise<string | null>;
 }
 
 const RenderBlock = ({
   block,
+  msgId,
+  index,
+  isExecuted,
+  isEnabled,
   onExecuteTool,
   onPreviewTool,
 }: {
   block: ContentBlock;
-  onExecuteTool?: (action: any) => void;
+  msgId: string;
+  index: number;
+  isExecuted: boolean;
+  isEnabled: boolean;
+  onExecuteTool?: (action: any, msgId: string, index: number) => void;
   onPreviewTool?: (action: any) => Promise<string | null>;
 }) => {
-  const [executed, setExecuted] = React.useState(false);
   const [showPreview, setShowPreview] = React.useState(false);
   const [previewData, setPreviewData] = React.useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = React.useState(false);
@@ -66,13 +74,9 @@ const RenderBlock = ({
       );
     }
 
-    // Check if this tool looks like it has already been "finished" or if it is just a proposal
-    // Since we don't have linking to results yet, we just provide the button.
-
     const handleRun = () => {
-      if (onExecuteTool) {
-        setExecuted(true);
-        onExecuteTool(action);
+      if (onExecuteTool && !isExecuted && isEnabled) {
+        onExecuteTool(action, msgId, index);
       }
     };
 
@@ -143,15 +147,21 @@ const RenderBlock = ({
             {/* Execute Button */}
             <button
               onClick={handleRun}
-              disabled={executed}
+              disabled={isExecuted || !isEnabled}
               className={`p-1 rounded transition-all ${
-                executed
+                isExecuted
                   ? 'text-green-500 cursor-not-allowed'
-                  : 'text-primary hover:bg-primary/10 hover:scale-105 active:scale-95'
+                  : isEnabled
+                    ? 'text-primary hover:bg-primary/10 hover:scale-105 active:scale-95'
+                    : 'text-muted-foreground cursor-not-allowed opacity-50'
               }`}
-              title={executed ? 'Executed' : 'Execute Tool'}
+              title={isExecuted ? 'Executed' : isEnabled ? 'Execute Tool' : 'Pending previous tool'}
             >
-              {executed ? <CheckCircle2 className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
+              {isExecuted ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <PlayCircle className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
@@ -256,6 +266,9 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
         const isUser = msg.role === 'user';
         if (isUser) requestCount++;
 
+        // Calculate tool execution state for this message
+        let pendingToolFound = false;
+
         return (
           <div key={msg.id} className="flex flex-col w-full animate-in fade-in duration-300">
             {/* Request Divider for User Messages */}
@@ -288,14 +301,38 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
               >
                 {msg.parsed ? (
                   <div className="flex flex-col gap-2">
-                    {msg.parsed.contentBlocks.map((block, idx) => (
-                      <RenderBlock
-                        key={idx}
-                        block={block}
-                        onExecuteTool={onExecuteTool}
-                        onPreviewTool={onPreviewTool}
-                      />
-                    ))}
+                    {msg.parsed.contentBlocks.map((block, idx) => {
+                      const isExecuted = msg.executedToolIndices?.includes(idx) ?? false;
+                      const isTool = block.type === 'tool';
+
+                      // Determine if enabled:
+                      // Must be a tool.
+                      // If processed previous tools (pendingToolFound is false), then this one is enabled.
+                      // If we find an unexecuted tool, subsequent tools are disabled.
+                      let isEnabled = false;
+                      if (isTool) {
+                        if (!isExecuted) {
+                          isEnabled = !pendingToolFound; // Only enable if it's the first pending one
+                          if (isEnabled) pendingToolFound = true; // Mark that we found the pending one, so next are disabled
+                        } else {
+                          // Already executed, so it's not "enabled" for running again (button handles this with isExecuted check too)
+                          // But functionally, we don't block based on this.
+                        }
+                      }
+
+                      return (
+                        <RenderBlock
+                          key={idx}
+                          block={block}
+                          msgId={msg.id}
+                          index={idx}
+                          isExecuted={isExecuted}
+                          isEnabled={isEnabled}
+                          onExecuteTool={onExecuteTool}
+                          onPreviewTool={onPreviewTool}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="whitespace-pre-wrap">{msg.content}</div>

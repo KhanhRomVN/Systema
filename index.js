@@ -33,6 +33,4 @@ proxy.onResponse(function (ctx, callback) {
   return callback();
 });
 
-proxy.listen({ port: PORT }, function () {
-  console.log('Proxy listening on port ' + PORT);
-});
+proxy.listen({ port: PORT }, function () {});

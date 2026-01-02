@@ -55,10 +55,15 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
       }
 
       // Host
-      if (filter.host.blacklist.some((blocked) => req.host.includes(blocked))) return false;
+      // Host (Whitelist)
+      const hostWhitelist = filter.host.whitelist || [];
+      if (hostWhitelist.length > 0 && !hostWhitelist.some((allowed) => req.host.includes(allowed)))
+        return false;
 
-      // Path
-      if (filter.path.blacklist.some((blocked) => req.path.includes(blocked))) return false;
+      // Path (Whitelist)
+      const pathWhitelist = filter.path.whitelist || [];
+      if (pathWhitelist.length > 0 && !pathWhitelist.some((allowed) => req.path.includes(allowed)))
+        return false;
 
       // Status
       // If status is 0 (Pending), usually we treat it as 'Other' or maybe enable if we want to see pending requests.

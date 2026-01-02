@@ -20,9 +20,10 @@ NETWORK OPERATIONS
   <field>size</field><value>100 - 1000</value>
 </set_filter>
 - Set filters.
-- Fields: method, status, type, size, time.
-- For arrays (method, status, type): Value is CSV. use <mode>append|remove</mode> to add/remove. Default append.
-- For ranges (size, time): Value is "min - max". Use "any" for open ended (e.g. "any - 500").
+- Fields: method, status, type, host, path, size, time.
+- For arrays (method, status, type): CSV. <mode>append|remove</mode>.
+- For host/path: Whitelist. "append" adds to allowed list (Show Only). Empty = Show All.
+- For ranges (size, time): "min - max". Use "any" for open ended.
 - Use <field>reset</field> to clear all.
 
 <get_active_filters />
