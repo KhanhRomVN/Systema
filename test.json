@@ -1,0 +1,1179 @@
+{
+  "overview": {
+    "url": "https://api.shop.example.com/v1/products/search",
+    "method": "POST",
+    "statusCode": 200,
+    "statusText": "OK",
+    "protocol": "HTTPS",
+    "httpVersion": "HTTP/2",
+    "timestamp": "2026-01-02T10:34:56.789Z",
+    "duration": "342ms",
+    "size": {
+      "request": "1.2 KB",
+      "response": "15.4 KB",
+      "total": "16.6 KB"
+    },
+    "scores": {
+      "overall": {
+        "value": 92,
+        "grade": "A",
+        "color": "#10b981"
+      },
+      "security": {
+        "value": 95,
+        "grade": "A+",
+        "color": "#10b981"
+      },
+      "performance": {
+        "value": 88,
+        "grade": "B+",
+        "color": "#f59e0b"
+      }
+    },
+    "summary": {
+      "critical": 0,
+      "warnings": 2,
+      "passed": 15,
+      "info": 3
+    },
+    "quickInsights": [
+      {
+        "type": "success",
+        "icon": "✓",
+        "message": "HTTPS configured correctly with TLS 1.3"
+      },
+      {
+        "type": "success",
+        "icon": "✓",
+        "message": "Strong cipher suite in use"
+      },
+      {
+        "type": "warning",
+        "icon": "⚠",
+        "message": "Response body size is large (15.4 KB)"
+      },
+      {
+        "type": "warning",
+        "icon": "⚠",
+        "message": "Missing Referrer-Policy header"
+      },
+      {
+        "type": "info",
+        "icon": "ℹ",
+        "message": "HTTP/2 is enabled"
+      }
+    ]
+  },
+  "request": {
+    "general": {
+      "method": "POST",
+      "url": "https://api.shop.example.com/v1/products/search",
+      "protocol": "https",
+      "httpVersion": "HTTP/2",
+      "host": "api.shop.example.com",
+      "port": 443,
+      "path": "/v1/products/search",
+      "scheme": "https"
+    },
+    "queryString": "category=electronics&sort=price_asc&page=1&limit=20",
+    "queryParams": {
+      "category": "electronics",
+      "sort": "price_asc",
+      "page": "1",
+      "limit": "20"
+    },
+    "timestamp": "2026-01-02T10:34:56.447Z",
+    "size": {
+      "headers": "856 bytes",
+      "body": "387 bytes",
+      "total": "1.2 KB"
+    }
+  },
+  "response": {
+    "general": {
+      "statusCode": 200,
+      "statusText": "OK",
+      "httpVersion": "HTTP/2",
+      "protocol": "https"
+    },
+    "timestamp": "2026-01-02T10:34:56.789Z",
+    "size": {
+      "headers": "1.1 KB",
+      "body": "14.3 KB",
+      "total": "15.4 KB"
+    },
+    "compression": {
+      "algorithm": "gzip",
+      "originalSize": "42.7 KB",
+      "compressedSize": "14.3 KB",
+      "ratio": "66.5%"
+    },
+    "redirectURL": null
+  },
+  "headers": {
+    "request": {
+      "general": [
+        {
+          "name": "Host",
+          "value": "api.shop.example.com",
+          "description": "Target host for the request"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive",
+          "description": "Connection persistence"
+        },
+        {
+          "name": "Content-Length",
+          "value": "387",
+          "description": "Size of request body in bytes"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json; charset=utf-8",
+          "description": "Media type of the request body"
+        }
+      ],
+      "authentication": [
+        {
+          "name": "Authorization",
+          "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3ODkwMTIiLCJpYXQiOjE3MDQyMDEwMDAsImV4cCI6MTcwNDI4NzQwMH0.dGhpc19pc19hX2Zha2Vfc2lnbmF0dXJl",
+          "description": "JWT token for authentication",
+          "parsed": {
+            "type": "Bearer",
+            "token": "eyJhbGci...signature"
+          }
+        }
+      ],
+      "client": [
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "description": "Client application details"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json, text/plain, */*",
+          "description": "Acceptable response media types"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US,en;q=0.9,vi;q=0.8",
+          "description": "Preferred languages"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br",
+          "description": "Acceptable content encodings"
+        }
+      ],
+      "referrer": [
+        {
+          "name": "Origin",
+          "value": "https://shop.example.com",
+          "description": "Origin of the request"
+        },
+        {
+          "name": "Referer",
+          "value": "https://shop.example.com/products",
+          "description": "Previous page URL"
+        }
+      ],
+      "custom": [
+        {
+          "name": "X-Request-ID",
+          "value": "req_9f8e7d6c5b4a3210",
+          "description": "Unique request identifier"
+        },
+        {
+          "name": "X-API-Version",
+          "value": "v1",
+          "description": "API version"
+        },
+        {
+          "name": "X-Client-Version",
+          "value": "2.5.0",
+          "description": "Client application version"
+        }
+      ]
+    },
+    "response": {
+      "general": [
+        {
+          "name": "Date",
+          "value": "Wed, 02 Jan 2026 10:34:56 GMT",
+          "description": "Response timestamp"
+        },
+        {
+          "name": "Server",
+          "value": "nginx/1.24.0",
+          "description": "Server software"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json; charset=utf-8",
+          "description": "Response media type"
+        },
+        {
+          "name": "Content-Length",
+          "value": "14638",
+          "description": "Response body size"
+        },
+        {
+          "name": "Content-Encoding",
+          "value": "gzip",
+          "description": "Content compression method"
+        }
+      ],
+      "cache": [
+        {
+          "name": "Cache-Control",
+          "value": "private, max-age=300, must-revalidate",
+          "description": "Caching directives",
+          "parsed": {
+            "private": true,
+            "maxAge": 300,
+            "mustRevalidate": true
+          }
+        },
+        {
+          "name": "Expires",
+          "value": "Wed, 02 Jan 2026 10:39:56 GMT",
+          "description": "Expiration date/time"
+        },
+        {
+          "name": "ETag",
+          "value": "\"33a64df551425fcc55e4d42a148795d9f25f89d4\"",
+          "description": "Resource version identifier"
+        },
+        {
+          "name": "Last-Modified",
+          "value": "Wed, 02 Jan 2026 10:30:00 GMT",
+          "description": "Last modification date"
+        }
+      ],
+      "security": [
+        {
+          "name": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload",
+          "description": "HSTS configuration",
+          "status": "good"
+        },
+        {
+          "name": "X-Frame-Options",
+          "value": "SAMEORIGIN",
+          "description": "Clickjacking protection",
+          "status": "good"
+        },
+        {
+          "name": "X-Content-Type-Options",
+          "value": "nosniff",
+          "description": "MIME type sniffing protection",
+          "status": "good"
+        },
+        {
+          "name": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://cdn.example.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;",
+          "description": "Content security rules",
+          "status": "good"
+        },
+        {
+          "name": "X-XSS-Protection",
+          "value": "1; mode=block",
+          "description": "XSS filter configuration",
+          "status": "warning"
+        }
+      ],
+      "cors": [
+        {
+          "name": "Access-Control-Allow-Origin",
+          "value": "https://shop.example.com",
+          "description": "Allowed origins"
+        },
+        {
+          "name": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS",
+          "description": "Allowed HTTP methods"
+        },
+        {
+          "name": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, X-Requested-With",
+          "description": "Allowed request headers"
+        },
+        {
+          "name": "Access-Control-Allow-Credentials",
+          "value": "true",
+          "description": "Credentials support"
+        }
+      ],
+      "custom": [
+        {
+          "name": "X-Response-Time",
+          "value": "342ms",
+          "description": "Server processing time"
+        },
+        {
+          "name": "X-RateLimit-Limit",
+          "value": "1000",
+          "description": "Rate limit threshold"
+        },
+        {
+          "name": "X-RateLimit-Remaining",
+          "value": "987",
+          "description": "Remaining requests"
+        },
+        {
+          "name": "X-RateLimit-Reset",
+          "value": "1704196496",
+          "description": "Rate limit reset time"
+        }
+      ]
+    },
+    "missing": [
+      {
+        "name": "Referrer-Policy",
+        "severity": "warning",
+        "description": "Controls referrer information",
+        "recommendation": "Add 'Referrer-Policy: strict-origin-when-cross-origin'"
+      },
+      {
+        "name": "Permissions-Policy",
+        "severity": "info",
+        "description": "Controls browser features",
+        "recommendation": "Consider adding Permissions-Policy header"
+      }
+    ]
+  },
+  "cookies": {
+    "request": [
+      {
+        "name": "session_id",
+        "value": "f8e9d7c6b5a43210abcdef1234567890",
+        "domain": "shop.example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Strict",
+        "size": "48 bytes",
+        "expires": null,
+        "maxAge": null,
+        "priority": "High",
+        "analysis": {
+          "security": "good",
+          "issues": []
+        }
+      },
+      {
+        "name": "auth_token",
+        "value": "xyz789abc456def123ghi789",
+        "domain": ".example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Lax",
+        "size": "32 bytes",
+        "expires": "2026-01-03T10:34:56.000Z",
+        "maxAge": 86400,
+        "priority": "High",
+        "analysis": {
+          "security": "good",
+          "issues": []
+        }
+      },
+      {
+        "name": "preferences",
+        "value": "theme:dark|lang:en|currency:USD",
+        "domain": "shop.example.com",
+        "path": "/",
+        "secure": false,
+        "httpOnly": false,
+        "sameSite": "Lax",
+        "size": "42 bytes",
+        "expires": "2026-12-31T23:59:59.000Z",
+        "maxAge": 31536000,
+        "priority": "Low",
+        "analysis": {
+          "security": "warning",
+          "issues": ["Cookie is not marked as Secure", "Cookie is not marked as HttpOnly"]
+        }
+      },
+      {
+        "name": "_ga",
+        "value": "GA1.2.1234567890.1704196496",
+        "domain": ".example.com",
+        "path": "/",
+        "secure": false,
+        "httpOnly": false,
+        "sameSite": "Lax",
+        "size": "38 bytes",
+        "expires": "2028-01-02T10:34:56.000Z",
+        "maxAge": 63072000,
+        "priority": "Low",
+        "analysis": {
+          "security": "info",
+          "issues": ["Third-party analytics cookie"]
+        }
+      }
+    ],
+    "response": [
+      {
+        "name": "session_id",
+        "value": "f8e9d7c6b5a43210abcdef1234567890",
+        "domain": "shop.example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Strict",
+        "maxAge": 86400,
+        "expires": "2026-01-03T10:34:56.000Z",
+        "priority": "High",
+        "raw": "session_id=f8e9d7c6b5a43210abcdef1234567890; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=86400",
+        "analysis": {
+          "security": "good",
+          "issues": []
+        }
+      },
+      {
+        "name": "csrf_token",
+        "value": "abc123def456ghi789jkl012mno345pqr",
+        "domain": "shop.example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Strict",
+        "maxAge": 3600,
+        "expires": "2026-01-02T11:34:56.000Z",
+        "priority": "High",
+        "raw": "csrf_token=abc123def456ghi789jkl012mno345pqr; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600",
+        "analysis": {
+          "security": "good",
+          "issues": []
+        }
+      }
+    ],
+    "summary": {
+      "totalRequest": 4,
+      "totalResponse": 2,
+      "secureCount": 2,
+      "httpOnlyCount": 2,
+      "sameSiteCount": 4,
+      "issues": {
+        "critical": 0,
+        "warning": 1,
+        "info": 1
+      }
+    }
+  },
+  "body": {
+    "request": {
+      "contentType": "application/json",
+      "size": "387 bytes",
+      "encoding": "utf-8",
+      "raw": "{\"query\":{\"category\":\"electronics\",\"priceRange\":{\"min\":0,\"max\":500},\"brands\":[\"Apple\",\"Samsung\",\"Sony\"],\"inStock\":true},\"sort\":{\"field\":\"price\",\"order\":\"asc\"},\"pagination\":{\"page\":1,\"limit\":20},\"filters\":{\"rating\":{\"min\":4},\"shipping\":\"free\"}}",
+      "formatted": {
+        "query": {
+          "category": "electronics",
+          "priceRange": {
+            "min": 0,
+            "max": 500
+          },
+          "brands": ["Apple", "Samsung", "Sony"],
+          "inStock": true
+        },
+        "sort": {
+          "field": "price",
+          "order": "asc"
+        },
+        "pagination": {
+          "page": 1,
+          "limit": 20
+        },
+        "filters": {
+          "rating": {
+            "min": 4
+          },
+          "shipping": "free"
+        }
+      },
+      "preview": "Search query for electronics with price range $0-$500..."
+    },
+    "response": {
+      "contentType": "application/json",
+      "size": "14.3 KB",
+      "originalSize": "42.7 KB",
+      "compression": "gzip (66.5% reduction)",
+      "encoding": "utf-8",
+      "raw": "{\"status\":\"success\",\"data\":{\"products\":[{\"id\":1001,\"name\":\"iPhone 15 Pro\",\"brand\":\"Apple\",\"price\":999.00,\"rating\":4.8,\"inStock\":true,\"image\":\"https://cdn.example.com/iphone15pro.jpg\"},{\"id\":1002,\"name\":\"Galaxy S24 Ultra\",\"brand\":\"Samsung\",\"price\":1199.00,\"rating\":4.7,\"inStock\":true,\"image\":\"https://cdn.example.com/galaxys24.jpg\"},{\"id\":1003,\"name\":\"AirPods Pro 2\",\"brand\":\"Apple\",\"price\":249.00,\"rating\":4.9,\"inStock\":true,\"image\":\"https://cdn.example.com/airpodspro2.jpg\"}],\"pagination\":{\"page\":1,\"totalPages\":12,\"totalItems\":235,\"itemsPerPage\":20,\"hasNext\":true,\"hasPrev\":false}}}",
+      "formatted": {
+        "status": "success",
+        "data": {
+          "products": [
+            {
+              "id": 1001,
+              "name": "iPhone 15 Pro",
+              "brand": "Apple",
+              "price": 999.0,
+              "rating": 4.8,
+              "inStock": true,
+              "image": "https://cdn.example.com/iphone15pro.jpg"
+            },
+            {
+              "id": 1002,
+              "name": "Galaxy S24 Ultra",
+              "brand": "Samsung",
+              "price": 1199.0,
+              "rating": 4.7,
+              "inStock": true,
+              "image": "https://cdn.example.com/galaxys24.jpg"
+            },
+            {
+              "id": 1003,
+              "name": "AirPods Pro 2",
+              "brand": "Apple",
+              "price": 249.0,
+              "rating": 4.9,
+              "inStock": true,
+              "image": "https://cdn.example.com/airpodspro2.jpg"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "totalPages": 12,
+            "totalItems": 235,
+            "itemsPerPage": 20,
+            "hasNext": true,
+            "hasPrev": false
+          }
+        }
+      },
+      "preview": "Search results: 235 electronics products found, showing page 1 of 12...",
+      "structure": {
+        "type": "JSON",
+        "depth": 4,
+        "keys": 3,
+        "arrays": 2,
+        "objects": 8
+      }
+    }
+  },
+  "security": {
+    "protocol": {
+      "version": "TLS 1.3",
+      "isSecure": true,
+      "grade": "A+",
+      "details": "Using modern TLS 1.3 with perfect forward secrecy"
+    },
+    "cipher": {
+      "suite": "TLS_AES_256_GCM_SHA384",
+      "strength": "256-bit",
+      "keyExchange": "ECDHE (X25519)",
+      "authentication": "RSA",
+      "encryption": "AES_256_GCM",
+      "mac": "SHA384",
+      "grade": "A",
+      "isStrong": true,
+      "supportsForwardSecrecy": true
+    },
+    "certificate": {
+      "valid": true,
+      "trusted": true,
+      "subject": "CN=api.shop.example.com, O=Example Shop Ltd, L=San Francisco, ST=California, C=US",
+      "issuer": "CN=DigiCert TLS RSA SHA256 2020 CA1, O=DigiCert Inc, C=US",
+      "commonName": "api.shop.example.com",
+      "subjectAltNames": ["api.shop.example.com", "shop.example.com", "www.shop.example.com"],
+      "validFrom": "2025-11-15T00:00:00Z",
+      "validTo": "2026-11-15T23:59:59Z",
+      "daysRemaining": 318,
+      "serialNumber": "0A:1B:2C:3D:4E:5F:60:71:82:93:A4:B5:C6:D7:E8:F9",
+      "fingerprint": "A1:B2:C3:D4:E5:F6:07:08:09:0A:1B:2C:3D:4E:5F:60:71:82:93:A4",
+      "signatureAlgorithm": "SHA256withRSA",
+      "publicKeyAlgorithm": "RSA",
+      "publicKeySize": 2048,
+      "version": 3
+    },
+    "securityHeaders": {
+      "strictTransportSecurity": {
+        "present": true,
+        "value": "max-age=31536000; includeSubDomains; preload",
+        "maxAge": 31536000,
+        "includeSubDomains": true,
+        "preload": true,
+        "grade": "A+",
+        "status": "good"
+      },
+      "contentSecurityPolicy": {
+        "present": true,
+        "value": "default-src 'self'; script-src 'self' https://cdn.example.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;",
+        "grade": "B+",
+        "status": "good",
+        "issues": ["'unsafe-inline' in style-src reduces security"]
+      },
+      "xFrameOptions": {
+        "present": true,
+        "value": "SAMEORIGIN",
+        "grade": "A",
+        "status": "good"
+      },
+      "xContentTypeOptions": {
+        "present": true,
+        "value": "nosniff",
+        "grade": "A",
+        "status": "good"
+      },
+      "referrerPolicy": {
+        "present": false,
+        "grade": "F",
+        "status": "missing",
+        "recommendation": "Add 'Referrer-Policy: strict-origin-when-cross-origin'"
+      },
+      "permissionsPolicy": {
+        "present": false,
+        "grade": "C",
+        "status": "missing",
+        "recommendation": "Consider adding Permissions-Policy header"
+      }
+    },
+    "vulnerabilities": [],
+    "score": {
+      "overall": 95,
+      "grade": "A+",
+      "breakdown": {
+        "protocol": 100,
+        "certificate": 100,
+        "cipher": 100,
+        "headers": 85
+      }
+    }
+  },
+  "certificateChain": {
+    "valid": true,
+    "trusted": true,
+    "chainLength": 3,
+    "certificates": [
+      {
+        "level": "Leaf Certificate",
+        "position": 0,
+        "subject": {
+          "commonName": "api.shop.example.com",
+          "organization": "Example Shop Ltd",
+          "organizationalUnit": "IT Department",
+          "locality": "San Francisco",
+          "state": "California",
+          "country": "US"
+        },
+        "issuer": {
+          "commonName": "DigiCert TLS RSA SHA256 2020 CA1",
+          "organization": "DigiCert Inc",
+          "country": "US"
+        },
+        "validity": {
+          "notBefore": "2025-11-15T00:00:00Z",
+          "notAfter": "2026-11-15T23:59:59Z",
+          "daysRemaining": 318,
+          "isValid": true
+        },
+        "subjectAltNames": ["api.shop.example.com", "shop.example.com", "www.shop.example.com"],
+        "serialNumber": "0A:1B:2C:3D:4E:5F:60:71:82:93:A4:B5:C6:D7:E8:F9",
+        "fingerprint": {
+          "sha1": "A1:B2:C3:D4:E5:F6:07:08:09:0A:1B:2C:3D:4E:5F:60:71:82:93:A4",
+          "sha256": "E3:99:AC:5E:2E:3F:8D:91:4C:6F:A2:D5:C8:7B:1E:9F:3A:4D:5C:6B:7E:8A:9D:0C:1F:2E:3D:4C:5B:6A:7F:8E"
+        },
+        "publicKey": {
+          "algorithm": "RSA",
+          "size": 2048,
+          "exponent": 65537
+        },
+        "signature": {
+          "algorithm": "SHA256withRSA",
+          "value": "3082..."
+        },
+        "extensions": {
+          "keyUsage": ["Digital Signature", "Key Encipherment"],
+          "extendedKeyUsage": ["Server Authentication", "Client Authentication"],
+          "basicConstraints": {
+            "ca": false,
+            "pathLen": null
+          },
+          "subjectKeyIdentifier": "9F:91:16:1F:43:43:3E:49:A6:DE:6D:B6:80:D7:9F:60:30:E2:B5:80",
+          "authorityKeyIdentifier": "B1:3E:C3:69:03:F8:BF:47:01:D4:98:26:1A:08:02:EF:63:64:2B:C3",
+          "certificatePolicies": ["2.23.140.1.2.2"],
+          "crlDistributionPoints": ["http://crl3.digicert.com/DigiCertTLSRSASHA2562020CA1-4.crl"],
+          "authorityInfoAccess": {
+            "ocsp": "http://ocsp.digicert.com",
+            "caIssuers": "http://cacerts.digicert.com/DigiCertTLSRSASHA2562020CA1-1.crt"
+          }
+        },
+        "version": 3,
+        "isSelfSigned": false,
+        "isTrusted": true
+      },
+      {
+        "level": "Intermediate Certificate",
+        "position": 1,
+        "subject": {
+          "commonName": "DigiCert TLS RSA SHA256 2020 CA1",
+          "organization": "DigiCert Inc",
+          "country": "US"
+        },
+        "issuer": {
+          "commonName": "DigiCert Global Root CA",
+          "organization": "DigiCert Inc",
+          "country": "US"
+        },
+        "validity": {
+          "notBefore": "2020-09-23T00:00:00Z",
+          "notAfter": "2030-09-23T23:59:59Z",
+          "daysRemaining": 1726,
+          "isValid": true
+        },
+        "serialNumber": "06:7F:94:41:83:87:A5:6F:06:4A:E0:61:F3:E4:74:45",
+        "fingerprint": {
+          "sha1": "52:3D:78:89:B3:3F:6C:E9:AB:D4:5E:6B:D4:ED:05:28:56:2E:BD:EE",
+          "sha256": "2E:A4:4C:7D:4C:31:2E:A1:EA:E0:E2:6B:DC:7A:0B:6B:F5:CB:4A:54:77:6E:4F:42:36:E1:4F:3C:2A:5B:6E:D2"
+        },
+        "publicKey": {
+          "algorithm": "RSA",
+          "size": 2048,
+          "exponent": 65537
+        },
+        "signature": {
+          "algorithm": "SHA256withRSA",
+          "value": "5F82..."
+        },
+        "extensions": {
+          "keyUsage": ["Digital Signature", "Certificate Sign", "CRL Sign"],
+          "extendedKeyUsage": ["Server Authentication", "Client Authentication"],
+          "basicConstraints": {
+            "ca": true,
+            "pathLen": 0
+          },
+          "subjectKeyIdentifier": "B1:3E:C3:69:03:F8:BF:47:01:D4:98:26:1A:08:02:EF:63:64:2B:C3",
+          "authorityKeyIdentifier": "03:DE:50:35:56:D1:4C:BB:66:F0:A3:E2:1B:1B:C3:97:B2:3D:D1:55"
+        },
+        "version": 3,
+        "isSelfSigned": false,
+        "isTrusted": true
+      },
+      {
+        "level": "Root Certificate",
+        "position": 2,
+        "subject": {
+          "commonName": "DigiCert Global Root CA",
+          "organization": "DigiCert Inc",
+          "organizationalUnit": "www.digicert.com",
+          "country": "US"
+        },
+        "issuer": {
+          "commonName": "DigiCert Global Root CA",
+          "organization": "DigiCert Inc",
+          "organizationalUnit": "www.digicert.com",
+          "country": "US"
+        },
+        "validity": {
+          "notBefore": "2006-11-10T00:00:00Z",
+          "notAfter": "2031-11-10T00:00:00Z",
+          "daysRemaining": 2139,
+          "isValid": true
+        },
+        "serialNumber": "08:3B:E0:56:90:42:46:B1:A1:75:6A:C9:59:91:C7:4A",
+        "fingerprint": {
+          "sha1": "A8:98:5D:3A:65:E5:E5:C4:B2:D7:D6:6D:40:C6:DD:2F:B1:9C:54:36",
+          "sha256": "43:48:A0:E9:44:4C:78:CB:26:5E:05:8D:5E:89:44:B4:D8:4F:96:62:BD:26:DB:25:7F:89:34:A4:43:C7:01:61"
+        },
+        "publicKey": {
+          "algorithm": "RSA",
+          "size": 2048,
+          "exponent": 65537
+        },
+        "signature": {
+          "algorithm": "SHA1withRSA",
+          "value": "C6A7..."
+        },
+        "extensions": {
+          "keyUsage": ["Digital Signature", "Certificate Sign", "CRL Sign"],
+          "basicConstraints": {
+            "ca": true,
+            "pathLen": null
+          },
+          "subjectKeyIdentifier": "03:DE:50:35:56:D1:4C:BB:66:F0:A3:E2:1B:1B:C3:97:B2:3D:D1:55",
+          "authorityKeyIdentifier": "03:DE:50:35:56:D1:4C:BB:66:F0:A3:E2:1B:1B:C3:97:B2:3D:D1:55"
+        },
+        "version": 3,
+        "isSelfSigned": true,
+        "isTrusted": true,
+        "isRootCA": true
+      }
+    ],
+    "trustPath": [
+      "DigiCert Global Root CA (Root)",
+      "DigiCert TLS RSA SHA256 2020 CA1 (Intermediate)",
+      "api.shop.example.com (Leaf)"
+    ],
+    "validation": {
+      "chainValid": true,
+      "signatureValid": true,
+      "datesValid": true,
+      "hostnameMatch": true,
+      "trustedRoot": true,
+      "revocationStatus": "Good (OCSP)",
+      "issues": []
+    }
+  },
+  "network": {
+    "connection": {
+      "protocol": "TCP",
+      "remoteAddress": "198.51.100.42",
+      "remotePort": 443,
+      "localAddress": "192.168.1.105",
+      "localPort": 54782,
+      "connectionReused": true,
+      "connectionId": "conn_abc123xyz789",
+      "socketId": "socket_def456uvw012"
+    },
+    "dns": {
+      "hostname": "api.shop.example.com",
+      "resolvedIPs": [
+        {
+          "ip": "198.51.100.42",
+          "type": "IPv4",
+          "ttl": 300,
+          "priority": 1
+        },
+        {
+          "ip": "198.51.100.43",
+          "type": "IPv4",
+          "ttl": 300,
+          "priority": 2
+        },
+        {
+          "ip": "2001:db8::1",
+          "type": "IPv6",
+          "ttl": 300,
+          "priority": 3
+        }
+      ],
+      "lookupTime": "8ms",
+      "dnsServer": "8.8.8.8",
+      "cacheHit": false
+    },
+    "proxy": {
+      "used": false,
+      "type": null,
+      "address": null,
+      "port": null
+    },
+    "geolocation": {
+      "ip": "198.51.100.42",
+      "country": "United States",
+      "countryCode": "US",
+      "region": "California",
+      "city": "San Francisco",
+      "latitude": 37.7749,
+      "longitude": -122.4194,
+      "timezone": "America/Los_Angeles",
+      "isp": "Example Hosting Provider",
+      "asn": "AS12345"
+    },
+    "routing": {
+      "hops": 12,
+      "path": ["192.168.1.1", "10.0.0.1", "203.0.113.1", "...", "198.51.100.42"]
+    }
+  },
+  "timing": {
+    "phases": {
+      "blocked": {
+        "time": "2ms",
+        "description": "Time spent in queue waiting for network connection"
+      },
+      "dns": {
+        "time": "8ms",
+        "description": "DNS lookup time"
+      },
+      "tcp": {
+        "time": "23ms",
+        "description": "TCP connection establishment"
+      },
+      "ssl": {
+        "time": "67ms",
+        "description": "SSL/TLS handshake time"
+      },
+      "send": {
+        "time": "2ms",
+        "description": "Time to send HTTP request"
+      },
+      "wait": {
+        "time": "152ms",
+        "description": "Waiting for server response (TTFB)"
+      },
+      "receive": {
+        "time": "88ms",
+        "description": "Time to download response"
+      }
+    },
+    "breakdown": {
+      "dnsLookup": "8ms",
+      "tcpConnection": "23ms",
+      "tlsHandshake": "67ms",
+      "requestSent": "2ms",
+      "waiting": "152ms",
+      "timeToFirstByte": "252ms",
+      "contentDownload": "88ms",
+      "total": "342ms"
+    },
+    "timestamps": {
+      "startTime": "2026-01-02T10:34:56.447Z",
+      "dnsStart": "2026-01-02T10:34:56.449Z",
+      "dnsEnd": "2026-01-02T10:34:56.457Z",
+      "tcpStart": "2026-01-02T10:34:56.457Z",
+      "tcpEnd": "2026-01-02T10:34:56.480Z",
+      "sslStart": "2026-01-02T10:34:56.480Z",
+      "sslEnd": "2026-01-02T10:34:56.547Z",
+      "requestStart": "2026-01-02T10:34:56.547Z",
+      "requestEnd": "2026-01-02T10:34:56.549Z",
+      "responseStart": "2026-01-02T10:34:56.701Z",
+      "responseEnd": "2026-01-02T10:34:56.789Z",
+      "endTime": "2026-01-02T10:34:56.789Z"
+    },
+    "performance": {
+      "downloadSpeed": "162.7 KB/s",
+      "uploadSpeed": "193.5 KB/s",
+      "latency": "23ms",
+      "bandwidth": "100 Mbps",
+      "throughput": "42.6 KB/s"
+    }
+  },
+  "performance": {
+    "metrics": {
+      "speed": {
+        "download": "162.7 KB/s",
+        "upload": "193.5 KB/s",
+        "avgSpeed": "178.1 KB/s"
+      },
+      "latency": {
+        "rtt": "23ms",
+        "serverProcessing": "152ms",
+        "totalLatency": "175ms"
+      },
+      "bandwidth": {
+        "available": "100 Mbps",
+        "used": "1.3 Mbps",
+        "utilization": "1.3%"
+      },
+      "compression": {
+        "enabled": true,
+        "algorithm": "gzip",
+        "originalSize": "42.7 KB",
+        "compressedSize": "14.3 KB",
+        "savedBytes": "28.4 KB",
+        "ratio": "66.5%"
+      }
+    },
+    "optimization": {
+      "http2": {
+        "enabled": true,
+        "multiplexing": true,
+        "serverPush": false,
+        "headerCompression": true
+      },
+      "keepAlive": {
+        "enabled": true,
+        "timeout": "60s",
+        "maxRequests": 100
+      },
+      "caching": {
+        "enabled": true,
+        "strategy": "private",
+        "maxAge": "300s",
+        "status": "MISS",
+        "cacheable": true
+      }
+    },
+    "resourceTiming": {
+      "redirectTime": "0ms",
+      "appCacheTime": "0ms",
+      "dnsTime": "8ms",
+      "tcpTime": "23ms",
+      "requestTime": "2ms",
+      "responseTime": "240ms",
+      "domInteractive": null,
+      "domComplete": null,
+      "loadEventEnd": null
+    },
+    "score": {
+      "overall": 88,
+      "grade": "B+",
+      "breakdown": {
+        "latency": 92,
+        "throughput": 85,
+        "compression": 95,
+        "caching": 80
+      }
+    },
+    "recommendations": [
+      {
+        "priority": "medium",
+        "category": "caching",
+        "title": "Increase cache duration",
+        "description": "Current max-age is 5 minutes. Consider increasing to 1 hour for better performance.",
+        "impact": "Medium",
+        "effort": "Low"
+      },
+      {
+        "priority": "low",
+        "category": "protocol",
+        "title": "Enable HTTP/3",
+        "description": "HTTP/3 with QUIC can reduce latency by ~15-20%",
+        "impact": "Medium",
+        "effort": "Medium"
+      },
+      {
+        "priority": "low",
+        "category": "cdn",
+        "title": "Consider using CDN",
+        "description": "CDN can reduce latency for global users",
+        "impact": "High",
+        "effort": "High"
+      }
+    ]
+  },
+  "issues": {
+    "summary": {
+      "total": 5,
+      "critical": 0,
+      "high": 0,
+      "medium": 2,
+      "low": 2,
+      "info": 1
+    },
+    "critical": [],
+    "high": [],
+    "medium": [
+      {
+        "id": "ISS-001",
+        "category": "security",
+        "title": "Missing Referrer-Policy header",
+        "description": "The Referrer-Policy header is not set. This header controls how much referrer information should be included with requests.",
+        "impact": "Privacy information may leak to third parties",
+        "severity": "medium",
+        "cvss": null,
+        "affected": "Response Headers",
+        "recommendation": "Add 'Referrer-Policy: strict-origin-when-cross-origin' header",
+        "references": [
+          "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
+          "https://owasp.org/www-project-secure-headers/"
+        ],
+        "remediation": {
+          "effort": "Low",
+          "steps": [
+            "Add the following header to your server configuration:",
+            "Referrer-Policy: strict-origin-when-cross-origin"
+          ]
+        }
+      },
+      {
+        "id": "ISS-002",
+        "category": "performance",
+        "title": "Large response body size",
+        "description": "Response body is 14.3 KB (42.7 KB uncompressed). This is relatively large for an API response.",
+        "impact": "Slower page load times, especially on slow connections",
+        "severity": "medium",
+        "cvss": null,
+        "affected": "Response Body",
+        "recommendation": "Consider pagination, field filtering, or GraphQL to reduce response size",
+        "references": ["https://developer.mozilla.org/en-US/docs/Web/Performance/Optimization"],
+        "remediation": {
+          "effort": "Medium",
+          "steps": [
+            "Implement field selection (sparse fieldsets)",
+            "Use pagination with smaller page sizes",
+            "Remove unnecessary data from response",
+            "Consider implementing GraphQL for flexible queries"
+          ]
+        }
+      }
+    ],
+    "low": [
+      {
+        "id": "ISS-003",
+        "category": "security",
+        "title": "Missing Permissions-Policy header",
+        "description": "The Permissions-Policy header is not set. This header allows you to control which browser features can be used.",
+        "impact": "Browser features may be used without explicit permission",
+        "severity": "low",
+        "cvss": null,
+        "affected": "Response Headers",
+        "recommendation": "Add Permissions-Policy header to control browser features",
+        "references": [
+          "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy"
+        ],
+        "remediation": {
+          "effort": "Low",
+          "steps": ["Add header: Permissions-Policy: geolocation=(), microphone=(), camera=()"]
+        }
+      },
+      {
+        "id": "ISS-004",
+        "category": "security",
+        "title": "Insecure cookie found",
+        "description": "Cookie 'preferences' is not marked as Secure or HttpOnly",
+        "impact": "Cookie may be transmitted over insecure connection or accessed by JavaScript",
+        "severity": "low",
+        "cvss": null,
+        "affected": "Cookie: preferences",
+        "recommendation": "Add Secure and HttpOnly flags to the cookie",
+        "references": ["https://owasp.org/www-community/controls/SecureCookieAttribute"],
+        "remediation": {
+          "effort": "Low",
+          "steps": ["Update cookie to include: Secure; HttpOnly; SameSite=Strict"]
+        }
+      }
+    ],
+    "info": [
+      {
+        "id": "ISS-005",
+        "category": "security",
+        "title": "CSP uses 'unsafe-inline'",
+        "description": "Content-Security-Policy includes 'unsafe-inline' for style-src, which reduces XSS protection",
+        "impact": "Slightly reduced protection against XSS attacks",
+        "severity": "info",
+        "cvss": null,
+        "affected": "Content-Security-Policy header",
+        "recommendation": "Use nonces or hashes instead of 'unsafe-inline'",
+        "references": ["https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP"],
+        "remediation": {
+          "effort": "Medium",
+          "steps": [
+            "Generate nonces for inline styles",
+            "Update CSP to use: style-src 'self' 'nonce-{random}'"
+          ]
+        }
+      }
+    ],
+    "recommendations": [
+      {
+        "priority": "high",
+        "category": "security",
+        "title": "Add missing security headers",
+        "description": "Add Referrer-Policy and Permissions-Policy headers"
+      },
+      {
+        "priority": "medium",
+        "category": "performance",
+        "title": "Optimize response size",
+        "description": "Implement pagination and field filtering"
+      },
+      {
+        "priority": "low",
+        "category": "security",
+        "title": "Improve cookie security",
+        "description": "Add Secure and HttpOnly flags to all cookies"
+      },
+      {
+        "priority": "low",
+        "category": "performance",
+        "title": "Enable HTTP/3",
+        "description": "Upgrade to HTTP/3 for better performance"
+      }
+    ]
+  }
+}
