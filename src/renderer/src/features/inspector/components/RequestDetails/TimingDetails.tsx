@@ -13,13 +13,13 @@ export function TimingDetails({ request }: TimingDetailsProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Waterfall Visualization */}
-      <div className="p-4 bg-muted/20 rounded-lg border border-border/50">
-        <h3 className="text-xs font-bold text-muted-foreground uppercase mb-4">
+      <div className="p-2.5 bg-muted/20 rounded-lg border border-border/50">
+        <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2.5">
           Request Waterfall
         </h3>
-        <div className="space-y-3 relative">
+        <div className="space-y-1.5 relative">
           {Object.entries(analysis.timing.phases).map(([phase, data]: [string, any]) => {
             // Simple mock visualization logic
             // In real app, calculate true start/duration percentages relative to total time
@@ -77,7 +77,7 @@ export function TimingDetails({ request }: TimingDetailsProps) {
             return (
               <div
                 key={phase}
-                className="grid grid-cols-[100px_1fr_60px] gap-4 items-center text-xs group"
+                className="grid grid-cols-[80px_1fr_50px] gap-2 items-center text-[10px] sm:text-xs group"
               >
                 <div
                   className="text-muted-foreground text-right capitalize truncate"
@@ -85,7 +85,7 @@ export function TimingDetails({ request }: TimingDetailsProps) {
                 >
                   {phase}
                 </div>
-                <div className="relative h-4 bg-muted/50 rounded-sm overflow-hidden">
+                <div className="relative h-3 bg-muted/50 rounded-sm overflow-hidden">
                   <div
                     className={cn(
                       'absolute top-0 bottom-0 rounded-sm opacity-60 group-hover:opacity-100 transition-opacity',
@@ -102,22 +102,24 @@ export function TimingDetails({ request }: TimingDetailsProps) {
       </div>
 
       {/* Performance Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-3 border border-border/40 rounded bg-muted/10">
-          <div className="text-[10px] text-muted-foreground uppercase mb-1">Total Time</div>
-          <div className="font-bold text-lg">{analysis.timing.breakdown.total}</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="p-2 border border-border/40 rounded bg-muted/10">
+          <div className="text-[10px] text-muted-foreground uppercase mb-0.5">Total Time</div>
+          <div className="font-bold text-base">{analysis.timing.breakdown.total}</div>
         </div>
-        <div className="p-3 border border-border/40 rounded bg-muted/10">
-          <div className="text-[10px] text-muted-foreground uppercase mb-1">Time to First Byte</div>
-          <div className="font-bold text-lg">{analysis.timing.breakdown.timeToFirstByte}</div>
+        <div className="p-2 border border-border/40 rounded bg-muted/10">
+          <div className="text-[10px] text-muted-foreground uppercase mb-0.5">
+            Time to First Byte
+          </div>
+          <div className="font-bold text-base">{analysis.timing.breakdown.timeToFirstByte}</div>
         </div>
-        <div className="p-3 border border-border/40 rounded bg-muted/10">
-          <div className="text-[10px] text-muted-foreground uppercase mb-1">Latency</div>
-          <div className="font-bold text-lg">{analysis.timing.performance.latency}</div>
+        <div className="p-2 border border-border/40 rounded bg-muted/10">
+          <div className="text-[10px] text-muted-foreground uppercase mb-0.5">Latency</div>
+          <div className="font-bold text-base">{analysis.timing.performance.latency}</div>
         </div>
-        <div className="p-3 border border-border/40 rounded bg-muted/10">
-          <div className="text-[10px] text-muted-foreground uppercase mb-1">Download Speed</div>
-          <div className="font-bold text-lg">{analysis.timing.performance.downloadSpeed}</div>
+        <div className="p-2 border border-border/40 rounded bg-muted/10">
+          <div className="text-[10px] text-muted-foreground uppercase mb-0.5">Download Speed</div>
+          <div className="font-bold text-base">{analysis.timing.performance.downloadSpeed}</div>
         </div>
       </div>
     </div>

@@ -78,18 +78,18 @@ export function RequestDetails({ request }: RequestDetailsProps) {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
+                'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
                 activeTab === tab.id ? 'border-primary text-primary' : 'text-muted-foreground',
               )}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               {tab.label}
             </button>
           );
         })}
       </div>
 
-      <div className="flex-1 overflow-auto p-4 font-mono text-sm">
+      <div className="flex-1 overflow-auto p-2 font-mono text-xs">
         {activeTab === 'overview' && <RequestOverview request={request} />}
         {activeTab === 'request' && <RequestGeneral request={request} />}
         {activeTab === 'response' && <ResponseGeneral request={request} />}

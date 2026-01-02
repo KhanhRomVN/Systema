@@ -13,10 +13,10 @@ export function CertDetails({ request }: CertDetailsProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="relative border-l-2 border-border/50 ml-3 space-y-8 py-2">
+    <div className="space-y-4">
+      <div className="relative border-l-2 border-border/50 ml-2 space-y-4 py-1">
         {analysis.certificateChain.certificates.map((cert, i) => (
-          <div key={i} className="relative pl-6">
+          <div key={i} className="relative pl-4">
             {/* Timeline dot */}
             <div
               className={cn(
@@ -29,13 +29,13 @@ export function CertDetails({ request }: CertDetailsProps) {
               )}
             />
 
-            <div className="bg-muted/10 p-4 rounded-lg border border-border/50">
-              <div className="flex justify-between items-start mb-2">
+            <div className="bg-muted/10 p-2.5 rounded-lg border border-border/50">
+              <div className="flex justify-between items-start mb-1.5">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
+                  <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
                     {cert.level}
                   </div>
-                  <div className="font-bold text-base">{cert.subject.commonName}</div>
+                  <div className="font-bold text-sm">{cert.subject.commonName}</div>
                 </div>
                 <div className="text-right">
                   <div
@@ -51,19 +51,19 @@ export function CertDetails({ request }: CertDetailsProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-xs mt-4 pt-3 border-t border-border/30">
+              <div className="grid grid-cols-2 gap-2 text-xs mt-2 pt-2 border-t border-border/30">
                 <div>
-                  <span className="text-muted-foreground block mb-1">Issuer</span>
-                  <span className="font-mono">{cert.issuer.commonName}</span>
+                  <span className="text-muted-foreground block mb-0.5">Issuer</span>
+                  <span className="font-mono text-[10px]">{cert.issuer.commonName}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block mb-1">Valid Until</span>
-                  <span className="font-mono">
+                  <span className="text-muted-foreground block mb-0.5">Valid Until</span>
+                  <span className="font-mono text-[10px]">
                     {new Date(cert.validity.notAfter).toLocaleDateString()}
                   </span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-muted-foreground block mb-1">Fingerprint (SHA256)</span>
+                  <span className="text-muted-foreground block mb-0.5">Fingerprint (SHA256)</span>
                   <span className="font-mono text-[10px] break-all text-muted-foreground/80">
                     {cert.fingerprint.sha256}
                   </span>

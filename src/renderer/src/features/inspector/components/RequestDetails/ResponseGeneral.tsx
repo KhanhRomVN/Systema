@@ -10,10 +10,10 @@ export function ResponseGeneral({ request }: ResponseGeneralProps) {
 
   if (analysis?.response) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-3">
         <div>
-          <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">General</h3>
-          <div className="grid grid-cols-[120px_1fr] gap-2 p-4 bg-muted/20 rounded border border-border/50">
+          <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">General</h3>
+          <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-muted/20 rounded border border-border/50">
             <div className="text-muted-foreground">Status</div>
             <div className="flex gap-2 items-center">
               <span
@@ -44,8 +44,8 @@ export function ResponseGeneral({ request }: ResponseGeneralProps) {
         </div>
 
         <div>
-          <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Metadata</h3>
-          <div className="grid grid-cols-[120px_1fr] gap-2 p-4 bg-muted/20 rounded border border-border/50">
+          <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">Metadata</h3>
+          <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-muted/20 rounded border border-border/50">
             <div className="text-muted-foreground">Timestamp</div>
             <div>
               {new Date(analysis.response.timestamp).toLocaleString()} (
@@ -53,7 +53,7 @@ export function ResponseGeneral({ request }: ResponseGeneralProps) {
             </div>
 
             <div className="text-muted-foreground">Size</div>
-            <div className="grid grid-cols-3 gap-4 text-xs w-full">
+            <div className="grid grid-cols-3 gap-3 text-xs w-full">
               <div>
                 <span className="text-muted-foreground block">Headers</span>
                 <span>{analysis.response.size.headers}</span>
@@ -72,8 +72,10 @@ export function ResponseGeneral({ request }: ResponseGeneralProps) {
 
         {analysis.response.compression && (
           <div>
-            <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Compression</h3>
-            <div className="grid grid-cols-[120px_1fr] gap-2 p-4 bg-muted/20 rounded border border-border/50">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">
+              Compression
+            </h3>
+            <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-muted/20 rounded border border-border/50">
               <div className="text-muted-foreground">Algorithm</div>
               <div>{analysis.response.compression.algorithm}</div>
 

@@ -9,29 +9,29 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
   const analysis = request.analysis;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Cookie Summary */}
       {analysis?.cookies?.summary && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-muted/20 p-3 rounded-lg border border-border/50 text-center">
-            <div className="text-2xl font-bold">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-muted/20 p-2 rounded-lg border border-border/50 text-center">
+            <div className="text-xl font-bold">
               {analysis.cookies.summary.totalRequest + analysis.cookies.summary.totalResponse}
             </div>
-            <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+            <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
               Total Cookies
             </div>
           </div>
-          <div className="bg-green-500/10 p-3 rounded-lg border border-green-500/20 text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <div className="bg-green-500/10 p-2 rounded-lg border border-green-500/20 text-center">
+            <div className="text-xl font-bold text-green-600 dark:text-green-400">
               {analysis.cookies.summary.secureCount}
             </div>
-            <div className="text-xs text-green-600/80 dark:text-green-400/80 uppercase font-bold tracking-wider">
+            <div className="text-[10px] text-green-600/80 dark:text-green-400/80 uppercase font-bold tracking-wider">
               Secure
             </div>
           </div>
           <div
             className={cn(
-              'p-3 rounded-lg border text-center',
+              'p-2 rounded-lg border text-center',
               analysis.cookies.summary.issues.critical + analysis.cookies.summary.issues.warning > 0
                 ? 'bg-yellow-500/10 border-yellow-500/20'
                 : 'bg-muted/20 border-border/50',
@@ -39,7 +39,7 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
           >
             <div
               className={cn(
-                'text-2xl font-bold',
+                'text-xl font-bold',
                 analysis.cookies.summary.issues.critical + analysis.cookies.summary.issues.warning >
                   0
                   ? 'text-yellow-600 dark:text-yellow-400'
@@ -50,7 +50,7 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
             </div>
             <div
               className={cn(
-                'text-xs uppercase font-bold tracking-wider',
+                'text-[10px] uppercase font-bold tracking-wider',
                 analysis.cookies.summary.issues.critical + analysis.cookies.summary.issues.warning >
                   0
                   ? 'text-yellow-600/80 dark:text-yellow-400/80'
@@ -63,21 +63,21 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Request Cookies */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold text-muted-foreground uppercase pb-2 border-b border-border/50">
+        <div className="space-y-3">
+          <h3 className="text-[10px] font-bold text-muted-foreground uppercase pb-1.5 border-b border-border/50">
             Request Cookies
           </h3>
           {analysis?.cookies?.request && analysis.cookies.request.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {analysis.cookies.request.map((cookie, i) => (
                 <div
                   key={i}
-                  className="flex flex-col border border-border/40 rounded-md bg-background overflow-hidden p-3 hover:bg-muted/20 transition-colors"
+                  className="flex flex-col border border-border/40 rounded-md bg-background overflow-hidden p-2 hover:bg-muted/20 transition-colors"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-bold font-mono text-sm">{cookie.name}</span>
+                  <div className="flex justify-between items-start mb-1.5 ">
+                    <span className="font-bold font-mono text-xs">{cookie.name}</span>
                     <div className="flex gap-1">
                       {cookie.analysis?.security === 'warning' && (
                         <span className="text-[9px] bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded uppercase font-bold">
@@ -86,11 +86,11 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
                       )}
                     </div>
                   </div>
-                  <div className="font-mono text-xs text-foreground/80 break-all mb-2 pl-2 border-l-2 border-primary/20">
+                  <div className="font-mono text-xs text-foreground/80 break-all mb-1.5 pl-2 border-l-2 border-primary/20">
                     {cookie.value}
                   </div>
 
-                  <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground/80 mt-auto pt-2 border-t border-border/30 border-dashed">
+                  <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground/80 mt-auto pt-1.5 border-t border-border/30 border-dashed">
                     <span className="px-1.5 py-0.5 bg-muted rounded border border-border/30">
                       Domain: {cookie.domain}
                     </span>
@@ -102,24 +102,24 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground italic">No request cookies</div>
+            <div className="text-xs text-muted-foreground italic">No request cookies</div>
           )}
         </div>
 
         {/* Response Cookies */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold text-muted-foreground uppercase pb-2 border-b border-border/50">
+        <div className="space-y-3">
+          <h3 className="text-[10px] font-bold text-muted-foreground uppercase pb-1.5 border-b border-border/50">
             Response Cookies
           </h3>
           {analysis?.cookies?.response && analysis.cookies.response.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {analysis.cookies.response.map((cookie, i) => (
                 <div
                   key={i}
-                  className="flex flex-col border border-border/40 rounded-md bg-background overflow-hidden p-3 hover:bg-muted/20 transition-colors"
+                  className="flex flex-col border border-border/40 rounded-md bg-background overflow-hidden p-2 hover:bg-muted/20 transition-colors"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-bold font-mono text-sm">{cookie.name}</span>
+                  <div className="flex justify-between items-start mb-1.5">
+                    <span className="font-bold font-mono text-xs">{cookie.name}</span>
                     <div className="flex gap-1">
                       {cookie.secure && (
                         <span className="text-[9px] bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded uppercase font-bold">
@@ -138,11 +138,11 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
                       )}
                     </div>
                   </div>
-                  <div className="font-mono text-xs text-foreground/80 break-all mb-2 pl-2 border-l-2 border-primary/20">
+                  <div className="font-mono text-xs text-foreground/80 break-all mb-1.5 pl-2 border-l-2 border-primary/20">
                     {cookie.value}
                   </div>
 
-                  <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground/80 mt-auto pt-2 border-t border-border/30 border-dashed">
+                  <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground/80 mt-auto pt-1.5 border-t border-border/30 border-dashed">
                     {cookie.expires && (
                       <span className="px-1.5 py-0.5 bg-muted rounded border border-border/30 text-nowrap">
                         Expires: {new Date(cookie.expires).toLocaleDateString()}
@@ -163,7 +163,7 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground italic">No response cookies</div>
+            <div className="text-xs text-muted-foreground italic">No response cookies</div>
           )}
         </div>
       </div>
@@ -173,19 +173,19 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
         (analysis.cookies.summary.issues.critical > 0 ||
           analysis.cookies.summary.issues.warning > 0) && (
           <div>
-            <h3 className="text-xs font-bold text-muted-foreground uppercase mb-3 border-b border-border/50 pb-2">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2 border-b border-border/50 pb-1.5">
               Cookie Issues
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {[...analysis.cookies.request, ...analysis.cookies.response]
                 .filter((c) => c.analysis?.issues && c.analysis.issues.length > 0)
                 .map((c, i) => (
                   <div
                     key={i}
-                    className="flex flex-col bg-yellow-500/5 border border-yellow-500/20 p-3 rounded text-sm relative"
+                    className="flex flex-col bg-yellow-500/5 border border-yellow-500/20 p-2 rounded text-xs relative"
                   >
                     <div className="font-bold font-mono text-xs mb-1">{c.name}</div>
-                    <ul className="list-disc list-inside text-muted-foreground text-xs space-y-1">
+                    <ul className="list-disc list-inside text-muted-foreground text-[10px] space-y-0.5">
                       {c.analysis!.issues.map((issue, idx) => (
                         <li key={idx}>{issue}</li>
                       ))}

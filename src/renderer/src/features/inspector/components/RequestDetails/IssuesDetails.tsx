@@ -12,35 +12,35 @@ export function IssuesDetails({ request }: IssuesDetailsProps) {
 
   if (analysis?.issues && analysis.issues.summary.total > 0) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
           {/* Summary Cards */}
-          <div className="bg-red-500/10 border border-red-500/20 p-3 rounded text-center">
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+          <div className="bg-red-500/10 border border-red-500/20 p-2 rounded text-center">
+            <div className="text-xl font-bold text-red-600 dark:text-red-400">
               {analysis.issues.summary.critical}
             </div>
             <div className="text-[10px] font-bold uppercase text-red-600/80 tracking-wider">
               Critical
             </div>
           </div>
-          <div className="bg-orange-500/10 border border-orange-500/20 p-3 rounded text-center">
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+          <div className="bg-orange-500/10 border border-orange-500/20 p-2 rounded text-center">
+            <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
               {analysis.issues.summary.high}
             </div>
             <div className="text-[10px] font-bold uppercase text-orange-600/80 tracking-wider">
               High
             </div>
           </div>
-          <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded text-center">
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 p-2 rounded text-center">
+            <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
               {analysis.issues.summary.medium}
             </div>
             <div className="text-[10px] font-bold uppercase text-yellow-600/80 tracking-wider">
               Medium
             </div>
           </div>
-          <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded text-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+          <div className="bg-blue-500/10 border border-blue-500/20 p-2 rounded text-center">
+            <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
               {analysis.issues.summary.low}
             </div>
             <div className="text-[10px] font-bold uppercase text-blue-600/80 tracking-wider">
@@ -50,7 +50,7 @@ export function IssuesDetails({ request }: IssuesDetailsProps) {
         </div>
 
         {/* Issue Lists */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {['critical', 'high', 'medium', 'low', 'info'].map((severity) => {
             const items = analysis.issues![severity as keyof IssuesAnalysis] as any[];
             if (
@@ -75,14 +75,14 @@ export function IssuesDetails({ request }: IssuesDetailsProps) {
                   <div
                     key={i}
                     className={cn(
-                      'p-4 rounded-lg border mb-3 last:mb-0',
+                      'p-2.5 rounded-lg border mb-2 last:mb-0',
                       colors[severity] || colors.info,
                     )}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-2">
                       <AlertOctagon
                         className={cn(
-                          'w-5 h-5 mt-0.5 shrink-0',
+                          'w-4 h-4 mt-0.5 shrink-0',
                           severity === 'critical'
                             ? 'text-red-500'
                             : severity === 'high'
@@ -95,14 +95,16 @@ export function IssuesDetails({ request }: IssuesDetailsProps) {
                       <div className="space-y-1">
                         <div className="font-bold text-sm flex items-center gap-2">
                           {issue.title}
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-background border border-border/20 uppercase text-muted-foreground">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background border border-border/20 uppercase text-muted-foreground">
                             {severity}
                           </span>
                         </div>
-                        <p className="text-sm text-foreground/80">{issue.description}</p>
+                        <p className="text-xs text-foreground/80">{issue.description}</p>
                         {issue.recommendation && (
-                          <div className="mt-2 text-xs bg-background/50 p-2 rounded border border-border/10 inline-block">
-                            <span className="font-bold text-muted-foreground">Fix:</span>{' '}
+                          <div className="mt-1.5 text-[10px] bg-background/50 p-1.5 rounded border border-border/10 inline-block">
+                            <span className="font-bold text-muted-foreground block mb-0.5">
+                              Fix:
+                            </span>
                             {issue.recommendation}
                           </div>
                         )}
