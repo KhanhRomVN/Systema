@@ -106,16 +106,13 @@ export class ProxyServer extends EventEmitter {
   }
 
   private setupListeners() {
-    this.proxy.onError((ctx: any, err: any, errorKind: string) => {
-      const url = ctx && ctx.clientToProxyRequest ? ctx.clientToProxyRequest.url : '';
+    this.proxy.onError((err: any) => {
       const code = err?.code;
 
       // Suppress common network errors that are usually just noise
       if (code === 'ECONNRESET' || err?.message === 'socket hang up') {
         return;
       }
-
-      console.error(`[ERROR] ${errorKind} on ${url}:`, err);
     });
 
     this.proxy.onRequest((ctx: any, callback: any) => {
@@ -189,7 +186,9 @@ export class ProxyServer extends EventEmitter {
           ).toLowerCase();
           const zlib = require('zlib');
 
+          let isBinaryResponse = false;
           let body = '';
+
           if (contentEncoding === 'gzip') {
             body = zlib.gunzipSync(buffer).toString('utf8');
           } else if (contentEncoding === 'br') {
@@ -207,21 +206,18 @@ export class ProxyServer extends EventEmitter {
             } else {
               // Binary detection: Check for NULL bytes in the first 1024 bytes
               const checkLen = Math.min(buffer.length, 1024);
-              let isBinary = false;
               for (let i = 0; i < checkLen; i++) {
                 if (buffer[i] === 0x00) {
-                  isBinary = true;
+                  isBinaryResponse = true;
                   break;
                 }
               }
 
-              if (isBinary) {
-                body = `[Systema Info] Response body appears to be binary data (size: ${sizeStr}). Preview not available.`;
+              if (isBinaryResponse) {
+                // Return base64 encoded binary data
+                body = buffer.toString('base64');
               } else {
                 body = buffer.toString('utf8');
-                // Double check for mojibake/garbage after toString?
-                // Simple heuristic: if too many replacement characters, it might be an unknown encoding issues.
-                // But generally NULL byte check is sufficient for "binary vs text".
               }
             }
           } else {
@@ -232,6 +228,8 @@ export class ProxyServer extends EventEmitter {
             id: ctx.requestId,
             body,
             size: sizeStr,
+            isBinary: isBinaryResponse, // Map renamed variable
+            contentType: res?.headers['content-type'] || '',
           });
         } catch (err) {
           console.error('Error processing response body:', err);

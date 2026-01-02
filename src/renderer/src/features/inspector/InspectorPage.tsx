@@ -51,10 +51,48 @@ export default function InspectorPage() {
         prev.map((req) => {
           // Use ID for matching if available
           if (req.id === data.id) {
+            const contentType = data.headers
+              ? data.headers['content-type'] || data.headers['Content-Type'] || ''
+              : '';
+            const url = req.path; // Or use full URL if available in req, but we have path.
+
+            // Determine Type
+            let type = 'Other';
+            if (
+              contentType.includes('json') ||
+              contentType.includes('xml') ||
+              contentType.includes('protobuf')
+            )
+              type = 'XHR';
+            else if (contentType.includes('javascript') || contentType.includes('ecmascript'))
+              type = 'JS';
+            else if (contentType.includes('css')) type = 'CSS';
+            else if (contentType.includes('image')) type = 'Img';
+            else if (contentType.includes('video') || contentType.includes('audio')) type = 'Media';
+            else if (contentType.includes('font')) type = 'Font';
+            else if (contentType.includes('html')) type = 'Doc';
+            else {
+              // Fallback to extension check if content-type is generic or missing
+              if (url.match(/\.js(\?|$)/)) type = 'JS';
+              else if (url.match(/\.css(\?|$)/)) type = 'CSS';
+              else if (url.match(/\.(png|jpg|jpeg|gif|svg|ico|webp)(\?|$)/)) type = 'Img';
+              else if (url.match(/\.(mp4|webm|ogg|mp3|wav)(\?|$)/)) type = 'Media';
+              else if (url.match(/\.(woff|woff2|ttf|otf|eot)(\?|$)/)) type = 'Font';
+              else if (url.match(/\.wasm(\?|$)/)) type = 'Wasm';
+              else if (url.match(/manifest\.json(\?|$)/)) type = 'Manifest';
+              else if (req.protocol === 'ws' || req.protocol === 'wss') type = 'WS';
+              else if (
+                type === 'Other' &&
+                (req.method === 'GET' || req.method === 'POST') &&
+                !url.includes('.')
+              )
+                type = 'XHR'; // Assume API call
+            }
+
             return {
               ...req,
               status: data.statusCode,
-              type: 'XHR', // Placeholder, refine logic
+              type: type,
               // size and time will be updated in response body or completion
               time: `${Date.now() - req.timestamp}ms`,
               responseHeaders: data.headers || {},
@@ -87,6 +125,8 @@ export default function InspectorPage() {
               responseBody: data.body,
               size: data.size || req.size,
               time: `${Date.now() - req.timestamp}ms`,
+              isBinary: data.isBinary,
+              contentType: data.contentType,
             };
           }
           return req;

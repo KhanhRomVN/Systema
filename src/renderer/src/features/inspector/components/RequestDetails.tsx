@@ -8,15 +8,7 @@ interface RequestDetailsProps {
 
 export function RequestDetails({ request }: RequestDetailsProps) {
   const [activeTab, setActiveTab] = useState<
-    | 'headers'
-    | 'request'
-    | 'payload'
-    | 'response'
-    | 'preview'
-    | 'cookies'
-    | 'timings'
-    | 'stackTrace'
-    | 'security'
+    'headers' | 'request' | 'payload' | 'response' | 'preview' | 'cookies' | 'raw'
   >('headers');
 
   if (!request) {
@@ -34,9 +26,7 @@ export function RequestDetails({ request }: RequestDetailsProps) {
     { id: 'response', label: 'Response' },
     { id: 'preview', label: 'Preview' },
     { id: 'cookies', label: 'Cookie' },
-    { id: 'timings', label: 'Timings' },
-    { id: 'stackTrace', label: 'Stack Trace' },
-    { id: 'security', label: 'Security' },
+    { id: 'raw', label: 'Raw' },
   ] as const;
 
   const queryParams = new URLSearchParams(request.path.split('?')[1] || {});
@@ -229,8 +219,111 @@ export function RequestDetails({ request }: RequestDetailsProps) {
         )}
 
         {activeTab === 'preview' && (
-          <div className="h-full flex items-center justify-center text-muted-foreground">
-            Preview not available for this content type.
+          <div className="h-full relative font-mono text-xs">
+            {(() => {
+              const contentType = (
+                request.contentType ||
+                request.responseHeaders['content-type'] ||
+                ''
+              ).toLowerCase();
+
+              const isImage = contentType.startsWith('image/');
+              const isJson = contentType.includes('application/json');
+              const isHtml = contentType.includes('text/html');
+              // const isCss = contentType.includes('text/css');
+              // const isJs = contentType.includes('javascript') || contentType.includes('application/x-javascript');
+
+              if (request.responseBody === undefined || request.responseBody === null) {
+                return (
+                  <div className="h-full flex items-center justify-center text-muted-foreground italic">
+                    No response body available
+                  </div>
+                );
+              }
+
+              if (isImage) {
+                // Determine source for image
+                let src = '';
+                if (request.isBinary && request.responseBody) {
+                  // If binary, use base64 data URI
+                  src = `data:${contentType};base64,${request.responseBody}`;
+                } else if (
+                  request.requestHeaders &&
+                  request.method === 'GET' &&
+                  !request.isBinary
+                ) {
+                  // Fallback to URL if not available (note: might re-trigger request)
+                  // Use proxy url if needed? Ideally use captured data.
+                  // If we don't have binary body yet, maybe it's too large or not captured?
+                  // For now, assume if isBinary is set we use it.
+                  src = `data:${contentType};base64,${request.responseBody}`;
+                }
+
+                if (!src && !request.responseBody) {
+                  return (
+                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                      Image data not captured
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="h-full flex items-center justify-center bg-muted/10 p-4">
+                    <img
+                      src={src}
+                      alt="Preview"
+                      className="max-w-full max-h-full object-contain shadow-sm border border-border/50 rounded"
+                    />
+                  </div>
+                );
+              }
+
+              if (isJson) {
+                try {
+                  const json = JSON.parse(request.responseBody);
+                  return (
+                    <pre className="h-full overflow-auto bg-muted/30 p-2 rounded border border-border/50 whitespace-pre-wrap">
+                      {JSON.stringify(json, null, 2)}
+                    </pre>
+                  );
+                } catch {
+                  return (
+                    <pre className="h-full overflow-auto bg-muted/30 p-2 rounded border border-border/50 whitespace-pre-wrap text-red-400">
+                      Error keying JSON: {request.responseBody}
+                    </pre>
+                  );
+                }
+              }
+
+              if (isHtml) {
+                return (
+                  <iframe
+                    title="HTML Preview"
+                    srcDoc={request.responseBody}
+                    className="w-full h-full bg-white border border-border/50 rounded"
+                    sandbox="allow-scripts"
+                  />
+                );
+              }
+
+              if (request.isBinary) {
+                return (
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    <div className="text-4xl">📦</div>
+                    <div className="font-bold">Binary Data</div>
+                    <div>Type: {contentType || 'Unknown'}</div>
+                    <div className="text-xs bg-muted p-1 rounded">Size: {request.size}</div>
+                  </div>
+                );
+              }
+
+              // Fallback for text/other
+              return (
+                <pre className="h-full overflow-auto bg-muted/30 p-2 rounded border border-border/50 whitespace-pre-wrap">
+                  {request.responseBody}
+                </pre>
+              );
+            })()}
           </div>
         )}
 
@@ -271,31 +364,56 @@ export function RequestDetails({ request }: RequestDetailsProps) {
           </div>
         )}
 
-        {activeTab === 'timings' && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Timing</h3>
-              <div className="grid grid-cols-[120px_1fr] gap-2">
-                <div className="text-muted-foreground">Total Duration</div>
-                <div>{request.time}</div>
-                <div className="text-muted-foreground">Timestamp</div>
-                <div>{new Date(request.timestamp).toLocaleTimeString()}</div>
-                <div className="text-muted-foreground">Size</div>
-                <div>{request.size}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'stackTrace' && (
-          <div className="h-full flex items-center justify-center text-muted-foreground italic">
-            Stack trace not available
-          </div>
-        )}
-
-        {activeTab === 'security' && (
-          <div className="h-full flex items-center justify-center text-muted-foreground italic">
-            Security details not available
+        {activeTab === 'raw' && (
+          <div className="h-full">
+            <pre className="h-full overflow-auto bg-muted/30 p-4 rounded border border-border/50 text-xs whitespace-pre-wrap font-mono">
+              {/* Metadata Section */}
+              {'# METADATA'.padEnd(80, '=')}
+              {'\n'}
+              Request ID: {request.id}
+              {'\n'}
+              Protocol: {request.protocol.toUpperCase()}
+              {'\n'}
+              Type: {request.type}
+              {'\n'}
+              Size: {request.size}
+              {'\n'}
+              Duration: {request.time}
+              {'\n'}
+              Timestamp: {new Date(request.timestamp).toISOString()} ({request.timestamp}){'\n\n'}
+              {'# HTTP REQUEST'.padEnd(80, '=')}
+              {'\n\n'}
+              {/* Request Line */}
+              {request.method} {request.path} HTTP/1.1
+              {'\n'}
+              Host: {request.host}
+              {'\n'}
+              {/* Request Headers */}
+              {Object.entries(request.requestHeaders).length > 0
+                ? Object.entries(request.requestHeaders)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join('\n')
+                : '(no request headers)'}
+              {'\n\n'}
+              {/* Request Body */}
+              {request.requestBody || '(no request body)'}
+              {'\n\n'}
+              {'# HTTP RESPONSE'.padEnd(80, '=')}
+              {'\n\n'}
+              {/* Status Line */}
+              HTTP/1.1 {request.status}
+              {'\n'}
+              {/* Response Headers */}
+              {Object.entries(request.responseHeaders).length > 0
+                ? Object.entries(request.responseHeaders)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join('\n')
+                : '(no response headers)'}
+              {'\n\n'}
+              {/* Response Body */}
+              {request.responseBody || '(no response body)'}
+              {'\n'}
+            </pre>
           </div>
         )}
       </div>

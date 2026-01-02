@@ -55,14 +55,12 @@ export function ChatPanel({
     // Only load if we were provided a conversation ID (resuming)
     // If it's a new chat (no initial ID), we start empty.
     if (initialConversationId) {
-      console.log('[ChatPanel] Resuming conversation:', initialConversationId);
       const savedMessages = ChatStorage.loadMessages(initialConversationId);
       if (savedMessages.length > 0) {
         setMessages(savedMessages);
         setIsFirstRequest(false); // Valid history means not first request
       }
     } else {
-      console.log('[ChatPanel] New conversation started:', currentConversationId);
       setMessages([]);
       setIsFirstRequest(true);
     }
@@ -258,7 +256,6 @@ export function ChatPanel({
           // Use targetApp from context, or fallback to provider if missing (though strictly should be from context now)
           const targetApp = inspectorContext.targetApp || provider;
           systemPrompt = combinePrompts(targetApp);
-          console.log('[ChatPanel] Loaded System Prompt size:', systemPrompt.length);
         } catch (e) {
           console.error('[ChatPanel] Failed to load system prompt:', e);
         }
@@ -273,6 +270,19 @@ export function ChatPanel({
         );
         if (req) {
           contextString = `\n\n[Context: Selected Request]\nMethod: ${req.method}\nURL: ${req.host}${req.path}\nStatus: ${req.status}\nHeaders: ${JSON.stringify(req.requestHeaders)}`;
+        }
+      }
+
+      // Inject Active Filters (First Request Only)
+      if (isFirstRequest) {
+        try {
+          const filterConfig = await executeTool(
+            { type: 'get_active_filters', params: {}, rawXml: '' },
+            inspectorContext,
+          );
+          contextString += `\n\n[Active Filters]\n${filterConfig}`;
+        } catch (e) {
+          console.warn('Failed to inject active filters', e);
         }
       }
 

@@ -49,14 +49,7 @@ app.whenReady().then(async () => {
       activeChildProcess = null;
     }
     if (activeProxyUrl) {
-      // Security note: activeProxyUrl is internally generated, but good to be aware of injection if user controlled.
-      // Here it comes from our internal logic (localhost).
-      exec(`pkill -f -- "--proxy-server=${activeProxyUrl}"`, (error) => {
-        if (error) {
-          console.error(`Failed to pkill VS Code: ${error.message}`);
-        } else {
-        }
-      });
+      exec(`pkill -f -- "--proxy-server=${activeProxyUrl}"`);
       activeProxyUrl = null;
     }
     return true;
@@ -126,7 +119,6 @@ app.whenReady().then(async () => {
       }
 
       if (!executable) {
-        console.error('No supported browser found');
         return false;
       }
 

@@ -86,7 +86,7 @@ const parseTaskProgress = (content: string): TaskProgressItem[] | null => {
 /**
  * Parse XML-like content to extract multiple parameter values for the same tag
  */
-const extractParamArray = (content: string, containerTag: string, itemTag: string): string[] => {
+const extractParamArray = (content: string, itemTag: string): string[] => {
   // Simple regex to find all occurrences of <itemTag>value</itemTag> inside content
   // But wait, the structure is <tool><field>f1</field><value>v1</value><field>f2</field><value>v2</value></tool>
   // So we just need to extract all <itemTag> matches from the content.
@@ -109,22 +109,29 @@ const parseToolAction = (toolName: string, innerContent: string, rawXml: string)
 
   switch (toolName) {
     case 'set_filter': {
-      // New format: <field>...</field><value>...</value> repeating
-      const fields = extractParamArray(innerContent, '', 'field');
-      const values = extractParamArray(innerContent, '', 'value');
+      // New format: <field>...</field><value>...</value><exclude>...</exclude> repeating
+      const fields = extractParamArray(innerContent, 'field');
+      const values = extractParamArray(innerContent, 'value');
+      const excludes = extractParamArray(innerContent, 'exclude');
+      const modes = extractParamArray(innerContent, 'mode');
 
       // Zip them
       if (fields.length > 0 && values.length > 0) {
         params.filters = fields.map((f, i) => ({
           field: f,
           value: values[i] || '',
+          ...(excludes[i] ? { exclude: excludes[i] } : {}),
+          mode: modes[i] || 'append',
         }));
       } else {
         // Fallback to old single way if needed, or strictly new way
-        const type = extractParamValue(innerContent, 'type');
+        const type =
+          extractParamValue(innerContent, 'type') || extractParamValue(innerContent, 'field');
         const value = extractParamValue(innerContent, 'value');
+        const exclude = extractParamValue(innerContent, 'exclude');
+
         if (type && value) {
-          params.filters = [{ field: type, value }];
+          params.filters = [{ field: type, value, exclude }];
         }
       }
       break;
@@ -133,8 +140,8 @@ const parseToolAction = (toolName: string, innerContent: string, rawXml: string)
     // Unified list_requests handles searching and listing
     case 'list_requests': {
       // New format: <field>...</field><value>...</value> repeating + optional <limit> + <show_all_columns>
-      const fields = extractParamArray(innerContent, '', 'field');
-      const values = extractParamArray(innerContent, '', 'value');
+      const fields = extractParamArray(innerContent, 'field');
+      const values = extractParamArray(innerContent, 'value');
       const limit = extractParamValue(innerContent, 'limit');
       const showAll = extractParamValue(innerContent, 'show_all_columns');
 

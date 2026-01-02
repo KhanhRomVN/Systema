@@ -15,10 +15,15 @@ NETWORK OPERATIONS
 - Get full details (headers, body, timings)
 
 <set_filter>
-  <field>method</field><value>POST</value>
-  <field>status</field><value>error</value>
+  <field>method</field><value>POST,PUT</value><mode>append</mode>
+  <field>status</field><value>200,404</value><mode>remove</mode>
+  <field>size</field><value>100 - 1000</value>
 </set_filter>
-- Set active filters. Use 'reset' as field to clear all.
+- Set filters.
+- Fields: method, status, type, size, time.
+- For arrays (method, status, type): Value is CSV. use <mode>append|remove</mode> to add/remove. Default append.
+- For ranges (size, time): Value is "min - max". Use "any" for open ended (e.g. "any - 500").
+- Use <field>reset</field> to clear all.
 
 <get_active_filters />
 - Returns the current filter configuration.

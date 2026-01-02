@@ -23,6 +23,18 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
         // Migration: Remove whitelist if present
         if ('whitelist' in parsed.host) delete (parsed.host as any).whitelist;
         if ('whitelist' in parsed.path) delete (parsed.path as any).whitelist;
+
+        // Migration: Check for legacy status keys (success, redirect, etc)
+        const statusKeys = Object.keys(parsed.status || {});
+        if (
+          statusKeys.some((k) =>
+            ['success', 'redirect', 'clientError', 'serverError', 'other'].includes(k),
+          )
+        ) {
+          // Found legacy status, reset status to initial (granular)
+          parsed.status = initialFilterState.status;
+        }
+
         return { ...initialFilterState, ...parsed };
       }
       return initialFilterState;
@@ -38,16 +50,7 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
   const filteredRequests = useMemo(() => {
     return requests.filter((req) => {
       // Method
-      if (
-        !filter.methods[req.method as keyof typeof filter.methods] &&
-        !(
-          req.method !== 'GET' &&
-          req.method !== 'POST' &&
-          req.method !== 'PUT' &&
-          req.method !== 'DELETE' &&
-          filter.methods.OPTIONAL
-        )
-      ) {
+      if (!filter.methods[req.method as keyof typeof filter.methods]) {
         return false;
       }
 
@@ -58,38 +61,103 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
       if (filter.path.blacklist.some((blocked) => req.path.includes(blocked))) return false;
 
       // Status
-      const status = req.status;
-      if (status === 0) {
-        // Pending
-        if (!filter.status.other) return false;
-      } else if (status >= 200 && status < 300) {
-        if (!filter.status.success) return false;
-      } else if (status >= 300 && status < 400) {
-        if (!filter.status.redirect) return false;
-      } else if (status >= 400 && status < 500) {
-        if (!filter.status.clientError) return false;
-      } else if (status >= 500) {
-        if (!filter.status.serverError) return false;
-      } else {
-        if (!filter.status.other) return false;
+      // If status is 0 (Pending), usually we treat it as 'Other' or maybe enable if we want to see pending requests.
+      // For now, let's map 0 to something or check if 'other' is enabled if we can't find it.
+      // But the requirement says "granular status".
+      // If the status is not in our list (e.g. 0), we might default to showing it or check 'other' if we had one (we removed 'other' from status).
+      // Let's assume pending requests (status 0) should be shown if we aren't filtering them out explicitly,
+      // BUT with granular filters, if we select 200, we probably only want 200.
+      // If the user hasn't selected "0" (which isn't an option), maybe pending requests shouldn't show?
+      // Or maybe we treat unknown status as enabled?
+      // Let's check against the map. If the status is in the map, use the value.
+      // If not in the map (like 0 or some obscure code), maybe we want to show it?
+      // Wait, the user wanted specific codes. If we receive 418 (Teapot) and it's not in the list, what happens?
+      // Usually "filter" means "include only these". So if 418 is not in the list, it's hidden.
+      // However, 0 is "pending". Usually we want to see pending requests.
+      // Let's assume pending requests are always visible OR maybe we should map them to a dummy "pending" status if we want to filter them.
+      // For now, let's strictly value the filter. If status is 0, checking filter.status[0] will be undefined.
+      // Let's treat undefined as TRUE for safely showing things not in the list? No, that defeats the purpose of "only show 200".
+      // Let's treat undefined as FALSE, EXCEPT for status 0 (Pending) which we might want to show until it resolves?
+      // Actually, standard behavior: if I click "200", I only want to see 200s. Pending requests (0) are NOT 200s. So they should disappear.
+      // BUT, that makes it hard to see requests in progress.
+      // Let's implement strict filtering. If status is 0, it's hidden if 0 isn't enabled.
+      // Since 0 isn't in the UI, pending requests will effectively be hidden if we strictly filter.
+      // OPTION: Add '0' or 'Pending' to the UI? The user didn't ask for it.
+      // OPTION: Use 'other' status logic? User removed 'other' category from status.
+      // Let's stick to strict filtering. If the code is in the list, check it. If not in the list (including 0), default to false?
+      // That might hide everything pending.
+      // Let's check if the user request implied "status code is one of these".
+      // "liệt kê toàn bộ badge status gồm..." -> "List all badge status including...".
+      // If I only check these, 0 is excluded.
+      // HACK: Let's assume if status is 0, we show it (allow it to pass status filter) so user sees activity.
+      // Once it completes, it gets a real status and then gets filtered.
+      if (
+        req.status !== 0 &&
+        typeof filter.status[req.status] !== 'undefined' &&
+        !filter.status[req.status]
+      ) {
+        return false;
       }
+      // If it is a status code NOT in our list (e.g. 418), and not 0, it falls through here.
+      // If we want strict "white list", we should return false if undefined.
+      // But the UI initializes all known codes to TRUE. So "undefined" means "unknown code".
+      // Let's show unknown codes by default or hide?
+      // Let's show them.
 
       // Type
-      const type = req.type.toLowerCase(); // 'xhr', 'js' etc usually set in InspectorPage
-      // Simplistic mapping
+      const type = req.type.toLowerCase();
       let typeKey: keyof typeof filter.type = 'other';
+
+      // Improved Type Detection
       if (type.includes('xhr') || type.includes('fetch')) typeKey = 'xhr';
-      else if (type.includes('js') || type.includes('script')) typeKey = 'js';
-      else if (type.includes('css')) typeKey = 'css';
+      else if (type.includes('js') || type.includes('script') || req.path.match(/\.js(\?|$)/))
+        typeKey = 'js';
+      else if (type.includes('css') || req.path.match(/\.css(\?|$)/)) typeKey = 'css';
       else if (
         type.includes('img') ||
         type.includes('image') ||
         type.includes('png') ||
-        type.includes('jpg')
+        type.includes('jpg') ||
+        type.includes('jpeg') ||
+        type.includes('gif') ||
+        type.includes('svg') ||
+        type.includes('ico') ||
+        type.includes('webp') ||
+        req.path.match(/\.(png|jpg|jpeg|gif|svg|ico|webp)(\?|$)/)
       )
         typeKey = 'img';
-      else if (type.includes('media') || type.includes('video') || type.includes('audio'))
+      else if (
+        type.includes('media') ||
+        type.includes('video') ||
+        type.includes('audio') ||
+        req.path.match(/\.(mp4|webm|ogg|mp3|wav)(\?|$)/)
+      )
         typeKey = 'media';
+      else if (
+        type.includes('font') ||
+        type.includes('woff') ||
+        type.includes('ttf') ||
+        req.path.match(/\.(woff|woff2|ttf|otf|eot)(\?|$)/)
+      )
+        typeKey = 'font';
+      else if (
+        type.includes('ws') ||
+        type.includes('websocket') ||
+        req.protocol === 'ws' ||
+        req.protocol === 'wss'
+      )
+        typeKey = 'ws';
+      else if (type.includes('wasm') || req.path.match(/\.wasm(\?|$)/)) typeKey = 'wasm';
+      else if (type.includes('manifest') || req.path.match(/manifest\.json(\?|$)/))
+        // Simple check
+        typeKey = 'manifest';
+      else if (
+        type.includes('doc') ||
+        type.includes('html') ||
+        type.includes('document') ||
+        (!typeKey && !req.path.includes('.')) // no extension often implies doc/api
+      )
+        typeKey = 'doc';
 
       if (!filter.type[typeKey]) return false;
 

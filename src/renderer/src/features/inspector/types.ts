@@ -13,6 +13,8 @@ export interface NetworkRequest {
   responseHeaders: Record<string, string>;
   requestBody?: string;
   responseBody?: string;
+  isBinary?: boolean;
+  contentType?: string;
 }
 
 export const MOCK_REQUESTS: NetworkRequest[] = [

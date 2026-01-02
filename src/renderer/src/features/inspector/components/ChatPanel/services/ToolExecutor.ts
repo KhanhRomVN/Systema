@@ -3,8 +3,6 @@ import { initialFilterState, InspectorFilter } from '../../FilterPanel';
 import { ToolAction } from '../../../../../services/ResponseParser';
 
 export async function executeTool(action: ToolAction, context: InspectorContext): Promise<string> {
-  console.log('[ToolExecutor] Executing:', action);
-
   switch (action.type) {
     case 'set_filter': {
       // Expecting params.filters array = [{field, value}]
@@ -13,10 +11,30 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
 
       if (filters.length === 0) return 'No filters provided.';
 
-      const newFilter = { ...context.filter };
+      const newFilter = {
+        ...context.filter,
+        methods: { ...context.filter.methods },
+        status: { ...context.filter.status },
+        type: { ...context.filter.type },
+        host: { ...context.filter.host, blacklist: [...context.filter.host.blacklist] },
+        path: { ...context.filter.path, blacklist: [...context.filter.path.blacklist] },
+        size: { ...context.filter.size },
+        time: { ...context.filter.time },
+      };
       const updates: string[] = [];
 
-      for (const { field, value } of filters) {
+      for (const filterItem of filters) {
+        const { field, value } = filterItem;
+        const exclude = filterItem.exclude === true || filterItem.exclude === 'true';
+        const mode = filterItem.mode || 'append';
+        const shouldRemove = exclude || mode === 'remove';
+
+        // Support comma-separated values
+        const values = value
+          .split(',')
+          .map((v: string) => v.trim())
+          .filter(Boolean);
+
         if (field === 'reset') {
           newFilter.host.blacklist = [];
           newFilter.path.blacklist = [];
@@ -32,36 +50,45 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
             'GET',
             'POST',
             'PUT',
+            'PATCH',
             'DELETE',
-            'OPTIONAL',
+            'HEAD',
+            'OPTIONS',
+            'TRACE',
+            'CONNECT',
           ];
-          const val = value as keyof InspectorFilter['methods'];
-          if (allowedMethods.includes(val)) {
-            // Reset methods first if we want exclusive selection?
-            // Or additive?
-            // User usage usually implies "Show me POST".
-            // If they do <field>method</field><value>POST</value> <field>method</field><value>GET</value>
-            // Then we should enable both.
-            // But let's assume additive for this session if multi-field.
-            // BUT for single field logic, we often cleared others.
-            // Let's implement additive logic for multi-field:
-            // Actually, safer to clear all methods IF it's the first method in this batch?
-            // No, simply set to true.
 
-            // If we want exact match, user might want to clear others.
-            // For now, let's just SET to true.
-            newFilter.methods[val] = true;
-            updates.push(`Method ${val}`);
-          }
+          values.forEach((val: string) => {
+            const methodVal = val as keyof InspectorFilter['methods'];
+            if (allowedMethods.includes(methodVal)) {
+              newFilter.methods[methodVal] = !shouldRemove;
+              updates.push(`Method ${methodVal} ${shouldRemove ? 'excluded' : 'included'}`);
+            }
+          });
         } else if (field === 'status') {
           const validStatuses = Object.keys(initialFilterState.status);
-          if (validStatuses.includes(value)) {
-            newFilter.status[value as keyof InspectorFilter['status']] = true;
-            updates.push(`Status ${value}`);
-          }
+          values.forEach((val: string | number) => {
+            if (validStatuses.includes(String(val))) {
+              newFilter.status[val as keyof InspectorFilter['status']] = !shouldRemove;
+              updates.push(`Status ${val} ${shouldRemove ? 'excluded' : 'included'}`);
+            }
+          });
+        } else if (field === 'type') {
+          const validTypes = Object.keys(initialFilterState.type);
+          values.forEach((val: string) => {
+            const typeKey = val.toLowerCase();
+            if (validTypes.includes(typeKey)) {
+              newFilter.type[typeKey as keyof InspectorFilter['type']] = !shouldRemove;
+              updates.push(`Type ${typeKey} ${shouldRemove ? 'excluded' : 'included'}`);
+            }
+          });
         }
       }
 
+      console.log(
+        '[ToolExecutor] Applying new filter state (methods):',
+        JSON.stringify(newFilter.methods, null, 2),
+      );
       context.onSetFilter(newFilter);
       return `Filters updated: ${updates.join(', ')}`;
     }
@@ -186,16 +213,8 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
           .join(',');
 
       const getStatusEnabled = (obj: Record<string, boolean>) => {
-        const mapping: Record<string, string> = {
-          success: '2xx',
-          redirect: '3xx',
-          clientError: '4xx',
-          serverError: '5xx',
-          other: 'other',
-        };
         return Object.keys(obj)
-          .filter((k) => obj[k])
-          .map((k) => mapping[k] || k)
+          .filter((k) => obj[k] && !isNaN(Number(k))) // Only numeric keys
           .join(',');
       };
 
@@ -209,8 +228,8 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
       parts.push(
         `path (exclude): ${f.path.blacklist.length ? f.path.blacklist.join(',') : 'none'}`,
       );
-      parts.push(`size: ${f.size.min || f.size.max ? `${f.size.min}-${f.size.max}` : 'any'}`);
-      parts.push(`time: ${f.time.min || f.time.max ? `${f.time.min}-${f.time.max}` : 'any'}`);
+      parts.push(`size: ${f.size.min || 'any'} - ${f.size.max || 'any'}`);
+      parts.push(`time: ${f.time.min || 'any'} - ${f.time.max || 'any'}`);
 
       return parts.join('\n');
     }

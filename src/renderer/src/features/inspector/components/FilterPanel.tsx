@@ -7,8 +7,12 @@ export interface InspectorFilter {
     GET: boolean;
     POST: boolean;
     PUT: boolean;
+    PATCH: boolean;
     DELETE: boolean;
-    OPTIONAL: boolean;
+    HEAD: boolean;
+    OPTIONS: boolean;
+    TRACE: boolean;
+    CONNECT: boolean;
   };
   host: {
     blacklist: string[];
@@ -17,11 +21,7 @@ export interface InspectorFilter {
     blacklist: string[];
   };
   status: {
-    success: boolean; // 2xx
-    redirect: boolean; // 3xx
-    clientError: boolean; // 4xx
-    serverError: boolean; // 5xx
-    other: boolean;
+    [key: number]: boolean;
   };
   type: {
     xhr: boolean;
@@ -29,6 +29,11 @@ export interface InspectorFilter {
     css: boolean;
     img: boolean;
     media: boolean;
+    font: boolean;
+    doc: boolean;
+    ws: boolean;
+    wasm: boolean;
+    manifest: boolean;
     other: boolean;
   };
   size: {
@@ -42,11 +47,58 @@ export interface InspectorFilter {
 }
 
 export const initialFilterState: InspectorFilter = {
-  methods: { GET: true, POST: true, PUT: true, DELETE: true, OPTIONAL: true },
+  methods: {
+    GET: true,
+    POST: true,
+    PUT: true,
+    PATCH: false,
+    DELETE: true,
+    HEAD: false,
+    OPTIONS: true,
+    TRACE: false,
+    CONNECT: false,
+  },
   host: { blacklist: [] },
   path: { blacklist: [] },
-  status: { success: true, redirect: true, clientError: true, serverError: true, other: true },
-  type: { xhr: true, js: true, css: true, img: true, media: true, other: true },
+  status: {
+    200: true,
+    201: true,
+    202: true,
+    204: true,
+    206: true,
+    301: true,
+    302: true,
+    304: true,
+    307: true,
+    308: true,
+    400: true,
+    401: true,
+    403: true,
+    404: true,
+    405: true,
+    409: true,
+    422: true,
+    429: true,
+    500: true,
+    501: true,
+    502: true,
+    503: true,
+    504: true,
+    505: true,
+  },
+  type: {
+    xhr: true,
+    js: true,
+    css: true,
+    img: true,
+    media: true,
+    font: true,
+    doc: true,
+    ws: true,
+    wasm: true,
+    manifest: true,
+    other: true,
+  },
   size: { min: '', max: '' },
   time: { min: '', max: '' },
 };
@@ -57,6 +109,7 @@ interface FilterPanelProps {
 }
 
 export function FilterPanel({ filter, onChange }: FilterPanelProps) {
+  console.log('[FilterPanel] Rendered with methods:', JSON.stringify(filter.methods));
   return (
     <div className="h-full overflow-auto bg-background/50 border-l border-border/50 flex flex-col font-sans select-none">
       <div className="sticky top-0 z-10 px-2 py-2 text-sm font-bold text-muted-foreground border-b border-border/50 bg-muted/20 flex items-center gap-2 backdrop-blur-sm">
@@ -73,8 +126,12 @@ export function FilterPanel({ filter, onChange }: FilterPanelProps) {
               { key: 'GET', color: 'text-blue-400 border-blue-400/30 bg-blue-400/10' },
               { key: 'POST', color: 'text-green-400 border-green-400/30 bg-green-400/10' },
               { key: 'PUT', color: 'text-orange-400 border-orange-400/30 bg-orange-400/10' },
+              { key: 'PATCH', color: 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10' },
               { key: 'DELETE', color: 'text-red-400 border-red-400/30 bg-red-400/10' },
-              { key: 'OPTIONAL', color: 'text-purple-400 border-purple-400/30 bg-purple-400/10' },
+              { key: 'HEAD', color: 'text-gray-400 border-gray-400/30 bg-gray-400/10' },
+              { key: 'OPTIONS', color: 'text-purple-400 border-purple-400/30 bg-purple-400/10' },
+              { key: 'TRACE', color: 'text-indigo-400 border-indigo-400/30 bg-indigo-400/10' },
+              { key: 'CONNECT', color: 'text-rose-400 border-rose-400/30 bg-rose-400/10' },
             ].map(({ key, color }) => (
               <button
                 key={key}
@@ -116,56 +173,59 @@ export function FilterPanel({ filter, onChange }: FilterPanelProps) {
 
         {/* Status */}
         <section>
-          <h3 className="text-xs font-semibold mb-2">Status</h3>
-          <div className="flex flex-wrap gap-2">
-            {[
-              {
-                key: 'success',
-                label: '2xx',
-                color: 'text-green-400 border-green-400/30 bg-green-400/10',
-              },
-              {
-                key: 'redirect',
-                label: '3xx',
-                color: 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10',
-              },
-              {
-                key: 'clientError',
-                label: '4xx',
-                color: 'text-red-400 border-red-400/30 bg-red-400/10',
-              },
-              {
-                key: 'serverError',
-                label: '5xx',
-                color: 'text-rose-400 border-rose-400/30 bg-rose-400/10',
-              },
-              {
-                key: 'other',
-                label: 'Other',
-                color: 'text-gray-400 border-gray-400/30 bg-gray-400/10',
-              },
-            ].map(({ key, label, color }) => (
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold">Status</h3>
+            <div className="flex gap-2">
               <button
-                key={key}
-                onClick={() =>
-                  onChange({
-                    ...filter,
-                    status: {
-                      ...filter.status,
-                      [key]: !filter.status[key as keyof typeof filter.status],
-                    },
-                  })
-                }
-                className={cn(
-                  'px-3 py-1 rounded text-xs font-medium border transition-all',
-                  filter.status[key as keyof typeof filter.status]
-                    ? color
-                    : 'text-muted-foreground border-border bg-transparent opacity-50',
-                )}
+                onClick={() => {
+                  const allTrue = Object.keys(filter.status).every((k) => filter.status[Number(k)]);
+                  const newStatus = { ...filter.status };
+                  Object.keys(newStatus).forEach((k) => (newStatus[Number(k)] = !allTrue));
+                  onChange({ ...filter, status: newStatus });
+                }}
+                className="text-[10px] text-blue-400 hover:underline"
               >
-                {label}
+                Toggle All
               </button>
-            ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              200, 201, 202, 204, 206, 301, 302, 304, 307, 308, 400, 401, 403, 404, 405, 409, 422,
+              429, 500, 501, 502, 503, 504, 505,
+            ].map((code) => {
+              let color = 'text-gray-400 border-gray-400/30 bg-gray-400/10';
+              if (code >= 200 && code < 300)
+                color = 'text-green-400 border-green-400/30 bg-green-400/10';
+              else if (code >= 300 && code < 400)
+                color = 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10';
+              else if (code >= 400 && code < 500)
+                color = 'text-red-400 border-red-400/30 bg-red-400/10';
+              else if (code >= 500) color = 'text-rose-400 border-rose-400/30 bg-rose-400/10';
+
+              return (
+                <button
+                  key={code}
+                  onClick={() =>
+                    onChange({
+                      ...filter,
+                      status: {
+                        ...filter.status,
+                        [code]: !filter.status[code],
+                      },
+                    })
+                  }
+                  className={cn(
+                    'px-1 py-1 rounded text-[10px] font-medium border transition-all text-center',
+                    filter.status[code]
+                      ? color
+                      : 'text-muted-foreground border-border bg-transparent opacity-50',
+                  )}
+                >
+                  {code}
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -176,7 +236,7 @@ export function FilterPanel({ filter, onChange }: FilterPanelProps) {
             {[
               {
                 key: 'xhr',
-                label: 'XHR/Fetch',
+                label: 'Fetch/XHR',
                 color: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10',
               },
               {
@@ -198,6 +258,31 @@ export function FilterPanel({ filter, onChange }: FilterPanelProps) {
                 key: 'media',
                 label: 'Media',
                 color: 'text-pink-400 border-pink-400/30 bg-pink-400/10',
+              },
+              {
+                key: 'font',
+                label: 'Font',
+                color: 'text-orange-400 border-orange-400/30 bg-orange-400/10',
+              },
+              {
+                key: 'doc',
+                label: 'Doc',
+                color: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
+              },
+              {
+                key: 'ws',
+                label: 'WS',
+                color: 'text-teal-400 border-teal-400/30 bg-teal-400/10',
+              },
+              {
+                key: 'wasm',
+                label: 'Wasm',
+                color: 'text-violet-400 border-violet-400/30 bg-violet-400/10',
+              },
+              {
+                key: 'manifest',
+                label: 'Manifest',
+                color: 'text-lime-400 border-lime-400/30 bg-lime-400/10',
               },
               {
                 key: 'other',

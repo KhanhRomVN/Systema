@@ -41,7 +41,6 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       const removeListener = ipc.on('ws:event', (_: any, { type, data }: any) => {
         if (type === 'client-connected') {
           setWsConnected(true);
-          console.log('[ChatContainer] Client connected, requesting focused tabs...');
           // Ask for real tabs from the connected agent
           ipc.invoke('ws:send', { type: 'requestFocusedTabs', timestamp: Date.now() });
         } else if (type === 'client-disconnected') {
