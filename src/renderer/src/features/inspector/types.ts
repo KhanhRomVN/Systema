@@ -1,3 +1,5 @@
+import { RequestAnalysis } from './analysisTypes';
+
 export interface NetworkRequest {
   id: string;
   method: string;
@@ -15,6 +17,7 @@ export interface NetworkRequest {
   responseBody?: string;
   isBinary?: boolean;
   contentType?: string;
+  analysis?: RequestAnalysis;
 }
 
 export const MOCK_REQUESTS: NetworkRequest[] = [

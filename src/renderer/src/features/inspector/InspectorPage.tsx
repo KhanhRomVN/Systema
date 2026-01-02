@@ -2,6 +2,7 @@ import { InspectorLayout } from './components/InspectorLayout';
 import { AppSelector } from '../../components/AppSelector';
 import { useState, useEffect } from 'react';
 import { NetworkRequest } from './types';
+import { generateRequestAnalysis } from './utils/analysisGenerator';
 
 export default function InspectorPage() {
   const [isScanning, setIsScanning] = useState(false);
@@ -29,17 +30,21 @@ export default function InspectorPage() {
         requestBody: '',
         responseBody: '',
       };
-      setRequests((prev) => [newRequest, ...prev]);
+      // Generate initial analysis
+      const analysis = generateRequestAnalysis(newRequest);
+      setRequests((prev) => [{ ...newRequest, analysis }, ...prev]);
     };
 
     const handleRequestBody = (_: any, data: any) => {
       setRequests((prev) =>
         prev.map((req) => {
           if (req.id === data.id) {
-            return {
+            const updatedReq = {
               ...req,
               requestBody: data.body,
             };
+            const analysis = generateRequestAnalysis(updatedReq);
+            return { ...updatedReq, analysis };
           }
           return req;
         }),
@@ -89,7 +94,7 @@ export default function InspectorPage() {
                 type = 'XHR'; // Assume API call
             }
 
-            return {
+            const updatedReq = {
               ...req,
               status: data.statusCode,
               type: type,
@@ -97,6 +102,8 @@ export default function InspectorPage() {
               time: `${Date.now() - req.timestamp}ms`,
               responseHeaders: data.headers || {},
             };
+            const analysis = generateRequestAnalysis(updatedReq);
+            return { ...updatedReq, analysis };
           }
           // Fallback mechanism (should not be needed with IDs)
           if (
@@ -104,12 +111,15 @@ export default function InspectorPage() {
             req.path === new URL(data.url).pathname + new URL(data.url).search &&
             req.status === 0
           ) {
-            return {
+            const reqWithStatus = {
               ...req,
               status: data.statusCode,
               time: `${Date.now() - req.timestamp}ms`,
               responseHeaders: data.headers || {},
             };
+            // Generate analysis for the new requested with updated status
+            const analysis = generateRequestAnalysis(reqWithStatus);
+            return { ...reqWithStatus, analysis };
           }
           return req;
         }),
@@ -120,14 +130,16 @@ export default function InspectorPage() {
       setRequests((prev) =>
         prev.map((req) => {
           if (req.id === data.id) {
-            return {
+            const reqWithBody = {
               ...req,
               responseBody: data.body,
               size: data.size || req.size,
-              time: `${Date.now() - req.timestamp}ms`,
               isBinary: data.isBinary,
               contentType: data.contentType,
             };
+            // Generate analysis with full body data
+            const analysis = generateRequestAnalysis(reqWithBody);
+            return { ...reqWithBody, analysis };
           }
           return req;
         }),
