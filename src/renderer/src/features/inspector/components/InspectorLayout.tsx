@@ -20,9 +20,9 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const parsed = saved ? JSON.parse(saved) : null;
       if (parsed) {
-        // Migration: Remove whitelist if present
-        if ('whitelist' in parsed.host) delete (parsed.host as any).whitelist;
-        if ('whitelist' in parsed.path) delete (parsed.path as any).whitelist;
+        // Migration: Remove blacklist if present (migrated to whitelist)
+        if ('blacklist' in parsed.host) delete (parsed.host as any).blacklist;
+        if ('blacklist' in parsed.path) delete (parsed.path as any).blacklist;
 
         // Migration: Check for legacy status keys (success, redirect, etc)
         const statusKeys = Object.keys(parsed.status || {});
