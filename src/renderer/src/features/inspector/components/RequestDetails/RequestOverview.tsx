@@ -24,7 +24,7 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
     <div className="space-y-4">
       <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-muted/20 rounded border border-border/50">
         <div className="text-muted-foreground">URL</div>
-        <div className="text-muted-foreground">URL</div>
+
         <div className="break-all">
           <HighlightText text={analysis.overview.url} searchTerm={searchTerm} />
         </div>
