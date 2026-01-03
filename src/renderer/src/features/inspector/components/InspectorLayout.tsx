@@ -155,8 +155,6 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
       return true;
     });
 
-    console.log('[InspectorLayout] Filtered requests:', result.length, 'Total:', requests.length);
-    console.log('[InspectorLayout] Current Filter:', JSON.stringify(filter, null, 2));
     return result;
   }, [requests, filter]);
 

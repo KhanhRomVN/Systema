@@ -17,6 +17,12 @@ export interface NetworkRequest {
   responseBody?: string;
   isBinary?: boolean;
   contentType?: string;
+  requestCookies?: Record<string, string>;
+  responseCookies?: Record<string, string>;
+  securityDetails?: any;
+  timing?: any;
+  serverIPAddress?: string;
+  connection?: string;
   analysis?: RequestAnalysis;
 }
 

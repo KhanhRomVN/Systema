@@ -22,6 +22,7 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
 
   return (
     <div className="space-y-4">
+      <h3 className="text-[10px] font-bold text-muted-foreground uppercase">General Information</h3>
       <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-muted/20 rounded border border-border/50">
         <div className="text-muted-foreground">URL</div>
 
@@ -72,6 +73,7 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
         </div>
       </div>
 
+      <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Analysis</h3>
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-card p-3 rounded border border-border/50">
           <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2">
