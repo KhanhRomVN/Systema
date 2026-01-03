@@ -1,0 +1,44 @@
+{
+  "name": "open-deepseek",
+  "productName": "Open DeepSeek",
+  "version": "1.0.0",
+  "description": "Open DeepSeek - A custom DeepSeek client",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && npm run build:renderer",
+    "build:renderer": "esbuild src/renderer/main.ts --bundle --outfile=static/js/main.js --format=esm --platform=browser",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.opendeepseek.app",
+    "productName": "Open DeepSeek",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "static/**/*"
+    ],
+    "linux": {
+      "category": "Utility"
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.27.1",
+    "typescript": "^5.9.3"
+  }
+}
