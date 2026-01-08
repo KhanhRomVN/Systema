@@ -218,6 +218,7 @@ export function RequestDetails({
       label: 'Overview',
       icon: BarChart2,
       count: matches.overview,
+      importantCount: 0,
       colors: {
         text: 'text-blue-500 dark:text-blue-400',
         border: 'border-blue-500 dark:border-blue-400',
@@ -231,6 +232,7 @@ export function RequestDetails({
       label: 'Request',
       icon: Upload,
       count: matches.request,
+      importantCount: 0,
       colors: {
         text: 'text-orange-500 dark:text-orange-400',
         border: 'border-orange-500 dark:border-orange-400',
@@ -244,6 +246,7 @@ export function RequestDetails({
       label: 'Response',
       icon: Download,
       count: matches.response,
+      importantCount: 0,
       colors: {
         text: 'text-green-500 dark:text-green-400',
         border: 'border-green-500 dark:border-green-400',
@@ -257,6 +260,7 @@ export function RequestDetails({
       label: 'Headers',
       icon: List,
       count: matches.headers,
+      importantCount: 0,
       colors: {
         text: 'text-purple-500 dark:text-purple-400',
         border: 'border-purple-500 dark:border-purple-400',
@@ -270,6 +274,7 @@ export function RequestDetails({
       label: 'Cookies',
       icon: Cookie,
       count: matches.cookies,
+      importantCount: 0,
       colors: {
         text: 'text-yellow-500 dark:text-yellow-400',
         border: 'border-yellow-500 dark:border-yellow-400',
@@ -283,6 +288,7 @@ export function RequestDetails({
       label: 'Body',
       icon: Box,
       count: matches.body,
+      importantCount: 0,
       colors: {
         text: 'text-pink-500 dark:text-pink-400',
         border: 'border-pink-500 dark:border-pink-400',
@@ -296,6 +302,7 @@ export function RequestDetails({
       label: 'Security',
       icon: Lock,
       count: matches.security,
+      importantCount: 0,
       colors: {
         text: 'text-red-500 dark:text-red-400',
         border: 'border-red-500 dark:border-red-400',
@@ -309,6 +316,7 @@ export function RequestDetails({
       label: 'Certificate',
       icon: Scroll,
       count: matches.cert,
+      importantCount: 0,
       colors: {
         text: 'text-teal-500 dark:text-teal-400',
         border: 'border-teal-500 dark:border-teal-400',
@@ -322,6 +330,7 @@ export function RequestDetails({
       label: 'Network',
       icon: Globe,
       count: matches.network,
+      importantCount: 0,
       colors: {
         text: 'text-cyan-500 dark:text-cyan-400',
         border: 'border-cyan-500 dark:border-cyan-400',
@@ -335,6 +344,7 @@ export function RequestDetails({
       label: 'Timing',
       icon: Timer,
       count: matches.timing,
+      importantCount: 0,
       colors: {
         text: 'text-indigo-500 dark:text-indigo-400',
         border: 'border-indigo-500 dark:border-indigo-400',
@@ -348,6 +358,7 @@ export function RequestDetails({
       label: 'Issues',
       icon: AlertTriangle,
       count: matches.issues,
+      importantCount: 0,
       colors: {
         text: 'text-rose-500 dark:text-rose-400',
         border: 'border-rose-500 dark:border-rose-400',
@@ -412,6 +423,7 @@ export function RequestDetails({
                     <Icon className="w-3.5 h-3.5" />
                     {tab.label}
                     <Badge count={tab.count} className={tab.colors.badge} />
+
                     <div
                       className={cn(
                         'ml-2 pl-2 border-l flex items-center gap-1 transition-colors',

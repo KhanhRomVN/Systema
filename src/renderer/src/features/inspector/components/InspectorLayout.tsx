@@ -11,9 +11,10 @@ interface InspectorLayoutProps {
   onBack: () => void;
   requests: NetworkRequest[];
   appName: string;
+  onDelete: (id: string) => void;
 }
 
-export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutProps) {
+export function InspectorLayout({ onBack, requests, appName, onDelete }: InspectorLayoutProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
@@ -292,6 +293,7 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
                 pendingActionIds={pendingActionIds}
                 onForward={handleForward}
                 onDrop={handleDrop}
+                onDelete={onDelete}
               />
             </div>
 

@@ -1,4 +1,4 @@
-import { net, session } from 'electron';
+import { net } from 'electron';
 import crypto from 'crypto';
 
 export interface ChatMessage {
@@ -13,6 +13,44 @@ export interface ChatPayload {
   temperature?: number;
 }
 
+interface PoWChallenge {
+  algorithm: string;
+  challenge: string;
+  salt: string;
+  difficulty: number;
+  signature: string;
+  expire_at: number;
+  expire_after: number;
+  target_path: string;
+}
+
+interface PoWResponse {
+  algorithm: string;
+  challenge: string;
+  salt: string;
+  answer: number;
+  signature: string;
+  target_path: string;
+}
+
+// TODO: Replace with actual implementation from user
+function solvePoW(challenge: PoWChallenge): PoWResponse {
+  console.log('[PoW] Solving challenge:', challenge);
+
+  // PLACEHOLDER: This needs the real "DeepSeekHashV1" algorithm.
+  // We will ask the user for this logic.
+  // For now, we return a dummy answer to verify the flow structure.
+
+  return {
+    algorithm: challenge.algorithm,
+    challenge: challenge.challenge,
+    salt: challenge.salt,
+    answer: 0, // DUMMY VALUE
+    signature: challenge.signature,
+    target_path: challenge.target_path,
+  };
+}
+
 export async function chatCompletionStream(
   token: string,
   payload: ChatPayload,
@@ -24,151 +62,169 @@ export async function chatCompletionStream(
     onError: (error: Error) => void;
   },
 ) {
-  // Use useSessionCookies: true to match Open Claude's architecture
-  // This automatically attaches cookies from the default session (where Auth Window logged in)
-  const request = net.request({
-    method: 'POST',
-    url: 'https://chat.deepseek.com/api/v0/chat/completion', // Corrected: singular 'completion'
-    useSessionCookies: true,
-  });
+  try {
+    const apiBase = 'https://chat.deepseek.com/api/v0';
+    const origin = 'https://chat.deepseek.com';
 
-  const origin = 'https://chat.deepseek.com';
+    // Helper for requests
+    const makeRequest = (
+      url: string,
+      method: string,
+      body?: any,
+      additionalHeaders: Record<string, string> = {},
+    ) => {
+      return new Promise<any>((resolve, reject) => {
+        const req = net.request({ method, url, useSessionCookies: true });
+        req.setHeader('Content-Type', 'application/json');
+        req.setHeader('Authorization', token);
+        req.setHeader('Origin', origin);
+        req.setHeader('Referer', `${origin}/`);
+        if (userAgent) req.setHeader('User-Agent', userAgent);
 
-  request.setHeader('Content-Type', 'application/json');
-  request.setHeader('Authorization', token); // Token captured from main process
-  request.setHeader('Origin', origin);
-  request.setHeader('Referer', `${origin}/`);
-  // Explicitly request stream
-  request.setHeader('Accept', 'text/event-stream');
-  request.setHeader('Accept-Language', 'en-US,en;q=0.9');
+        Object.entries(additionalHeaders).forEach(([k, v]) => req.setHeader(k, v));
 
-  if (userAgent) {
-    request.setHeader('User-Agent', userAgent);
-  }
+        req.on('response', (response) => {
+          let data = '';
+          response.on('data', (chunk) => (data += chunk.toString()));
+          response.on('end', () => {
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                resolve(data);
+              }
+            } else {
+              reject(new Error(`Request to ${url} failed: ${response.statusCode} ${data}`));
+            }
+          });
+          response.on('error', reject);
+        });
 
-  // Generate necessary IDs
-  const chatSessionsId = crypto.randomUUID(); // New session every time for now
+        req.on('error', reject);
 
-  // Format: YYYYMMDD-random
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const randomHex = crypto.randomBytes(8).toString('hex');
-  const clientStreamId = `${dateStr}-${randomHex}`;
-
-  // Private API often uses different payload structure.
-  // We mimic what the browser sends.
-  const webPayload = {
-    chat_session_id: chatSessionsId,
-    parent_message_id: null,
-    prompt: payload.messages[payload.messages.length - 1].content,
-    ref_file_ids: [],
-    thinking_enabled: false, // Can expose this to UI later
-    search_enabled: false,
-    client_stream_id: clientStreamId,
-  };
-
-  request.on('response', (response) => {
-    console.log(`[API] Response Status: ${response.statusCode} ${response.statusMessage}`);
-    console.log('[API] Response Headers:', JSON.stringify(response.headers, null, 2));
-
-    if (response.statusCode !== 200) {
-      // Capture error body
-      let errorBody = '';
-      response.on('data', (chunk) => {
-        errorBody += chunk.toString();
-      });
-      response.on('end', () => {
-        console.error(`[API] Error Body: ${errorBody}`);
-        // Try to parse error
-        try {
-          const errorJson = JSON.parse(errorBody);
-          callbacks.onError(
-            new Error(`API Error ${response.statusCode}: ${JSON.stringify(errorJson)}`),
-          );
-        } catch {
-          callbacks.onError(new Error(`API Error ${response.statusCode}: ${errorBody}`));
+        if (body) {
+          req.write(JSON.stringify(body));
         }
+        req.end();
       });
-      return;
-    }
+    };
 
-    let buffer = '';
-
-    response.on('data', (chunk) => {
-      const chunkStr = chunk.toString();
-      console.log(`[API Debug] Chunk received (${chunk.length} bytes): ${chunkStr}`);
-      buffer += chunkStr;
-
-      const lines = buffer.split('\n');
-      // If the new chunk finishes a line, we process it.
-      // But we always keep the last part in buffer unless it was empty/newline
-      if (chunkStr.endsWith('\n')) {
-        // If ends with newline, the last element of split is empty string, which is fine
-      }
-
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        processLine(line);
-      }
+    // 1. Create Chat Session
+    console.log('[API] Creating Chat Session...');
+    const sessionRes = await makeRequest(`${apiBase}/chat_session/create`, 'POST', {
+      character_id: null, // As usually seen in web
     });
 
-    response.on('end', () => {
-      console.log('[API] Response Ended (Stream closed)');
-      if (buffer.trim()) {
-        console.log('[API Debug] Processing remaining buffer:', buffer);
-        processLine(buffer);
+    // Extract session ID (biz_data.id)
+    const sessionId = sessionRes?.data?.biz_data?.id;
+    if (!sessionId) {
+      throw new Error('Failed to create chat session: No ID returned');
+    }
+    console.log('[API] Chat Session Created:', sessionId);
+
+    // 2. Request PoW Challenge
+    console.log('[API] Requesting PoW Challenge...');
+    const challengeRes = await makeRequest(
+      `${apiBase}/chat/create_pow_challenge`,
+      'POST',
+      { target_path: '/api/v0/chat/completion' },
+      { Referer: `${origin}/a/chat/s/${sessionId}` }, // Important: Referer with session ID
+    );
+
+    const challengeData: PoWChallenge = challengeRes?.data?.biz_data?.challenge;
+    if (!challengeData) {
+      throw new Error('Failed to get PoW challenge');
+    }
+
+    // 3. Solve PoW
+    console.log('[API] Solving PoW...');
+    const powAnswer = solvePoW(challengeData);
+    const powResponseBase64 = Buffer.from(JSON.stringify(powAnswer)).toString('base64');
+
+    // 4. Send Chat Completion
+    console.log('[API] Sending Completion Request...');
+
+    const clientStreamId = `${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomBytes(8).toString('hex')}`;
+
+    const webPayload = {
+      chat_session_id: sessionId,
+      parent_message_id: null,
+      prompt: payload.messages[payload.messages.length - 1].content,
+      ref_file_ids: [],
+      thinking_enabled: false,
+      search_enabled: false,
+      client_stream_id: clientStreamId,
+    };
+
+    const request = net.request({
+      method: 'POST',
+      url: `${apiBase}/chat/completion`,
+      useSessionCookies: true,
+    });
+
+    request.setHeader('Content-Type', 'application/json');
+    request.setHeader('Authorization', token);
+    request.setHeader('Origin', origin);
+    request.setHeader('Referer', `${origin}/a/chat/s/${sessionId}`);
+    request.setHeader('Accept', 'text/event-stream');
+    request.setHeader('X-Ds-Pow-Response', powResponseBase64); // The magic header
+    if (userAgent) request.setHeader('User-Agent', userAgent);
+
+    request.on('response', (response) => {
+      console.log(`[API] Completion Status: ${response.statusCode}`);
+
+      if (response.statusCode !== 200) {
+        let errBody = '';
+        response.on('data', (c) => (errBody += c));
+        response.on('end', () =>
+          callbacks.onError(new Error(`API Error ${response.statusCode}: ${errBody}`)),
+        );
+        return;
       }
-      callbacks.onDone();
+
+      let buffer = '';
+      response.on('data', (chunk) => {
+        const chunkStr = chunk.toString();
+        buffer += chunkStr;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          processLine(line);
+        }
+      });
+
+      response.on('end', () => {
+        if (buffer.trim()) processLine(buffer);
+        callbacks.onDone();
+      });
     });
 
     function processLine(line: string) {
       const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data: ')) {
-        // Try parsing as JSON error if small enough
-        if (trimmed.startsWith('{')) {
-          try {
-            console.log('[API Debug] Possible JSON body:', trimmed);
-            const err = JSON.parse(trimmed);
-            if (err.detail) console.error('[API Error Detail] ', err.detail);
-          } catch {}
-        }
-        return;
-      }
+      if (!trimmed || !trimmed.startsWith('data: ')) return;
 
       const dataStr = trimmed.slice(6);
-      if (dataStr === '[DONE]') {
-        return; // Don't call onDone here, wait for 'end'
-      }
+      if (dataStr === '[DONE]') return;
 
       try {
         const data = JSON.parse(dataStr);
-
+        // Handle stream format
         if (typeof data.v === 'string') {
           callbacks.onContent(data.v);
-          return;
-        }
-
-        if (data.choices?.[0]?.delta?.content) {
+        } else if (data.choices?.[0]?.delta?.content) {
           callbacks.onContent(data.choices[0].delta.content);
         }
       } catch (e) {
-        console.error('[API Debug] JSON Parse Error:', e, dataStr.substring(0, 50));
+        // Ignore parse errors for keep-alive messages
       }
     }
 
-    response.on('error', (err) => {
-      console.error('[API] Response Error:', err);
-      callbacks.onError(err);
-    });
-  });
-
-  request.on('error', (err) => {
-    console.error('[API] Request Error:', err);
-    callbacks.onError(err);
-  });
-
-  console.log('[API] Sending Payload:', JSON.stringify(webPayload, null, 2));
-  request.write(JSON.stringify(webPayload));
-  request.end();
+    request.on('error', (err) => callbacks.onError(err));
+    request.write(JSON.stringify(webPayload));
+    request.end();
+  } catch (error: any) {
+    console.error('[API] Fatal Error:', error);
+    callbacks.onError(error);
+  }
 }

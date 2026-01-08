@@ -10,7 +10,7 @@ import {
 import { NetworkRequest } from '../types';
 import { useState, useMemo } from 'react';
 import { cn } from '../../../shared/lib/utils';
-import { ArrowUpDown, Search } from 'lucide-react';
+import { ArrowUpDown, Search, Copy, Trash2 } from 'lucide-react';
 
 interface RequestListProps {
   requests: NetworkRequest[];
@@ -22,6 +22,7 @@ interface RequestListProps {
   pendingActionIds?: Set<string>;
   onForward?: (id: string) => void;
   onDrop?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 export function RequestList({
@@ -34,6 +35,7 @@ export function RequestList({
   pendingActionIds,
   onForward,
   onDrop,
+  onDelete,
 }: RequestListProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -151,8 +153,38 @@ export function RequestList({
         header: 'Time',
         cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('time')}</span>,
       },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(
+                  `${row.original.method} ${row.original.protocol}://${row.original.host}${row.original.path}`,
+                );
+              }}
+              className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
+              title="Copy Request URL"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.(row.original.id);
+              }}
+              className="p-1 hover:bg-red-500/20 rounded text-muted-foreground hover:text-red-500"
+              title="Delete Request"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ),
+      },
     ],
-    [pendingActionIds, onForward, onDrop],
+    [pendingActionIds, onForward, onDrop, onDelete],
   );
 
   const table = useReactTable({

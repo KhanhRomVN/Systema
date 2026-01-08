@@ -193,13 +193,22 @@ export default function InspectorPage() {
     setIsScanning(false);
   };
 
+  const handleDeleteRequest = (id: string) => {
+    setRequests((prev) => prev.filter((req) => req.id !== id));
+  };
+
   if (!isScanning) {
     return <AppSelector onSelect={handleSelectApp} />;
   }
 
   return (
     <div className="h-screen w-screen bg-background">
-      <InspectorLayout onBack={handleBack} requests={requests} appName={selectedApp} />
+      <InspectorLayout
+        onBack={handleBack}
+        requests={requests}
+        appName={selectedApp}
+        onDelete={handleDeleteRequest}
+      />
     </div>
   );
 }
