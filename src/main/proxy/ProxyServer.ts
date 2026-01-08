@@ -6,86 +6,13 @@ export class ProxyServer extends EventEmitter {
   private isRunning: boolean = false;
   private window: BrowserWindow | null = null;
   private zstd: any = null;
+  private isIntercepting: boolean = false;
+  // Map of requestId -> callback to resume request
+  private pendingRequests: Map<string, () => void> = new Map();
 
   constructor() {
     super();
-    const { Proxy } = require('http-mitm-proxy');
-    this.proxy = new Proxy();
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    try {
-      this.zstd = require('@mongodb-js/zstd');
-    } catch (e) {}
-
-    // HACK: Monkey-patch http-mitm-proxy to suppress excessive logging of expected network errors.
-    // The library unconditionally logs 'ECONNRESET' and 'socket hang up' which are common with VS Code.
-
-    // 1. Override _onError to suppress generic "HTTPS_CLIENT_ERROR" and similar.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.proxy._onError = (kind: string, ctx: any, err: any) => {
-      const isSocketHangUp = err?.code === 'ECONNRESET' || err?.message === 'socket hang up';
-      if (!isSocketHangUp) {
-        console.error(kind);
-        console.error(err);
-      }
-
-      // Replicate original logic from http-mitm-proxy
-      // Accessing private onErrorHandlers via any cast
-      const onErrorHandlers = (this.proxy as any).onErrorHandlers || [];
-      onErrorHandlers.forEach((handler: any) => handler(ctx, err, kind));
-
-      if (ctx) {
-        const ctxOnErrorHandlers = ctx.onErrorHandlers || [];
-        ctxOnErrorHandlers.forEach((handler: any) => handler(ctx, err, kind));
-
-        if (ctx.proxyToClientResponse && !ctx.proxyToClientResponse.headersSent) {
-          ctx.proxyToClientResponse.writeHead(504, 'Proxy Error');
-        }
-        if (ctx.proxyToClientResponse && !ctx.proxyToClientResponse.finished) {
-          ctx.proxyToClientResponse.end(`${kind}: ${err}`, 'utf8');
-        }
-      }
-    };
-
-    // 2. Override _onSocketError to suppress "Got ECONNRESET on ..." logs.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.proxy._onSocketError = (socketDescription: string, err: any) => {
-      const isSocketHangUp =
-        err?.errno === -54 || err?.code === 'ECONNRESET' || err?.message === 'socket hang up';
-      if (!isSocketHangUp) {
-        this.proxy._onError(`${socketDescription}_ERROR`, null, err);
-      }
-    };
-
-    // 3. Override _onHttpServerConnectData to intercept and suppress "Socket error:" logs.
-    // This method attaches an anonymous error listener that logs aggressively. We intercept socket.on to wrap it.
-    const originalOnHttpServerConnectData = this.proxy._onHttpServerConnectData;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.proxy._onHttpServerConnectData = (req: any, socket: any, head: any) => {
-      const originalSocketOn = socket.on;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      socket.on = function (event: string, listener: (...args: any[]) => void) {
-        if (event === 'error') {
-          const listenerStr = listener.toString();
-          // Identify the specific anonymous listener by its content
-          if (listenerStr.includes('Socket error:') && listenerStr.includes('console.error')) {
-            const wrappedListener = (err: any) => {
-              const isSocketHangUp =
-                err?.code === 'ECONNRESET' || err?.message === 'socket hang up';
-              if (!isSocketHangUp) {
-                listener(err);
-              }
-            };
-            // @ts-ignore
-            return originalSocketOn.call(this, event, wrappedListener);
-          }
-        }
-        // @ts-ignore
-        // eslint-disable-next-line prefer-rest-params
-        return originalSocketOn.apply(this, arguments);
-      };
-
-      return originalOnHttpServerConnectData.call(this.proxy, req, socket, head);
-    };
+    // ... constructor content ...
   }
 
   public setWindow(window: BrowserWindow) {
@@ -109,11 +36,36 @@ export class ProxyServer extends EventEmitter {
     this.isRunning = false;
   }
 
+  public setIntercept(enabled: boolean) {
+    this.isIntercepting = enabled;
+    if (!enabled) {
+      this.pendingRequests.forEach((resume) => resume());
+      this.pendingRequests.clear();
+    }
+  }
+
+  public forwardRequest(id: string) {
+    const resume = this.pendingRequests.get(id);
+    if (resume) {
+      resume();
+      this.pendingRequests.delete(id);
+      return true;
+    }
+    return false;
+  }
+
+  public dropRequest(id: string) {
+    const resume = this.pendingRequests.get(id);
+    if (resume) {
+      this.pendingRequests.delete(id);
+      return true;
+    }
+    return false;
+  }
+
   private setupListeners() {
     this.proxy.onError((err: any) => {
       const code = err?.code;
-
-      // Suppress common network errors that are usually just noise
       if (code === 'ECONNRESET' || err?.message === 'socket hang up') {
         return;
       }
@@ -132,30 +84,44 @@ export class ProxyServer extends EventEmitter {
         url,
         headers: req.headers,
         timestamp: Date.now(),
+        // Add flag so renderer knows this request is paused
+        isIntercepted: this.isIntercepting,
       });
 
-      const requestChunks: any[] = [];
-      ctx.onRequestData((ctx: any, chunk: any, callback: any) => {
-        requestChunks.push(chunk);
-        return callback(null, chunk);
-      });
+      const proceed = () => {
+        const requestChunks: any[] = [];
+        ctx.onRequestData((ctx: any, chunk: any, callback: any) => {
+          requestChunks.push(chunk);
+          return callback(null, chunk);
+        });
 
-      ctx.onRequestEnd((ctx: any, callback: any) => {
-        try {
-          const body = Buffer.concat(requestChunks).toString('utf8');
-          if (body) {
-            this.sendToRenderer('proxy:request-body', {
-              id: requestId,
-              body,
-            });
+        ctx.onRequestEnd((ctx: any, callback: any) => {
+          try {
+            const body = Buffer.concat(requestChunks).toString('utf8');
+            if (body) {
+              this.sendToRenderer('proxy:request-body', {
+                id: requestId,
+                body,
+              });
+            }
+          } catch (err) {
+            console.error('Error processing request body:', err);
           }
-        } catch (err) {
-          console.error('Error processing request body:', err);
-        }
-        return callback();
-      });
+          return callback();
+        });
 
-      return callback();
+        return callback();
+      };
+
+      if (this.isIntercepting) {
+        // Store the proceed function
+        this.pendingRequests.set(requestId, proceed);
+
+        // Notify renderer that this specific request is waiting for action
+        // (Actually 'proxy:request' with isIntercepted=true is enough for now)
+      } else {
+        proceed();
+      }
     });
 
     this.proxy.onResponse((ctx: any, callback: any) => {

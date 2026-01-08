@@ -42,6 +42,19 @@ app.whenReady().then(async () => {
     return true;
   });
 
+  ipcMain.handle('proxy:set-intercept', async (_, enabled: boolean) => {
+    proxyServer.setIntercept(enabled);
+    return true;
+  });
+
+  ipcMain.handle('proxy:forward-request', async (_, id: string) => {
+    return proxyServer.forwardRequest(id);
+  });
+
+  ipcMain.handle('proxy:drop-request', async (_, id: string) => {
+    return proxyServer.dropRequest(id);
+  });
+
   ipcMain.handle('proxy:stop', async () => {
     proxyServer.stop();
     if (activeChildProcess) {

@@ -8,7 +8,7 @@ import {
   SortingState,
 } from '@tanstack/react-table';
 import { NetworkRequest } from '../types';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '../../../shared/lib/utils';
 import { ArrowUpDown, Search } from 'lucide-react';
 
@@ -18,78 +18,11 @@ interface RequestListProps {
   onSelect: (id: string) => void;
   searchTerm: string;
   onSearchChange: (term: string) => void;
+  interceptedIds?: Set<string>;
+  pendingActionIds?: Set<string>;
+  onForward?: (id: string) => void;
+  onDrop?: (id: string) => void;
 }
-
-const columns: ColumnDef<NetworkRequest>[] = [
-  {
-    accessorKey: 'id',
-    header: ({ column }) => {
-      return (
-        <button
-          className="flex items-center gap-1 hover:text-foreground"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          #
-          <ArrowUpDown className="h-3 w-3" />
-        </button>
-      );
-    },
-    cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('id')}</span>,
-  },
-  {
-    accessorKey: 'method',
-    header: 'Method',
-    cell: ({ row }) => {
-      const method = row.getValue('method') as string;
-      let colorClass = 'text-foreground';
-      if (method === 'GET') colorClass = 'text-blue-400';
-      if (method === 'POST') colorClass = 'text-green-400';
-      if (method === 'PUT') colorClass = 'text-orange-400';
-      if (method === 'DELETE') colorClass = 'text-red-400';
-      return <span className={cn('font-bold', colorClass)}>{method}</span>;
-    },
-  },
-  {
-    accessorKey: 'host',
-    header: 'Host',
-    cell: ({ row }) => <span className="truncate block max-w-[200px]">{row.getValue('host')}</span>,
-  },
-  {
-    accessorKey: 'path',
-    header: 'Path',
-    cell: ({ row }) => (
-      <span className="truncate block max-w-[300px]" title={row.getValue('path')}>
-        {row.getValue('path')}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const status = row.getValue('status') as number;
-      let colorClass = 'text-foreground';
-      if (status >= 200 && status < 300) colorClass = 'text-green-400';
-      else if (status >= 300 && status < 400) colorClass = 'text-yellow-400';
-      else if (status >= 400) colorClass = 'text-red-400';
-      return <span className={colorClass}>{status}</span>;
-    },
-  },
-  {
-    accessorKey: 'type',
-    header: 'Type',
-  },
-  {
-    accessorKey: 'size',
-    header: 'Size',
-    cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('size')}</span>,
-  },
-  {
-    accessorKey: 'time',
-    header: 'Time',
-    cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('time')}</span>,
-  },
-];
 
 export function RequestList({
   requests,
@@ -97,13 +30,15 @@ export function RequestList({
   onSelect,
   searchTerm,
   onSearchChange,
+  interceptedIds,
+  pendingActionIds,
+  onForward,
+  onDrop,
 }: RequestListProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
 
   const handleSearch = () => {
-    console.log('Searching for:', searchTerm);
-    setGlobalFilter(searchTerm);
+    // No-op or additional logic if needed, currently state is managed by parent
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -112,18 +47,126 @@ export function RequestList({
     }
   };
 
+  const columns = useMemo<ColumnDef<NetworkRequest>[]>(
+    () => [
+      {
+        accessorKey: 'id',
+        header: ({ column }) => {
+          return (
+            <button
+              className="flex items-center gap-1 hover:text-foreground"
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            >
+              #
+              <ArrowUpDown className="h-3 w-3" />
+            </button>
+          );
+        },
+        cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('id')}</span>,
+      },
+      {
+        accessorKey: 'method',
+        header: 'Method',
+        cell: ({ row }) => {
+          const method = row.getValue('method') as string;
+          let colorClass = 'text-foreground';
+          if (method === 'GET') colorClass = 'text-blue-400';
+          if (method === 'POST') colorClass = 'text-green-400';
+          if (method === 'PUT') colorClass = 'text-orange-400';
+          if (method === 'DELETE') colorClass = 'text-red-400';
+          return <span className={cn('font-bold', colorClass)}>{method}</span>;
+        },
+      },
+      {
+        accessorKey: 'host',
+        header: 'Host',
+        cell: ({ row }) => (
+          <span className="truncate block max-w-[200px]">{row.getValue('host')}</span>
+        ),
+      },
+      {
+        accessorKey: 'path',
+        header: 'Path',
+        cell: ({ row }) => (
+          <span className="truncate block max-w-[300px]" title={row.getValue('path')}>
+            {row.getValue('path')}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        id: 'status', // Explicitly set ID for the column
+        cell: ({ row }) => {
+          const id = row.original.id;
+          const isPending = pendingActionIds?.has(id);
+          const status = row.getValue('status') as number;
+
+          if (isPending) {
+            return (
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <span className="text-orange-500 font-bold animate-pulse text-[10px]">PAUSED</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onForward?.(id);
+                  }}
+                  className="px-2 py-0.5 bg-green-500/20 text-green-500 hover:bg-green-500/30 rounded text-[10px] border border-green-500/50"
+                  title="Forward Request"
+                >
+                  Fwd
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDrop?.(id);
+                  }}
+                  className="px-2 py-0.5 bg-red-500/20 text-red-500 hover:bg-red-500/30 rounded text-[10px] border border-red-500/50"
+                  title="Drop Request"
+                >
+                  Drop
+                </button>
+              </div>
+            );
+          }
+
+          let colorClass = 'text-foreground';
+          if (status >= 200 && status < 300) colorClass = 'text-green-400';
+          else if (status >= 300 && status < 400) colorClass = 'text-yellow-400';
+          else if (status >= 400) colorClass = 'text-red-400';
+          return <span className={colorClass}>{status || 'Pending'}</span>;
+        },
+      },
+      {
+        accessorKey: 'type',
+        header: 'Type',
+      },
+      {
+        accessorKey: 'size',
+        header: 'Size',
+        cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('size')}</span>,
+      },
+      {
+        accessorKey: 'time',
+        header: 'Time',
+        cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('time')}</span>,
+      },
+    ],
+    [pendingActionIds, onForward, onDrop],
+  );
+
   const table = useReactTable({
     data: requests,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
     state: {
       sorting,
-      globalFilter,
+      globalFilter: searchTerm,
     },
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange: onSearchChange,
     globalFilterFn: (row, _columnId, filterValue) => {
       const searchTerm = String(filterValue);
       if (!searchTerm) return true;
@@ -182,35 +225,24 @@ export function RequestList({
   return (
     <div className="h-full w-full flex flex-col bg-background/50 text-sm overflow-hidden">
       {/* Filter Bar */}
-      <div className="p-2 border-b border-border flex gap-2 bg-muted/20">
-        <div className="relative flex-1 flex gap-2">
-          <input
-            type="text"
-            placeholder="Search https... (Regex supported)"
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1 bg-background border border-border rounded px-3 py-1 text-sm focus:outline-none focus:border-primary transition-colors"
-          />
-          <button
-            onClick={handleSearch}
-            className="p-1 px-3 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
-          >
-            <Search className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="flex items-center p-2 border-b border-border/40 gap-2">
+        <Search className="w-4 h-4 text-muted-foreground" />
+        <input
+          placeholder="Filter requests..."
+          className="bg-transparent border-none outline-none text-xs flex-1"
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
       </div>
 
       <div className="flex-1 overflow-auto">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-sm">
+          <thead className="bg-muted/50 sticky top-0 z-10 text-xs font-medium text-muted-foreground">
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-border/50">
+              <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="h-8 px-4 font-medium text-muted-foreground select-none"
-                  >
+                  <th key={header.id} className="px-4 py-2 font-normal">
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -221,28 +253,41 @@ export function RequestList({
           </thead>
           <tbody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
-                  className={cn(
-                    'border-b border-border/20 hover:bg-muted/50 transition-colors cursor-pointer text-xs',
-                    row.original.id === selectedId &&
-                      'bg-accent text-accent-foreground hover:bg-accent',
-                  )}
-                  onClick={() => onSelect(row.original.id)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const isIntercepted = interceptedIds?.has(row.original.id);
+                const isPending = pendingActionIds?.has(row.original.id);
+
+                return (
+                  <tr
+                    key={row.id}
+                    data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
+                    className={cn(
+                      'border-b border-border/20 transition-colors cursor-pointer text-xs',
+                      isPending
+                        ? 'bg-orange-500/10 hover:bg-orange-500/20'
+                        : isIntercepted
+                          ? 'bg-red-500/10 hover:bg-red-500/20'
+                          : 'hover:bg-muted/50',
+                      row.original.id === selectedId &&
+                        'bg-accent text-accent-foreground hover:bg-accent',
+                    )}
+                    onClick={() => onSelect(row.original.id)}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             ) : (
               <tr>
-                <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  No requests recorded.
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-8 text-center text-muted-foreground"
+                >
+                  No requests found
                 </td>
               </tr>
             )}

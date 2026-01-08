@@ -5,6 +5,7 @@ import { initialFilterState, InspectorFilter } from './FilterPanel';
 import { ChatContainer } from './ChatContainer';
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
+import { cn } from '../../../shared/lib/utils';
 
 interface InspectorLayoutProps {
   onBack: () => void;
@@ -17,6 +18,80 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   const [detailsTab, setDetailsTab] = useState('overview');
+
+  // Intercept state
+  const [isIntercepting, setIsIntercepting] = useState(false);
+  const [interceptedIds, setInterceptedIds] = useState<Set<string>>(new Set());
+  const [pendingActionIds, setPendingActionIds] = useState<Set<string>>(new Set());
+  const [processedIds] = useState(new Set<string>()); // helper to track seen IDs for interception
+
+  const handleSetIntercept = (enabled: boolean) => {
+    setIsIntercepting(enabled);
+    window.api.invoke('proxy:set-intercept', enabled);
+    if (!enabled) {
+      setPendingActionIds(new Set()); // Clear pending actions when disabled
+    }
+  };
+
+  const handleForward = async (id: string) => {
+    await window.api.invoke('proxy:forward-request', id);
+    setPendingActionIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const handleDrop = async (id: string) => {
+    await window.api.invoke('proxy:drop-request', id);
+    setPendingActionIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  // Track new requests for interception
+  useEffect(() => {
+    let hasNewIntercepted = false;
+    let hasNewPending = false;
+    const newIntercepted = new Set(interceptedIds);
+    const newPending = new Set(pendingActionIds);
+
+    requests.forEach((req) => {
+      // If we haven't processed this ID yet
+      if (!processedIds.has(req.id)) {
+        processedIds.add(req.id); // Mark as seen
+
+        // If request is marked as intercepted by proxy (BLOCKING)
+        if (req.isIntercepted) {
+          newIntercepted.add(req.id);
+          newPending.add(req.id);
+          hasNewIntercepted = true;
+          hasNewPending = true;
+        }
+        // Logic solely for local highlighting if enabled (fallback)
+        else if (isIntercepting) {
+          newIntercepted.add(req.id);
+          hasNewIntercepted = true;
+        }
+      }
+    });
+
+    if (hasNewIntercepted) setInterceptedIds(newIntercepted);
+    if (hasNewPending) setPendingActionIds(newPending);
+  }, [requests, isIntercepting, processedIds]);
+
+  // Make sure we mark all initial/incoming requests as processed even if not intercepting
+  // so we don't "catch up" old requests when turning on intercept
+  useEffect(() => {
+    requests.forEach((req) => {
+      if (!processedIds.has(req.id)) {
+        processedIds.add(req.id);
+      }
+    });
+  }, [requests]);
+
   const [filter, setFilter] = useState<InspectorFilter>(() => {
     try {
       const saved = localStorage.getItem(`inspector-filter-state-${appName}`);
@@ -170,6 +245,23 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
         </button>
         <div className="h-4 w-px bg-border/50" />
         <span className="font-semibold text-sm">Network Inspector</span>
+
+        {/* Intercept Button */}
+        <button
+          onClick={() => handleSetIntercept(!isIntercepting)}
+          className={cn(
+            'ml-2 px-3 py-1 rounded text-xs font-medium border transition-all flex items-center gap-2',
+            isIntercepting
+              ? 'bg-red-500/10 text-red-500 border-red-500/30 animate-pulse'
+              : 'bg-transparent text-muted-foreground border-border hover:bg-muted/50',
+          )}
+        >
+          <div
+            className={cn('w-2 h-2 rounded-full', isIntercepting ? 'bg-red-500' : 'bg-gray-400')}
+          />
+          {isIntercepting ? 'Intercepting (Blocking)' : 'Intercept'}
+        </button>
+
         <div className="ml-auto text-xs text-muted-foreground">
           {filteredRequests.length} / {requests.length} requests
         </div>
@@ -196,6 +288,10 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
                 onSelect={setSelectedId}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
+                interceptedIds={interceptedIds}
+                pendingActionIds={pendingActionIds}
+                onForward={handleForward}
+                onDrop={handleDrop}
               />
             </div>
 
