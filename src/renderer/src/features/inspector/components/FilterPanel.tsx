@@ -1,6 +1,13 @@
-import { useState } from 'react';
-import { X, Search, Filter } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Filter } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
+
+export interface NetworkRequest {
+  id: string;
+  host: string;
+  path: string;
+  [key: string]: any;
+}
 
 export interface InspectorFilter {
   methods: {
@@ -106,9 +113,14 @@ export const initialFilterState: InspectorFilter = {
 interface FilterPanelProps {
   filter: InspectorFilter;
   onChange: (filter: InspectorFilter) => void;
+  requests?: NetworkRequest[];
 }
 
-export function FilterPanel({ filter, onChange }: FilterPanelProps) {
+export function FilterPanel({ filter, onChange, requests = [] }: FilterPanelProps) {
+  // Extract all unique hosts and paths from requests
+  const allHosts = Array.from(new Set(requests.map((r) => r.host).filter(Boolean)));
+  const allPaths = Array.from(new Set(requests.map((r) => r.path).filter(Boolean)));
+
   return (
     <div className="h-full overflow-auto bg-background/50 border-l border-border/50 flex flex-col font-sans select-none">
       <div className="p-4 space-y-6">
@@ -156,6 +168,7 @@ export function FilterPanel({ filter, onChange }: FilterPanelProps) {
           title="Host"
           lists={filter.host}
           onChange={(newHost) => onChange({ ...filter, host: newHost })}
+          allItems={allHosts}
         />
 
         {/* Path */}
@@ -163,6 +176,7 @@ export function FilterPanel({ filter, onChange }: FilterPanelProps) {
           title="Path"
           lists={filter.path}
           onChange={(newPath) => onChange({ ...filter, path: newPath })}
+          allItems={allPaths}
         />
 
         {/* Status */}
@@ -329,12 +343,52 @@ function ListFilterSection({
   title,
   lists,
   onChange,
+  allItems = [],
 }: {
   title: string;
   lists: { whitelist: string[] };
   onChange: (lists: { whitelist: string[] }) => void;
+  allItems?: string[];
 }) {
   const [input, setInput] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Filter suggestions based on input
+  const filteredSuggestions = input.trim()
+    ? allItems.filter((item) => {
+        try {
+          // Try to match as regex
+          const regex = new RegExp(input, 'i');
+          return regex.test(item);
+        } catch {
+          // If invalid regex, fall back to simple substring match
+          return item.toLowerCase().includes(input.toLowerCase());
+        }
+      })
+    : [];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    if (showDropdown || showSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+    return undefined;
+  }, [showDropdown, showSuggestions]);
 
   const handleAdd = (value: string) => {
     if (!value.trim()) return;
@@ -348,23 +402,129 @@ function ListFilterSection({
     onChange({ ...lists, whitelist: currentList.filter((v) => v !== value) });
   };
 
+  const handleSelectSuggestion = (suggestion: string) => {
+    setInput(suggestion);
+    setShowSuggestions(false);
+  };
+
+  const handleToggleItem = (item: string) => {
+    const currentList = lists.whitelist || [];
+    if (currentList.includes(item)) {
+      handleRemove(item);
+    } else {
+      handleAdd(item);
+    }
+    setShowDropdown(false);
+  };
+
   return (
     <section>
       <h3 className="text-xs font-semibold mb-2">{title}</h3>
       <div className="space-y-1.5">
-        <div className="flex gap-2">
-          <input
-            className="flex-1 bg-background border border-border/50 rounded px-2 py-1 text-xs focus:border-primary/50 outline-none"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleAdd(input);
-                setInput('');
-              }
-            }}
-            placeholder={`Filter ${title}... (Press Enter to include)`}
-          />
+        <div className="flex gap-2 relative">
+          <div className="flex-1 relative">
+            <input
+              className="w-full bg-background border border-border/50 rounded px-2 py-1.5 text-xs focus:border-primary/50 outline-none"
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setShowSuggestions(e.target.value.trim().length > 0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAdd(input);
+                  setInput('');
+                  setShowSuggestions(false);
+                } else if (e.key === 'Escape') {
+                  setShowSuggestions(false);
+                }
+              }}
+              onFocus={() => {
+                if (input.trim().length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
+              placeholder={`Filter ${title}... (Press Enter to include)`}
+            />
+
+            {/* Autocomplete Suggestions Dropdown */}
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div
+                ref={suggestionsRef}
+                className="absolute top-full mt-1 left-0 right-0 max-h-48 overflow-auto bg-background border border-border rounded-md shadow-lg z-50"
+              >
+                <div className="p-1">
+                  {filteredSuggestions.slice(0, 10).map((suggestion) => {
+                    const isAlreadyAdded = (lists.whitelist || []).includes(suggestion);
+                    return (
+                      <button
+                        key={suggestion}
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        disabled={isAlreadyAdded}
+                        className={cn(
+                          'w-full text-left px-2 py-1.5 text-[11px] rounded transition-colors flex items-center justify-between gap-2',
+                          isAlreadyAdded
+                            ? 'text-muted-foreground/50 cursor-not-allowed'
+                            : 'hover:bg-muted/50 cursor-pointer',
+                        )}
+                      >
+                        <span className="truncate">{suggestion}</span>
+                        {isAlreadyAdded && (
+                          <span className="text-[10px] text-muted-foreground/50 shrink-0">
+                            Added
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {filteredSuggestions.length > 10 && (
+                    <div className="px-2 py-1 text-[10px] text-muted-foreground text-center border-t border-border/50">
+                      +{filteredSuggestions.length - 10} more...
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            className="px-2 py-1.5 border border-border/50 rounded bg-background hover:bg-muted/50 transition-colors"
+            title={`Show all ${title.toLowerCase()}s`}
+          >
+            <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+
+          {/* Dropdown */}
+          {showDropdown && allItems.length > 0 && (
+            <div
+              ref={dropdownRef}
+              className="absolute top-full mt-1 right-0 w-80 max-h-60 overflow-auto bg-background border border-border rounded-md shadow-lg z-50"
+            >
+              <div className="p-2 border-b border-border/50 text-[10px] text-muted-foreground font-semibold">
+                All {title}s ({allItems.length})
+              </div>
+              <div className="p-1">
+                {allItems.map((item) => {
+                  const isSelected = (lists.whitelist || []).includes(item);
+                  return (
+                    <button
+                      key={item}
+                      onClick={() => handleToggleItem(item)}
+                      className={cn(
+                        'w-full text-left px-2 py-1.5 text-[11px] rounded hover:bg-muted/50 transition-colors flex items-center justify-between gap-2',
+                        isSelected && 'bg-primary/10 text-primary',
+                      )}
+                    >
+                      <span className="truncate">{item}</span>
+                      {isSelected && (
+                        <span className="text-[10px] text-primary/70 shrink-0">✓</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
         {(lists.whitelist || []).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-1">

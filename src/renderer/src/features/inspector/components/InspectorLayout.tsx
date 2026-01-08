@@ -1,10 +1,9 @@
 import { ResizableSplit } from '../../../components/ResizableSplit';
 import { RequestList } from './RequestList';
 import { RequestDetails } from './RequestDetails';
-import { FilterPanel, initialFilterState, InspectorFilter } from './FilterPanel';
+import { initialFilterState, InspectorFilter } from './FilterPanel';
 import { ChatContainer } from './ChatContainer';
 import { useState, useMemo, useEffect } from 'react';
-import { Filter } from 'lucide-react';
 import { NetworkRequest } from '../types';
 
 interface InspectorLayoutProps {
@@ -58,19 +57,18 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
         return false;
       }
 
-      // Pending requests (status 0) should always be visible to show activity
-      if (req.status === 0) return true;
-
-      // Host
-      // Host (Whitelist)
+      // Host (Whitelist) - Apply even to pending requests
       const hostWhitelist = filter.host.whitelist || [];
       if (hostWhitelist.length > 0 && !hostWhitelist.some((allowed) => req.host.includes(allowed)))
         return false;
 
-      // Path (Whitelist)
+      // Path (Whitelist) - Apply even to pending requests
       const pathWhitelist = filter.path.whitelist || [];
       if (pathWhitelist.length > 0 && !pathWhitelist.some((allowed) => req.path.includes(allowed)))
         return false;
+
+      // Pending requests (status 0) skip remaining filters but respect host/path
+      if (req.status === 0) return true;
 
       // Status
       if (
@@ -210,6 +208,7 @@ export function InspectorLayout({ onBack, requests, appName }: InspectorLayoutPr
               isFilterOpen={isFilterPanelOpen}
               filter={filter}
               onFilterChange={setFilter}
+              requests={requests}
             />
           </ResizableSplit>
 

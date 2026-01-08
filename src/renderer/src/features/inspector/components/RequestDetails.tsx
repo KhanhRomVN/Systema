@@ -56,6 +56,7 @@ interface RequestDetailsProps {
   isFilterOpen?: boolean;
   filter: InspectorFilter;
   onFilterChange: (filter: InspectorFilter) => void;
+  requests?: NetworkRequest[];
 }
 
 export function RequestDetails({
@@ -67,6 +68,7 @@ export function RequestDetails({
   isFilterOpen,
   filter,
   onFilterChange,
+  requests = [],
 }: RequestDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview');
   const [isRawMode, setIsRawMode] = useState(false);
@@ -476,7 +478,7 @@ export function RequestDetails({
         {isFilterOpen ? (
           <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
             {content}
-            <FilterPanel filter={filter} onChange={onFilterChange} />
+            <FilterPanel filter={filter} onChange={onFilterChange} requests={requests} />
           </ResizableSplit>
         ) : (
           content

@@ -1,4 +1,3 @@
-import { Proxy } from 'http-mitm-proxy';
 import { BrowserWindow } from 'electron';
 import { EventEmitter } from 'events';
 
@@ -15,9 +14,7 @@ export class ProxyServer extends EventEmitter {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     try {
       this.zstd = require('@mongodb-js/zstd');
-    } catch (e) {
-      console.warn('[ProxyServer] Failed to load @mongodb-js/zstd', e);
-    }
+    } catch (e) {}
 
     // HACK: Monkey-patch http-mitm-proxy to suppress excessive logging of expected network errors.
     // The library unconditionally logs 'ECONNRESET' and 'socket hang up' which are common with VS Code.
@@ -136,7 +133,6 @@ export class ProxyServer extends EventEmitter {
         headers: req.headers,
         timestamp: Date.now(),
       });
-      console.log(`[ProxyServer] Intercepted REQUEST: ${method} ${url}`);
 
       const requestChunks: any[] = [];
       ctx.onRequestData((ctx: any, chunk: any, callback: any) => {
@@ -268,10 +264,7 @@ export class ProxyServer extends EventEmitter {
 
   private sendToRenderer(channel: string, data: any) {
     if (this.window && !this.window.isDestroyed()) {
-      // console.log(`[ProxyServer] Sending IO to renderer: ${channel}`);
       this.window.webContents.send(channel, data);
-    } else {
-      console.warn('[ProxyServer] Cannot send to renderer (window destroyed or null)');
     }
   }
 }
