@@ -13,3 +13,6 @@ out
 .env.production.local
 .env.*
 !.env.example
+
+# Http-mitm-proxy
+.http-mitm-proxy

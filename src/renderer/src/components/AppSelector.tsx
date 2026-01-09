@@ -50,6 +50,66 @@ export const AppSelector: React.FC<AppSelectorProps> = ({ onSelect }) => {
           </div>
         </div>
 
+        {/* Claude (Web) Card */}
+        <div
+          className="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition cursor-pointer border border-gray-700 hover:border-orange-500"
+          onClick={() => onSelect('claude-web', 'http://127.0.0.1:8081')}
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="w-12 h-12 bg-orange-500 rounded flex items-center justify-center text-xl font-bold">
+              CW
+            </div>
+            <h2 className="text-xl font-semibold">Claude (Web)</h2>
+          </div>
+          <p className="text-gray-400 mb-4">
+            Launches a trusted browser pointing to Claude. Intercepts HTTPS traffic.
+          </p>
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <span>Proxy: :8081</span>
+            <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Ready</span>
+          </div>
+        </div>
+
+        {/* ChatGPT (Web) Card */}
+        <div
+          className="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition cursor-pointer border border-gray-700 hover:border-green-500"
+          onClick={() => onSelect('chatgpt-web', 'http://127.0.0.1:8081')}
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="w-12 h-12 bg-green-600 rounded flex items-center justify-center text-xl font-bold">
+              CG
+            </div>
+            <h2 className="text-xl font-semibold">ChatGPT (Web)</h2>
+          </div>
+          <p className="text-gray-400 mb-4">
+            Launches a trusted browser pointing to ChatGPT. Intercepts HTTPS traffic.
+          </p>
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <span>Proxy: :8081</span>
+            <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Ready</span>
+          </div>
+        </div>
+
+        {/* Antigravity Card */}
+        <div
+          className="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition cursor-pointer border border-gray-700 hover:border-purple-500"
+          onClick={() => onSelect('antigravity', 'http://127.0.0.1:8081')}
+        >
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="w-12 h-12 bg-purple-600 rounded flex items-center justify-center text-xl font-bold">
+              AG
+            </div>
+            <h2 className="text-xl font-semibold">Antigravity</h2>
+          </div>
+          <p className="text-gray-400 mb-4">
+            Launches Antigravity IDE with proxy settings configured.
+          </p>
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <span>Proxy: :8081</span>
+            <span className="bg-green-900 text-green-300 px-2 py-1 rounded">Ready</span>
+          </div>
+        </div>
+
         {/* Open Claude Card */}
         <div
           className="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition cursor-pointer border border-gray-700 hover:border-orange-500"

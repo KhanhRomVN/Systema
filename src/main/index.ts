@@ -116,7 +116,8 @@ app.whenReady().then(async () => {
     }
     if (appName === 'deepseek-web') {
       activeProxyUrl = proxyUrl;
-      const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'systema-browser-'));
+      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'deepseek-web');
+      fs.mkdirSync(userDataDir, { recursive: true });
 
       // Find browser (Linux)
       const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
@@ -140,9 +141,10 @@ app.whenReady().then(async () => {
         [
           '--proxy-server=' + proxyUrl,
           '--ignore-certificate-errors',
-          '--disable-blink-features=AutomationControlled',
           '--no-first-run',
           '--no-default-browser-check',
+          '--disable-http2',
+          '--disable-quic',
           `--user-data-dir=${userDataDir}`,
           'https://chat.deepseek.com',
         ],
@@ -157,11 +159,58 @@ app.whenReady().then(async () => {
         if (activeChildProcess === child) {
           activeChildProcess = null;
           activeProxyUrl = null;
-          try {
-            fs.rmSync(userDataDir, { recursive: true, force: true });
-          } catch (e) {
-            console.error('Failed to cleanup tmp dir', e);
-          }
+        }
+      });
+
+      child.unref();
+      return true;
+    }
+
+    if (appName === 'claude-web') {
+      activeProxyUrl = proxyUrl;
+      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'claude-web');
+      fs.mkdirSync(userDataDir, { recursive: true });
+
+      // Find browser (Linux)
+      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
+      let executable = '';
+      for (const b of browsers) {
+        try {
+          execSync(`which ${b}`);
+          executable = b;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!executable) {
+        return false;
+      }
+
+      const child = spawn(
+        executable,
+        [
+          '--proxy-server=' + proxyUrl,
+          '--ignore-certificate-errors',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-http2',
+          '--disable-quic',
+          `--user-data-dir=${userDataDir}`,
+          'https://claude.ai',
+        ],
+        {
+          detached: true,
+          stdio: 'ignore',
+        },
+      );
+      activeChildProcess = child;
+
+      child.on('exit', () => {
+        if (activeChildProcess === child) {
+          activeChildProcess = null;
+          activeProxyUrl = null;
         }
       });
 
@@ -222,6 +271,91 @@ app.whenReady().then(async () => {
       child.unref();
       return true;
     }
+    if (appName === 'chatgpt-web') {
+      activeProxyUrl = proxyUrl;
+      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'chatgpt-web');
+      fs.mkdirSync(userDataDir, { recursive: true });
+
+      // Find browser (Linux)
+      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
+      let executable = '';
+      for (const b of browsers) {
+        try {
+          execSync(`which ${b}`);
+          executable = b;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!executable) {
+        return false;
+      }
+
+      const child = spawn(
+        executable,
+        [
+          '--proxy-server=' + proxyUrl,
+          '--ignore-certificate-errors',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-http2',
+          '--disable-quic',
+          `--user-data-dir=${userDataDir}`,
+          'https://chatgpt.com',
+        ],
+        {
+          detached: true,
+          stdio: 'ignore',
+        },
+      );
+      activeChildProcess = child;
+
+      child.on('exit', () => {
+        if (activeChildProcess === child) {
+          activeChildProcess = null;
+          activeProxyUrl = null;
+        }
+      });
+
+      child.unref();
+      return true;
+    }
+
+    if (appName === 'antigravity') {
+      activeProxyUrl = proxyUrl;
+      // Using 'antigravity' command assuming it's in PATH
+      const child = spawn(
+        'antigravity',
+        [
+          '--wait',
+          '--new-window',
+          '--proxy-server=' + proxyUrl,
+          '--ignore-certificate-errors',
+          '.',
+        ],
+        {
+          detached: true,
+          stdio: 'ignore',
+          shell: true, // For Windows/Linux compatibility with command resolution
+        },
+      );
+      activeChildProcess = child;
+
+      child.on('exit', () => {
+        if (activeChildProcess === child) {
+          activeChildProcess = null;
+          // Don't clear activeProxyUrl here immediately, as we might want to ensure cleanup on explicit stop
+          // But effectively if it exits, it's gone.
+          activeProxyUrl = null;
+        }
+      });
+
+      child.unref();
+      return true;
+    }
+
     return false;
   });
 
