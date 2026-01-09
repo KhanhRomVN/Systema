@@ -4,6 +4,7 @@ import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
 import { ProxyServer } from './proxy/ProxyServer';
 import { SingletonWSManager } from './server/SingletonWSManager';
+import { createClaudeWebWindow, closeClaudeWebWindow } from './features/claude-web';
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -57,6 +58,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('proxy:stop', async () => {
     proxyServer.stop();
+    closeClaudeWebWindow(); // Close Claude Web window if open
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -69,6 +71,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('app:terminate', async () => {
+    closeClaudeWebWindow(); // Close Claude Web window if open
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -167,54 +170,17 @@ app.whenReady().then(async () => {
     }
 
     if (appName === 'claude-web') {
+      // Use Electron BrowserWindow instead of spawning Chrome (like OpenClaude)
       activeProxyUrl = proxyUrl;
-      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'claude-web');
-      fs.mkdirSync(userDataDir, { recursive: true });
+      const success = await createClaudeWebWindow(proxyUrl);
 
-      // Find browser (Linux)
-      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
-      let executable = '';
-      for (const b of browsers) {
-        try {
-          execSync(`which ${b}`);
-          executable = b;
-          break;
-        } catch {
-          continue;
-        }
-      }
-
-      if (!executable) {
+      if (!success) {
+        console.error('[Systema] Failed to create Claude Web window');
+        activeProxyUrl = null;
         return false;
       }
 
-      const child = spawn(
-        executable,
-        [
-          '--proxy-server=' + proxyUrl,
-          '--ignore-certificate-errors',
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--disable-http2',
-          '--disable-quic',
-          `--user-data-dir=${userDataDir}`,
-          'https://claude.ai',
-        ],
-        {
-          detached: true,
-          stdio: 'ignore',
-        },
-      );
-      activeChildProcess = child;
-
-      child.on('exit', () => {
-        if (activeChildProcess === child) {
-          activeChildProcess = null;
-          activeProxyUrl = null;
-        }
-      });
-
-      child.unref();
+      console.log('[Systema] Claude Web window created successfully');
       return true;
     }
     if (appName === 'open-claude') {
@@ -386,6 +352,7 @@ app.whenReady().then(async () => {
 // explicitly with Cmd + Q.
 const cleanup = () => {
   proxyServer.stop();
+  closeClaudeWebWindow(); // Close Claude Web window if open
   if (activeChildProcess) {
     activeChildProcess.kill();
     activeChildProcess = null;
