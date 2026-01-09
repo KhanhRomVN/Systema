@@ -20,6 +20,7 @@ export interface CodeBlockThemeConfig {
   background?: string;
   foreground?: string;
   rules?: CodeBlockThemeRule[];
+  highlightLine?: number;
 }
 
 interface CodeBlockProps {
@@ -28,6 +29,8 @@ interface CodeBlockProps {
   className?: string;
   themeConfig?: CodeBlockThemeConfig;
   wordWrap?: 'off' | 'on' | 'wordWrapColumn' | 'bounded';
+  showLineNumbers?: boolean;
+  onEditorMounted?: (editor: any) => void;
 }
 
 const SYSTEMA_THEME = {
@@ -52,6 +55,8 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
   className,
   themeConfig,
   wordWrap = 'on',
+  showLineNumbers = false,
+  onEditorMounted,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const editorInstance = useRef<any>(null);
@@ -102,7 +107,13 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
           automaticLayout: true,
           padding: { top: 16, bottom: 16 },
           wordWrap: wordWrap,
+          lineNumbers: showLineNumbers ? 'on' : 'off',
         });
+
+        // Expose editor instance
+        if (onEditorMounted) {
+          onEditorMounted(editorInstance.current);
+        }
       } catch (error) {
         console.error('Failed to create monaco editor instance:', error);
       }
@@ -184,6 +195,42 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
       editorInstance.current.updateOptions({ wordWrap });
     }
   }, [wordWrap]);
+
+  // Handle line highlighting
+  useEffect(() => {
+    if (
+      editorInstance.current &&
+      showLineNumbers &&
+      typeof themeConfig?.highlightLine === 'number'
+    ) {
+      const line = themeConfig.highlightLine;
+      const editor = editorInstance.current;
+
+      // Clear previous decorations/collections if we stored them (simple version: just overwrite)
+      const decorations = editor.deltaDecorations(
+        [],
+        [
+          {
+            range: new window.monaco.Range(line, 1, line, 1),
+            options: {
+              isWholeLine: true,
+              className: 'monaco-highlight-line bg-yellow-500/20', // Tailwind class might not work inside shadow DOM/iframe if Monaco isolates, but usually works in DOM mode
+              inlineClassName: 'font-bold',
+            },
+          },
+        ],
+      );
+
+      editor.revealLineInCenter(line);
+
+      // Cleanup function to remove decorations?
+      // Monaco handles deltaDecorations by returning new IDs. For this simple case, we trust re-renders or disposal.
+      // But ideally we should track `decorations` ref.
+      return () => {
+        editor.deltaDecorations(decorations, []);
+      };
+    }
+  }, [themeConfig?.highlightLine, showLineNumbers]);
 
   return <div ref={editorRef} className={`w-full h-full min-h-[200px] ${className || ''}`} />;
 };

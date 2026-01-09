@@ -25,6 +25,7 @@ export interface NetworkRequest {
   connection?: string;
   analysis?: RequestAnalysis;
   isIntercepted?: boolean;
+  initiator?: string;
 }
 
 export const MOCK_REQUESTS: NetworkRequest[] = [

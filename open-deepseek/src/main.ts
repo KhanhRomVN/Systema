@@ -78,6 +78,7 @@ function createAuthWindow() {
     }
 
     try {
+      // 1. Check for Token
       const localStorageData = await authWindow.webContents.executeJavaScript(
         'JSON.stringify(localStorage)',
       );
@@ -92,34 +93,62 @@ function createAuthWindow() {
             if (current !== bearerToken) {
               console.log('[Auth] Token captured successfully.');
               safeStore.set('deepseekToken', bearerToken);
-
-              if (mainWindow) {
-                mainWindow.webContents.send('auth-success');
-              }
-
-              // Close Auth Window on success
-              clearInterval(checkStorage);
-              authWindow.close();
+              if (mainWindow) mainWindow.webContents.send('auth-success');
             }
           }
-        } catch (err) {
-          // Silent catch
-        }
+        } catch (err) {}
       }
+
+      // 2. INJECT HUNTER SCRIPT: Search for PoW Algorithm
+      // We look for webpack chunks that contain "DeepSeekHashV1"
+      await authWindow.webContents.executeJavaScript(`
+        if (!window.hasInjectedPoWHunter) {
+          window.hasInjectedPoWHunter = true;
+          console.log('[Hunter] Starting search for PoW algorithm...');
+          
+          function findWebpackModules() {
+            // Typical webpack jsonp global
+            const chunkName = Object.keys(window).find(k => k.toLowerCase().includes('chunk') || k.toLowerCase().includes('webpack'));
+            if (!chunkName) return;
+            
+            const chunk = window[chunkName];
+            if (!chunk || !chunk.push) return;
+
+            // We hook into the pushing mechanism or just iterate existing if array-like
+            // But usually we need to find the 'modules' store.
+            // A simpler way for modern apps: scan all loaded scripts content? No, CORS.
+            // Better: Hook Function.prototype.toString? No.
+            
+            console.log('[Hunter] Found potential webpack object:', chunkName);
+          }
+          
+          findWebpackModules();
+        }
+      `);
     } catch (e) {
       // Silent catch
     }
   }, 2000);
 
-  // Sniff Network Traffic for Chat Endpoint
+  // Sniff Network Traffic for Chat Endpoint + Challenge
+  // We also try to capture the "answer" from valid requests to analyze
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['*://*.deepseek.com/*'] },
     (details, callback) => {
       // Filter for chat/completion
       if (details.method === 'POST' && details.url.includes('completion')) {
         console.log('\n\n************************************************');
-        console.log('[Network Debug] CAPTURED HEADERS for:', details.url);
-        console.log(JSON.stringify(details.requestHeaders, null, 2));
+        console.log('[Network Debug] CAPTURED outgoing request:', details.url);
+        const powResponse =
+          details.requestHeaders['x-ds-pow-response'] ||
+          details.requestHeaders['X-Ds-Pow-Response'];
+        if (powResponse) {
+          console.log('[PoW] Found valid PoW Response (Base64):', powResponse);
+          try {
+            const decoded = Buffer.from(powResponse, 'base64').toString();
+            console.log('[PoW] Decoded Payload:', decoded);
+          } catch (e) {}
+        }
         console.log('************************************************\n\n');
       }
       callback({});

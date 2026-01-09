@@ -29,6 +29,7 @@ export default function InspectorPage() {
         requestBody: '',
         responseBody: '',
         isIntercepted: data.isIntercepted,
+        initiator: data.initiator,
       };
       // Generate initial analysis
       const analysis = generateRequestAnalysis(newRequest);

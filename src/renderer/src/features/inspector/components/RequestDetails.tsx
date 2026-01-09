@@ -1,6 +1,6 @@
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   BarChart2,
   Upload,
@@ -16,6 +16,8 @@ import {
   Copy,
   Flower2,
   Filter,
+  ScanEye,
+  PlayCircle,
 } from 'lucide-react';
 
 import { RequestOverview } from './RequestDetails/RequestOverview';
@@ -29,6 +31,7 @@ import { CertDetails } from './RequestDetails/CertDetails';
 import { NetworkDetails } from './RequestDetails/NetworkDetails';
 import { TimingDetails } from './RequestDetails/TimingDetails';
 import { IssuesDetails } from './RequestDetails/IssuesDetails';
+import { InitiatorDetails } from './RequestDetails/InitiatorDetails';
 import { InspectorFilter, FilterPanel } from './FilterPanel';
 import { ResizableSplit } from '../../../components/ResizableSplit';
 import { CodeBlock } from '../../../components/CodeBlock';
@@ -72,7 +75,20 @@ export function RequestDetails({
 }: RequestDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview');
   const [isRawMode, setIsRawMode] = useState(false);
+
+  // Ref for the content container to search for highlights
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track focused match
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
   const activeTab = propsActiveTab || internalActiveTab;
+
+  // Reset match index when tab or search changes
+  useEffect(() => {
+    setCurrentMatchIndex(-1);
+  }, [activeTab, searchTerm]);
+
   const setActiveTab = (tab: string) => {
     setIsRawMode(false);
     if (onTabChange) {
@@ -122,6 +138,8 @@ export function RequestDetails({
         return request.timing;
       case 'issues':
         return analysis?.issues;
+      case 'initiator':
+        return request.initiator;
       default:
         return request;
     }
@@ -193,6 +211,7 @@ export function RequestDetails({
     network: 0,
     timing: 0,
     issues: 0,
+    initiator: request?.initiator ? 1 : 0,
   };
 
   // Basic overview checks
@@ -367,7 +386,45 @@ export function RequestDetails({
         activeAction: 'bg-rose-500/20 text-rose-600 dark:text-rose-400',
       },
     },
+    {
+      id: 'initiator',
+      label: 'Initiator',
+      // @ts-ignore
+      icon: PlayCircle,
+      count: matches.initiator,
+      importantCount: 0,
+      colors: {
+        text: 'text-gray-500 dark:text-gray-400',
+        border: 'border-gray-500 dark:border-gray-400',
+        badge: 'bg-gray-500/20 text-gray-600 dark:text-gray-300',
+        hover: 'hover:bg-gray-500/10',
+        activeAction: 'bg-gray-500/20 text-gray-600 dark:text-gray-400',
+      },
+    },
   ] as const;
+
+  // Scroll to next match logic
+  const scrollToNextMatch = () => {
+    if (!scrollContainerRef.current) return;
+
+    // Find all highlighted marks
+    const marks = scrollContainerRef.current.querySelectorAll('mark');
+    if (marks.length === 0) return;
+
+    let nextIndex = currentMatchIndex + 1;
+    if (nextIndex >= marks.length) {
+      nextIndex = 0;
+    }
+
+    const targetMark = marks[nextIndex];
+    targetMark.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+
+    // Update index
+    setCurrentMatchIndex(nextIndex);
+  };
 
   const content = (
     <div className="flex-1 overflow-hidden h-full">
@@ -382,24 +439,33 @@ export function RequestDetails({
           themeConfig={{ background: '#00000000' }} // Transparent background
         />
       ) : (
-        <div className="flex-1 overflow-auto h-full p-2 font-mono text-xs">
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto h-full p-2 font-mono text-xs">
           {activeTab === 'overview' && (
             <RequestOverview request={request} searchTerm={searchTerm} />
           )}
           {activeTab === 'request' && <RequestGeneral request={request} />}
           {activeTab === 'response' && <ResponseGeneral request={request} />}
           {activeTab === 'headers' && <HeadersDetails request={request} searchTerm={searchTerm} />}
-          {activeTab === 'cookies' && <CookiesDetails request={request} />}
+          {activeTab === 'cookies' && <CookiesDetails request={request} searchTerm={searchTerm} />}
           {activeTab === 'body' && <BodyDetails request={request} searchTerm={searchTerm} />}
           {activeTab === 'security' && <SecurityDetails request={request} />}
           {activeTab === 'cert' && <CertDetails request={request} />}
           {activeTab === 'network' && <NetworkDetails request={request} />}
           {activeTab === 'timing' && <TimingDetails request={request} />}
           {activeTab === 'issues' && <IssuesDetails request={request} />}
+          {activeTab === 'initiator' && <InitiatorDetails request={request} requests={requests} />}
         </div>
       )}
     </div>
   );
+
+  // Calculate if we should show the ScanEye button
+  // 1. Not in Raw Mode
+  // 2. Search term exists
+  // 3. Current tab has matches (based on matches object calculated earlier)
+  // We need to map activeTab ID to the key in `matches` object
+  const currentTabHasMatches =
+    searchTerm && !isRawMode && (matches[activeTab as keyof typeof matches] || 0) > 0;
 
   return (
     <div className="h-full flex flex-col bg-background/50 border-t border-border/50">
@@ -430,6 +496,22 @@ export function RequestDetails({
                         'border-current/20', // use current text color for divider
                       )}
                     >
+                      {/* ScanEye Button - Only show if current tab has matches logic */}
+                      {currentTabHasMatches && (
+                        <button
+                          onClick={scrollToNextMatch}
+                          className={cn(
+                            'p-0.5 rounded transition-colors text-muted-foreground',
+                            'hover:text-current',
+                            tab.colors.hover,
+                            'animate-in fade-in zoom-in duration-200',
+                          )}
+                          title="Next Match"
+                        >
+                          <ScanEye className="w-3 h-3" />
+                        </button>
+                      )}
+
                       <button
                         onClick={handleCopy}
                         className={cn(

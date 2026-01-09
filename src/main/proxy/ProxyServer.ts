@@ -1,5 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { EventEmitter } from 'events';
+import { INJECT_SCRIPT } from './injection';
+import * as zlib from 'zlib'; // Ensure zlib is imported for decompression
 
 export class ProxyServer extends EventEmitter {
   private proxy: any;
@@ -12,7 +14,36 @@ export class ProxyServer extends EventEmitter {
 
   constructor() {
     super();
-    // ... constructor content ...
+    console.log('[ProxyServer] Constructor called');
+    try {
+      // Fix: Destructure Proxy and use new keyword
+      const { Proxy } = require('http-mitm-proxy');
+      console.log('[ProxyServer] http-mitm-proxy required:', typeof Proxy);
+      this.proxy = new Proxy();
+      console.log('[ProxyServer] this.proxy initialized:', !!this.proxy);
+
+      // Initialize zstd
+      try {
+        const { ZstdInit } = require('@oneidentity/zstd-js');
+        ZstdInit()
+          .then(({ ZstdSimple }: any) => {
+            this.zstd = ZstdSimple;
+            console.log('[ProxyServer] Zstd loaded successfully');
+          })
+          .catch((err: any) => {
+            console.error('[ProxyServer] Zstd init failed:', err);
+          });
+      } catch (e) {
+        console.error(
+          '[ProxyServer] Failed to require zstd-js (Normal if not installed yet, but required for DeepSeek):',
+          e,
+        );
+      }
+
+      this.proxy.use(Proxy.gunzip);
+    } catch (e) {
+      console.error('[ProxyServer] CRITICAL CONSTRUCTOR ERROR:', e);
+    }
   }
 
   public setWindow(window: BrowserWindow) {
@@ -78,6 +109,21 @@ export class ProxyServer extends EventEmitter {
       const requestId = Date.now().toString() + Math.random();
       ctx.requestId = requestId;
 
+      if (url.includes('deepseek.com')) {
+        console.log(`[Proxy] Request to ${url}`);
+        console.log('[Proxy] Headers:', JSON.stringify(req.headers, null, 2));
+      }
+
+      const initiatorStackBase64 = req.headers['x-systema-initiator'];
+      let initiator = null;
+      if (initiatorStackBase64) {
+        try {
+          initiator = Buffer.from(initiatorStackBase64 as string, 'base64').toString('utf8');
+          // Remove the header so the real server doesn't see it (though usually harmless)
+          delete req.headers['x-systema-initiator'];
+        } catch (e) {}
+      }
+
       this.sendToRenderer('proxy:request', {
         id: requestId,
         method,
@@ -86,6 +132,7 @@ export class ProxyServer extends EventEmitter {
         timestamp: Date.now(),
         // Add flag so renderer knows this request is paused
         isIntercepted: this.isIntercepting,
+        initiator: initiator, // Send initiator to renderer
       });
 
       const proceed = () => {
@@ -138,15 +185,84 @@ export class ProxyServer extends EventEmitter {
       });
 
       const responseChunks: any[] = [];
+      let isHtml = false;
+      const contentType = res?.headers['content-type'] || '';
+      if (contentType.toLowerCase().includes('text/html')) {
+        isHtml = true;
+        // Strip CSP headers to allow injection
+        delete res.headers['content-security-policy'];
+        delete res.headers['content-security-policy-report-only'];
+        console.log('[Proxy] Stripped CSP for:', url);
+      }
+
       ctx.onResponseData((ctx: any, chunk: any, callback: any) => {
+        if (isHtml) {
+          // Buffer HTML to inject script
+          responseChunks.push(chunk);
+          return callback(null, null); // Don't send yet
+        }
         responseChunks.push(chunk);
         return callback(null, chunk);
       });
 
       ctx.onResponseEnd(async (ctx: any, callback: any) => {
         const buffer = Buffer.concat(responseChunks);
-        // Calculate size from chunks
-        const size = responseChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+
+        // --- Injection Logic for HTML ---
+        if (isHtml) {
+          try {
+            const encodingHeader = res?.headers['content-encoding'];
+            const contentEncoding = (
+              Array.isArray(encodingHeader) ? encodingHeader[0] : encodingHeader || ''
+            ).toLowerCase();
+
+            let body = '';
+            // Decompress if needed
+            if (contentEncoding === 'gzip') {
+              body = zlib.gunzipSync(buffer).toString('utf8');
+            } else if (contentEncoding === 'br') {
+              body = zlib.brotliDecompressSync(buffer).toString('utf8');
+            } else if (contentEncoding === 'deflate') {
+              body = zlib.inflateSync(buffer).toString('utf8');
+            } else if (contentEncoding === 'zstd' && this.zstd) {
+              // @oneidentity/zstd-js decompression
+              body = Buffer.from(this.zstd.decompress(buffer)).toString('utf8');
+            } else {
+              body = buffer.toString('utf8');
+            }
+
+            // Inject Script just before <head> or <body>
+            // Simple injection: Append to <head>
+            if (body.includes('<head>')) {
+              body = body.replace('<head>', `<head><script>${INJECT_SCRIPT}</script>`);
+              console.log('[Proxy] Injected script into <head> for:', url);
+            } else {
+              // Fallback
+              body = `<script>${INJECT_SCRIPT}</script>` + body;
+              console.log('[Proxy] Injected script (fallback) for:', url);
+            }
+
+            // Re-compress? For simplicity, we send uncompressed and update headers
+            // Removing content-encoding header ensures browser treats it as plain/identity
+            if (res.headers['content-encoding']) {
+              delete res.headers['content-encoding'];
+            }
+            // Update Content-Length
+            const newBuffer = Buffer.from(body, 'utf8');
+            res.headers['content-length'] = newBuffer.length;
+
+            // Write modified data to client
+            ctx.proxyToClientResponse.write(newBuffer);
+          } catch (e) {
+            console.error('[Proxy] Injection failed:', e);
+            // Fallback: send original buffer
+            ctx.proxyToClientResponse.write(buffer);
+          }
+        }
+        // --------------------------------
+
+        // Calculate size from chunks (approximate if modified, but we track original mostly)
+        const size = buffer.length;
         const sizeStr = size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`;
 
         try {

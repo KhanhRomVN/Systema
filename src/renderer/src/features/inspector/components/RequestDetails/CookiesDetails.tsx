@@ -1,11 +1,14 @@
 import { NetworkRequest } from '../../types';
 import { cn } from '../../../../shared/lib/utils';
 
+import { HighlightText } from './HighlightText';
+
 interface CookiesDetailsProps {
   request: NetworkRequest;
+  searchTerm: string;
 }
 
-export function CookiesDetails({ request }: CookiesDetailsProps) {
+export function CookiesDetails({ request, searchTerm }: CookiesDetailsProps) {
   const analysis = request.analysis;
 
   return (
@@ -77,7 +80,9 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
                   className="flex flex-col border border-border/40 rounded-md bg-background overflow-hidden p-2 hover:bg-muted/20 transition-colors"
                 >
                   <div className="flex justify-between items-start mb-1.5 ">
-                    <span className="font-bold font-mono text-xs">{cookie.name}</span>
+                    <span className="font-bold font-mono text-xs">
+                      <HighlightText text={cookie.name} searchTerm={searchTerm} />
+                    </span>
                     <div className="flex gap-1">
                       {cookie.analysis?.security === 'warning' && (
                         <span className="text-[9px] bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded uppercase font-bold">
@@ -87,7 +92,7 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
                     </div>
                   </div>
                   <div className="font-mono text-xs text-foreground/80 break-all mb-1.5 pl-2 border-l-2 border-primary/20">
-                    {cookie.value}
+                    <HighlightText text={cookie.value} searchTerm={searchTerm} />
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground/80 mt-auto pt-1.5 border-t border-border/30 border-dashed">
@@ -119,7 +124,9 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
                   className="flex flex-col border border-border/40 rounded-md bg-background overflow-hidden p-2 hover:bg-muted/20 transition-colors"
                 >
                   <div className="flex justify-between items-start mb-1.5">
-                    <span className="font-bold font-mono text-xs">{cookie.name}</span>
+                    <span className="font-bold font-mono text-xs">
+                      <HighlightText text={cookie.name} searchTerm={searchTerm} />
+                    </span>
                     <div className="flex gap-1">
                       {cookie.secure && (
                         <span className="text-[9px] bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded uppercase font-bold">
@@ -139,7 +146,7 @@ export function CookiesDetails({ request }: CookiesDetailsProps) {
                     </div>
                   </div>
                   <div className="font-mono text-xs text-foreground/80 break-all mb-1.5 pl-2 border-l-2 border-primary/20">
-                    {cookie.value}
+                    <HighlightText text={cookie.value} searchTerm={searchTerm} />
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground/80 mt-auto pt-1.5 border-t border-border/30 border-dashed">
