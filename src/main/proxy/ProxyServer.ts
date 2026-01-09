@@ -345,8 +345,17 @@ export class ProxyServer extends EventEmitter {
   }
 
   private sendToRenderer(channel: string, data: any) {
+    console.log(`[ProxyServer] 📤 Sending to renderer: ${channel}`, {
+      hasWindow: !!this.window,
+      isDestroyed: this.window?.isDestroyed(),
+      dataKeys: Object.keys(data),
+    });
+
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send(channel, data);
+      console.log(`[ProxyServer] ✅ Event sent successfully: ${channel}`);
+    } else {
+      console.error(`[ProxyServer] ❌ Cannot send event - window unavailable: ${channel}`);
     }
   }
 }

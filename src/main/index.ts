@@ -30,8 +30,19 @@ app.whenReady().then(async () => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
-    proxyServer.setWindow(window);
-    wsManager.setWindow(window);
+
+    // CRITICAL: Only set window for Systema Inspector (main window)
+    // Do NOT set for Claude Web or other target app windows!
+    // Check if this is NOT Claude Web window by checking title
+    const title = window.getTitle();
+
+    if (!title.includes('Claude (Web)')) {
+      console.log('[Main] Setting ProxyServer window for:', title);
+      proxyServer.setWindow(window);
+      wsManager.setWindow(window);
+    } else {
+      console.log('[Main] Skipping ProxyServer.setWindow for target app:', title);
+    }
   });
 
   // Setup IPC event handlers
@@ -181,60 +192,6 @@ app.whenReady().then(async () => {
       }
 
       console.log('[Systema] Claude Web window created successfully');
-      return true;
-    }
-    if (appName === 'open-claude') {
-      activeProxyUrl = proxyUrl;
-      const openClaudePath = path.join(process.cwd(), 'open-claude');
-
-      // Ensure dependencies are installed and built (optional, but good for dev)
-      // For speed, assuming user has done this or we just run start.
-      // npm start in open-claude runs: npm run build && electron .
-
-      // Use local electron binary to ensure we can pass arguments correctly
-      const electronPath = path.join(openClaudePath, 'node_modules', '.bin', 'electron');
-
-      console.log('[Systema] Launching Open Claude from:', openClaudePath);
-      console.log('[Systema] Electron path:', electronPath);
-      console.log('[Systema] Proxy URL:', proxyUrl);
-
-      const child = spawn(
-        electronPath,
-        [
-          '.',
-          '--proxy-server=' + proxyUrl,
-          '--ignore-certificate-errors', // Essential for MITM proxy
-          '--no-default-browser-check',
-        ],
-        {
-          cwd: openClaudePath,
-          shell: true,
-          env: {
-            ...process.env,
-            http_proxy: proxyUrl,
-            https_proxy: proxyUrl,
-            HTTP_PROXY: proxyUrl,
-            HTTPS_PROXY: proxyUrl,
-          },
-          detached: true,
-          stdio: ['ignore', 'pipe', 'pipe'], // Capture stdout/stderr manually
-        },
-      );
-      activeChildProcess = child;
-
-      // Pipe output to main process console
-      child.stdout?.on('data', (data) => console.log(`[OpenClaude stdout]: ${data}`));
-      child.stderr?.on('data', (data) => console.error(`[OpenClaude stderr]: ${data}`));
-
-      child.on('exit', (code) => {
-        console.log(`[OpenClaude] Exited with code ${code}`);
-        if (activeChildProcess === child) {
-          activeChildProcess = null;
-          activeProxyUrl = null;
-        }
-      });
-
-      child.unref();
       return true;
     }
     if (appName === 'chatgpt-web') {

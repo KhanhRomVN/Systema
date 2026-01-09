@@ -39,8 +39,8 @@ export async function createClaudeWebWindow(proxyUrl: string): Promise<boolean> 
       partition: 'persist:claude-web', // Separate session for Claude
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: true,
-      allowRunningInsecureContent: false,
+      webSecurity: false, // Disable web security for MITM proxy
+      allowRunningInsecureContent: true, // Allow insecure content for proxy
     },
   });
 
@@ -69,6 +69,13 @@ export async function createClaudeWebWindow(proxyUrl: string): Promise<boolean> 
   ses.setCertificateVerifyProc((request, callback) => {
     callback(0); // 0 = accept, -2 = reject, -3 = use default verification
   });
+
+  // NOTE: Do NOT register Claude window with ProxyServer!
+  // ProxyServer should send events to Systema Inspector window, not Claude window.
+  // The main window is already registered in index.ts via browser-window-created event.
+  console.log(
+    '[Claude Web] Window created (NOT registered with ProxyServer - events go to Inspector)',
+  );
 
   // Load Claude.ai
   claudeWindow.loadURL(CLAUDE_URL);
