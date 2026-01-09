@@ -297,15 +297,14 @@ export async function chatCompletionStream(
 
     const clientStreamId = `${new Date().toISOString().slice(0, 10).replace(/-/g, '')}${crypto.randomBytes(8).toString('hex')}`;
 
-    // Payload matching browser
+    // Payload matching deepseek4free
     const webPayload = {
       chat_session_id: sessionId,
       parent_message_id: null,
       prompt: payload.messages[payload.messages.length - 1].content,
       ref_file_ids: [],
-      thinking_enabled: false,
+      thinking_enabled: true,
       search_enabled: false,
-      client_stream_id: clientStreamId,
     };
 
     const request = net.request({
@@ -317,13 +316,13 @@ export async function chatCompletionStream(
     request.setHeader('Content-Type', 'application/json');
     request.setHeader('Authorization', token);
     request.setHeader('Origin', origin);
-    request.setHeader('Referer', `${origin}/a/chat/s/${sessionId}`);
+    request.setHeader('Referer', `${origin}/`);
     request.setHeader('Accept', 'text/event-stream');
     request.setHeader('X-Ds-Pow-Response', powResponseBase64);
     request.setHeader('X-App-Version', '20241129.1');
     request.setHeader('X-Client-Locale', 'en_US');
     request.setHeader('X-Client-Platform', 'web');
-    request.setHeader('X-Client-Version', '1.6.1'); // Updated to match browser
+    request.setHeader('X-Client-Version', '1.0.0-always'); // Match deepseek4free
 
     if (userAgent) request.setHeader('User-Agent', userAgent);
 
