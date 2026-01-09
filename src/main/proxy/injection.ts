@@ -6,19 +6,22 @@ export const INJECT_SCRIPT = `
 
   function getStackTrace() {
     try {
+      // Increase stack limit to capture deep call stacks (e.g. from framework internals)
+      if (Error.stackTraceLimit && Error.stackTraceLimit < 50) {
+        Error.stackTraceLimit = 50;
+      }
       throw new Error();
     } catch (e) {
       // Split lines, remove the first "Error" line and the current function call
-      // Stack format varies by browser, but usually:
-      // Error
-      //     at getStackTrace (...)
-      //     at window.fetch (...)
-      //     at callingFunction (...)
       const stack = e.stack || '';
+      console.log('[Systema Debug] Raw Stack Length:', stack.split('\\n').length);
+      console.log('[Systema Debug] Raw Stack:', stack);
       const lines = stack.split('\\n');
+      
       // We want to find the first line that is NOT inside this script
-      // This is a naive implementation, can be improved
-      return lines.slice(3, 8).join('\\n').trim();
+      // Taking a larger slice to match DevTools behavior better (e.g. 30+ frames)
+      // Slice from 3 to omit 'Error', 'getStackTrace', and hook wrapper
+      return lines.slice(3, 40).join('\\n').trim();
     }
   }
 

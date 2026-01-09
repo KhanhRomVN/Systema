@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, session } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import Store from 'electron-store';
+import { v4 as uuidv4 } from 'uuid';
 
 const store = new Store();
 // @ts-ignore
@@ -9,6 +10,14 @@ const safeStore = store as any;
 
 let mainWindow: BrowserWindow | null = null;
 let authWindow: BrowserWindow | null = null;
+
+interface Account {
+  id: string;
+  token: string;
+  name: string;
+  userAgent: string;
+  isMain?: boolean;
+}
 
 const USER_AGENTS = [
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -19,6 +28,33 @@ const USER_AGENTS = [
 
 function getRandomUserAgent() {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+// Store Helpers
+function getAccounts(): Account[] {
+  return (safeStore.get('accounts') as Account[]) || [];
+}
+
+function setAccounts(accounts: Account[]) {
+  safeStore.set('accounts', accounts);
+}
+
+function getCurrentAccountId(): string | undefined {
+  return safeStore.get('currentAccountId') as string;
+}
+
+function setCurrentAccountId(id: string | undefined) {
+  if (!id) {
+    safeStore.delete('currentAccountId');
+  } else {
+    safeStore.set('currentAccountId', id);
+  }
+}
+
+function getCurrentAccount(): Account | undefined {
+  const accounts = getAccounts();
+  const id = getCurrentAccountId();
+  return accounts.find((a) => a.id === id);
 }
 
 function createWindow() {
@@ -45,7 +81,7 @@ function createWindow() {
   return win;
 }
 
-function createAuthWindow() {
+async function createAuthWindow() {
   if (authWindow) {
     authWindow.focus();
     return;
@@ -53,8 +89,14 @@ function createAuthWindow() {
 
   // Rotate User Agent
   const userAgent = getRandomUserAgent();
-  safeStore.set('deepseekUserAgent', userAgent);
+  safeStore.set('tempUserAgent', userAgent); // Temporary storage for this auth session
   console.log('Using User-Agent:', userAgent);
+
+  // Clear Session Data to ensure clean login
+  console.log('[Auth] Clearing session data for fresh login...');
+  await session.defaultSession.clearStorageData({
+    storages: ['cookies', 'localstorage', 'indexdb', 'cachestorage', 'shadercache'],
+  });
 
   const win = new BrowserWindow({
     width: 1000,
@@ -79,6 +121,7 @@ function createAuthWindow() {
 
     try {
       // 1. Check for Token
+      // Try to capture token from localStorage
       const localStorageData = await authWindow.webContents.executeJavaScript(
         'JSON.stringify(localStorage)',
       );
@@ -89,40 +132,53 @@ function createAuthWindow() {
           const tokenObj = JSON.parse(data.userToken);
           if (tokenObj && tokenObj.value) {
             const bearerToken = `Bearer ${tokenObj.value}`;
-            const current = safeStore.get('deepseekToken');
-            if (current !== bearerToken) {
-              console.log('[Auth] Token captured successfully.');
-              safeStore.set('deepseekToken', bearerToken);
-              if (mainWindow) mainWindow.webContents.send('auth-success');
+
+            // Handle Account Saving
+            const accounts = getAccounts();
+
+            // Check if token exists
+            const existingAccount = accounts.find((a) => a.token === bearerToken);
+
+            if (!existingAccount) {
+              console.log('[Auth] New Token captured successfully.');
+
+              const newAccount: Account = {
+                id: uuidv4(),
+                token: bearerToken,
+                name: `Account ${accounts.length + 1}`,
+                userAgent: safeStore.get('tempUserAgent') || userAgent,
+              };
+
+              accounts.push(newAccount);
+              setAccounts(accounts);
+              setCurrentAccountId(newAccount.id);
+
+              if (mainWindow) {
+                mainWindow.webContents.send('auth-success');
+                mainWindow.webContents.send('accounts-updated', accounts);
+              }
+
+              win.close();
+            } else {
+              // Token exists, ensure it's selected?
+              // For now, do nothing or switch to it
+              if (getCurrentAccountId() !== existingAccount.id) {
+                setCurrentAccountId(existingAccount.id);
+                if (mainWindow) mainWindow.webContents.send('accounts-updated', accounts);
+              }
+              win.close();
             }
           }
         } catch (err) {}
       }
 
-      // 2. INJECT HUNTER SCRIPT: Search for PoW Algorithm
-      // We look for webpack chunks that contain "DeepSeekHashV1"
+      // Also try to capture from global state if needed...
+
+      // 2. INJECT HUNTER SCRIPT
       await authWindow.webContents.executeJavaScript(`
         if (!window.hasInjectedPoWHunter) {
           window.hasInjectedPoWHunter = true;
           console.log('[Hunter] Starting search for PoW algorithm...');
-          
-          function findWebpackModules() {
-            // Typical webpack jsonp global
-            const chunkName = Object.keys(window).find(k => k.toLowerCase().includes('chunk') || k.toLowerCase().includes('webpack'));
-            if (!chunkName) return;
-            
-            const chunk = window[chunkName];
-            if (!chunk || !chunk.push) return;
-
-            // We hook into the pushing mechanism or just iterate existing if array-like
-            // But usually we need to find the 'modules' store.
-            // A simpler way for modern apps: scan all loaded scripts content? No, CORS.
-            // Better: Hook Function.prototype.toString? No.
-            
-            console.log('[Hunter] Found potential webpack object:', chunkName);
-          }
-          
-          findWebpackModules();
         }
       `);
     } catch (e) {
@@ -130,8 +186,7 @@ function createAuthWindow() {
     }
   }, 2000);
 
-  // Sniff Network Traffic for Chat Endpoint + Challenge
-  // We also try to capture the "answer" from valid requests to analyze
+  // Sniff Network Traffic
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['*://*.deepseek.com/*'] },
     (details, callback) => {
@@ -144,10 +199,6 @@ function createAuthWindow() {
           details.requestHeaders['X-Ds-Pow-Response'];
         if (powResponse) {
           console.log('[PoW] Found valid PoW Response (Base64):', powResponse);
-          try {
-            const decoded = Buffer.from(powResponse, 'base64').toString();
-            console.log('[PoW] Decoded Payload:', decoded);
-          } catch (e) {}
         }
         console.log('************************************************\n\n');
       }
@@ -163,24 +214,9 @@ function createAuthWindow() {
   authWindow = win;
 }
 
-// Sniff Authorization Header
+// Sniff Authorization Header (Legacy / Global fallback)
 app.whenReady().then(() => {
   createWindow();
-
-  session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['https://chat.deepseek.com/*'] },
-    (details, callback) => {
-      const authHeader = details.requestHeaders['Authorization'];
-      if (authHeader && authHeader.startsWith('Bearer')) {
-        safeStore.set('deepseekToken', authHeader);
-
-        if (mainWindow) {
-          mainWindow.webContents.send('auth-success');
-        }
-      }
-      callback({});
-    },
-  );
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -196,34 +232,56 @@ app.on('window-all-closed', () => {
 });
 
 // IPC Handlers
-ipcMain.handle('get-api-key', () => {
-  return safeStore.get('deepseekToken');
+ipcMain.handle('get-accounts', () => {
+  return getAccounts();
 });
 
-ipcMain.handle('save-api-key', (_event, key: string) => {
-  // Legacy or Manual override
-  safeStore.set('deepseekToken', key);
-  return true;
+ipcMain.handle('get-current-account-id', () => {
+  return getCurrentAccountId();
 });
 
-ipcMain.handle('open-auth-window', () => {
-  createAuthWindow();
+ipcMain.handle('switch-account', (_event, id: string) => {
+  const accounts = getAccounts();
+  if (accounts.find((a) => a.id === id)) {
+    setCurrentAccountId(id);
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('remove-account', (_event, id: string) => {
+  let accounts = getAccounts();
+  const currentId = getCurrentAccountId();
+
+  accounts = accounts.filter((a) => a.id !== id);
+  setAccounts(accounts);
+
+  if (currentId === id) {
+    // Switch to first available or undefined
+    const nextId = accounts.length > 0 ? accounts[0].id : undefined;
+    setCurrentAccountId(nextId);
+  }
+
+  return getAccounts();
+});
+
+ipcMain.handle('open-auth-window', async () => {
+  await createAuthWindow();
 });
 
 ipcMain.handle('send-message', async (event, payload: any) => {
-  const token = safeStore.get('deepseekToken') as string;
-  const userAgent = safeStore.get('deepseekUserAgent') as string;
+  const account = getCurrentAccount();
 
-  if (!token) {
-    event.sender.send('error', 'Authentication Token missing. Please Login.');
+  if (!account) {
+    event.sender.send('error', 'No active account selected. Please Login.');
     return;
   }
 
   // Use dynamic require or import
   const { chatCompletionStream } = require('./api/client');
 
-  chatCompletionStream(token, payload, userAgent, {
-    // Pass userAgent
+  chatCompletionStream(account.token, payload, account.userAgent, {
+    // Pass userAgent from account
     onContent: (content: string) => event.sender.send('message-stream', content),
     onThinking: (content: string) => event.sender.send('message-thinking', content),
     onDone: () => event.sender.send('message-complete'),

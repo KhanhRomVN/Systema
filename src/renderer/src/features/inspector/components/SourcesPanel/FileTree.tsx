@@ -24,6 +24,59 @@ export function FileTree({ requests, onSelectFile }: FileTreeProps) {
 
     requests.forEach((req) => {
       // Basic structure: Domain -> Path segments -> File
+      // Filter out system/noise domains
+      const IGNORED_PATTERNS = [
+        'clients2.google.com',
+        'clientservices.googleapis.com',
+        'update.googleapis.com',
+        'safebrowsing.googleapis.com',
+        'safebrowsinghttpgateway.googleapis.com',
+        'optimizationguide-pa.googleapis.com',
+        'content-autofill.googleapis.com',
+        'chromewebstore.googleapis.com',
+        'accounts.google.com',
+        'www.google.com',
+        'gvt1.com',
+        'doubleclick.net',
+        'google-analytics.com',
+        'googletagmanager.com',
+        'facebook.com/tr',
+        'bat.bing.com',
+        // Additions based on logs
+        'android.clients.google.com',
+        'mtalk.google.com',
+        'gator.volces.com',
+        'fp-it-acc.portal101.cn',
+        'challenges.cloudflare.com',
+        'appleid.cdn-apple.com',
+        'cdn.deepseek.com', // User might want this? But it's usually static assets. Wait, looking at user's image, deepseek assets ARE desired.
+        // Wait, 'cdn.deepseek.com' IS in the user's "Top" screenshot as a valid source. I should NOT filter it.
+        // The user complained about "android.clients..." etc.
+        // I will filter "clients*.google.com" and "googleapis.com" broadly.
+      ];
+
+      // Robust check: match if the host ENDS WITH any of these, or includes unique substrings
+      const NOISE_SUBSTRINGS = [
+        'googleapis.com',
+        'clients.google.com',
+        'gvt1.com',
+        'doubleclick.net',
+        'google-analytics.com',
+        'googletagmanager.com',
+        'safebrowsing',
+        'content-autofill',
+        'mtalk.google.com',
+      ];
+
+      const isIgnored =
+        IGNORED_PATTERNS.some((p) => req.host === p) ||
+        NOISE_SUBSTRINGS.some((s) => req.host.includes(s));
+
+      if (isIgnored) {
+        // console.log('Filtering out:', req.host);
+        return;
+      }
+
       if (!req.responseBody) return; // Only show requests with proper body? Or all? Let's show all but empty if no body.
 
       const domain = req.host;

@@ -1,10 +1,18 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 
-// Define types locally since this file is excluded from root tsconfig
+interface Account {
+  id: string;
+  name: string;
+  token: string;
+  isMain?: boolean;
+}
+
 interface IElectronAPI {
-  getApiKey: () => Promise<string | undefined>;
-  saveApiKey: (key: string) => Promise<boolean>;
+  getAccounts: () => Promise<Account[]>;
+  getCurrentAccountId: () => Promise<string | undefined>;
+  switchAccount: (id: string) => Promise<boolean>;
+  removeAccount: (id: string) => Promise<Account[]>;
   openAuthWindow: () => Promise<void>;
   sendMessage: (payload: any) => Promise<void>;
   onMessageStream: (callback: (chunk: string) => void) => void;
@@ -12,6 +20,7 @@ interface IElectronAPI {
   onMessageComplete: (callback: () => void) => void;
   onError: (callback: (error: string) => void) => void;
   onAuthSuccess: (callback: () => void) => void;
+  onAccountsUpdated: (callback: (accounts: Account[]) => void) => void;
 }
 
 declare global {
@@ -31,25 +40,97 @@ let isGenerating = false;
 const setupScreen = document.getElementById('setup-screen')!;
 const chatScreen = document.getElementById('chat-screen')!;
 const loginBtn = document.getElementById('save-key-btn')!;
-const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement; // Re-purposed or hidden
+const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement;
 const messageInput = document.getElementById('message-input') as HTMLTextAreaElement;
 const sendBtn = document.getElementById('send-btn')!;
 const messagesContainer = document.getElementById('messages-container')!;
 
+// Sidebar Elements
+const sidebar = document.getElementById('sidebar')!;
+const menuBtn = document.getElementById('menu-btn');
+const closeSidebarBtn = document.getElementById('close-sidebar-btn')!;
+const addAccountBtn = document.getElementById('add-account-btn')!;
+const accountListContainer = document.getElementById('account-list')!;
+
 // Change UI Text
-document.querySelector('#setup-screen h1')!.textContent = 'Login to DeepSeek';
-document.querySelector('#setup-screen p')!.textContent = 'Click below to login via browser';
-apiKeyInput.style.display = 'none'; // Hide input
-loginBtn.textContent = 'Open Login Window';
+if (document.querySelector('#setup-screen h1')) {
+  document.querySelector('#setup-screen h1')!.textContent = 'Login to DeepSeek';
+}
+if (document.querySelector('#setup-screen p')) {
+  document.querySelector('#setup-screen p')!.textContent = 'Click below to login via browser';
+}
+if (apiKeyInput) {
+  apiKeyInput.style.display = 'none'; // Hide input
+}
+if (loginBtn) {
+  loginBtn.textContent = 'Open Login Window';
+}
 
 // Setup
 async function init() {
-  const existingKey = await window.electronAPI.getApiKey();
-  if (existingKey) {
-    showChat();
-  } else {
-    showSetup();
+  await refreshAccounts();
+}
+
+async function refreshAccounts() {
+  try {
+    const accounts = await window.electronAPI.getAccounts();
+    const currentId = await window.electronAPI.getCurrentAccountId();
+
+    renderAccountList(accounts, currentId);
+
+    if (accounts.length > 0) {
+      showChat();
+    } else {
+      showSetup();
+    }
+  } catch (err) {
+    console.error('Failed to refresh accounts:', err);
   }
+}
+
+function renderAccountList(accounts: Account[], currentId: string | undefined) {
+  if (!accountListContainer) return;
+  accountListContainer.innerHTML = '';
+
+  accounts.forEach((acc) => {
+    const item = document.createElement('div');
+    item.className = `account-item ${acc.id === currentId ? 'active' : ''}`;
+
+    const info = document.createElement('div');
+    info.className = 'account-info';
+    info.innerHTML = `<span class="account-name">${acc.name}</span>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'account-actions';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.innerText = '✕';
+    removeBtn.title = 'Remove Account';
+    removeBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm(`Remove account ${acc.name}?`)) {
+        await window.electronAPI.removeAccount(acc.id);
+        await refreshAccounts();
+      }
+    };
+
+    actions.appendChild(removeBtn);
+
+    item.appendChild(info);
+    item.appendChild(actions);
+
+    item.onclick = async () => {
+      if (acc.id !== currentId) {
+        await window.electronAPI.switchAccount(acc.id);
+        await refreshAccounts();
+        // Clear chat
+        conversation = [];
+        messagesContainer.innerHTML = '';
+      }
+    };
+
+    accountListContainer.appendChild(item);
+  });
 }
 
 function showSetup() {
@@ -63,25 +144,55 @@ function showChat() {
   messageInput.focus();
 }
 
+// Sidebar Logic
+function toggleSidebar() {
+  sidebar.classList.toggle('hidden');
+}
+
+if (menuBtn) {
+  menuBtn.addEventListener('click', toggleSidebar);
+}
+if (closeSidebarBtn) {
+  closeSidebarBtn.addEventListener('click', toggleSidebar);
+}
+if (addAccountBtn) {
+  addAccountBtn.addEventListener('click', async () => {
+    await window.electronAPI.openAuthWindow();
+  });
+}
+
 // Event Listeners
-loginBtn.addEventListener('click', async () => {
-  // Open Auth Window
-  await window.electronAPI.openAuthWindow();
-});
+if (loginBtn) {
+  loginBtn.addEventListener('click', async () => {
+    await window.electronAPI.openAuthWindow();
+  });
+}
 
-// Auth Success Listener
-window.electronAPI.onAuthSuccess(() => {
-  showChat();
-});
+// Auth Success & Updates Listener
+if (window.electronAPI.onAuthSuccess) {
+  window.electronAPI.onAuthSuccess(async () => {
+    await refreshAccounts();
+  });
+}
 
-sendBtn.addEventListener('click', sendMessage);
+if (window.electronAPI.onAccountsUpdated) {
+  window.electronAPI.onAccountsUpdated((accounts) => {
+    refreshAccounts();
+  });
+}
 
-messageInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-});
+if (sendBtn) {
+  sendBtn.addEventListener('click', sendMessage);
+}
+
+if (messageInput) {
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+}
 
 async function sendMessage() {
   const text = messageInput.value.trim();
@@ -105,7 +216,7 @@ async function sendMessage() {
 
   // Send to Main
   window.electronAPI.sendMessage({
-    model: 'deepseek-chat', // or deepseek-reasoner
+    model: 'deepseek-chat',
     messages: conversation,
     stream: true,
   });

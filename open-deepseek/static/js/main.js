@@ -52990,17 +52990,74 @@ var apiKeyInput = document.getElementById("api-key-input");
 var messageInput = document.getElementById("message-input");
 var sendBtn = document.getElementById("send-btn");
 var messagesContainer = document.getElementById("messages-container");
-document.querySelector("#setup-screen h1").textContent = "Login to DeepSeek";
-document.querySelector("#setup-screen p").textContent = "Click below to login via browser";
-apiKeyInput.style.display = "none";
-loginBtn.textContent = "Open Login Window";
+var sidebar = document.getElementById("sidebar");
+var menuBtn = document.getElementById("menu-btn");
+var closeSidebarBtn = document.getElementById("close-sidebar-btn");
+var addAccountBtn = document.getElementById("add-account-btn");
+var accountListContainer = document.getElementById("account-list");
+if (document.querySelector("#setup-screen h1")) {
+  document.querySelector("#setup-screen h1").textContent = "Login to DeepSeek";
+}
+if (document.querySelector("#setup-screen p")) {
+  document.querySelector("#setup-screen p").textContent = "Click below to login via browser";
+}
+if (apiKeyInput) {
+  apiKeyInput.style.display = "none";
+}
+if (loginBtn) {
+  loginBtn.textContent = "Open Login Window";
+}
 async function init() {
-  const existingKey = await window.electronAPI.getApiKey();
-  if (existingKey) {
-    showChat();
-  } else {
-    showSetup();
+  await refreshAccounts();
+}
+async function refreshAccounts() {
+  try {
+    const accounts = await window.electronAPI.getAccounts();
+    const currentId = await window.electronAPI.getCurrentAccountId();
+    renderAccountList(accounts, currentId);
+    if (accounts.length > 0) {
+      showChat();
+    } else {
+      showSetup();
+    }
+  } catch (err) {
+    console.error("Failed to refresh accounts:", err);
   }
+}
+function renderAccountList(accounts, currentId) {
+  if (!accountListContainer) return;
+  accountListContainer.innerHTML = "";
+  accounts.forEach((acc) => {
+    const item = document.createElement("div");
+    item.className = `account-item ${acc.id === currentId ? "active" : ""}`;
+    const info = document.createElement("div");
+    info.className = "account-info";
+    info.innerHTML = `<span class="account-name">${acc.name}</span>`;
+    const actions = document.createElement("div");
+    actions.className = "account-actions";
+    const removeBtn = document.createElement("button");
+    removeBtn.innerText = "\u2715";
+    removeBtn.title = "Remove Account";
+    removeBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm(`Remove account ${acc.name}?`)) {
+        await window.electronAPI.removeAccount(acc.id);
+        await refreshAccounts();
+      }
+    };
+    actions.appendChild(removeBtn);
+    item.appendChild(info);
+    item.appendChild(actions);
+    item.onclick = async () => {
+      if (acc.id !== currentId) {
+        await window.electronAPI.switchAccount(acc.id);
+        await refreshAccounts();
+        conversation = [];
+        messagesContainer.innerHTML = "";
+      }
+    };
+    accountListContainer.appendChild(item);
+  });
 }
 function showSetup() {
   setupScreen.classList.remove("hidden");
@@ -53011,19 +53068,46 @@ function showChat() {
   chatScreen.classList.remove("hidden");
   messageInput.focus();
 }
-loginBtn.addEventListener("click", async () => {
-  await window.electronAPI.openAuthWindow();
-});
-window.electronAPI.onAuthSuccess(() => {
-  showChat();
-});
-sendBtn.addEventListener("click", sendMessage);
-messageInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-});
+function toggleSidebar() {
+  sidebar.classList.toggle("hidden");
+}
+if (menuBtn) {
+  menuBtn.addEventListener("click", toggleSidebar);
+}
+if (closeSidebarBtn) {
+  closeSidebarBtn.addEventListener("click", toggleSidebar);
+}
+if (addAccountBtn) {
+  addAccountBtn.addEventListener("click", async () => {
+    await window.electronAPI.openAuthWindow();
+  });
+}
+if (loginBtn) {
+  loginBtn.addEventListener("click", async () => {
+    await window.electronAPI.openAuthWindow();
+  });
+}
+if (window.electronAPI.onAuthSuccess) {
+  window.electronAPI.onAuthSuccess(async () => {
+    await refreshAccounts();
+  });
+}
+if (window.electronAPI.onAccountsUpdated) {
+  window.electronAPI.onAccountsUpdated((accounts) => {
+    refreshAccounts();
+  });
+}
+if (sendBtn) {
+  sendBtn.addEventListener("click", sendMessage);
+}
+if (messageInput) {
+  messageInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+}
 async function sendMessage() {
   const text = messageInput.value.trim();
   if (!text || isGenerating) return;
@@ -53037,7 +53121,6 @@ async function sendMessage() {
   createBotMessagePlaceholder();
   window.electronAPI.sendMessage({
     model: "deepseek-chat",
-    // or deepseek-reasoner
     messages: conversation,
     stream: true
   });
