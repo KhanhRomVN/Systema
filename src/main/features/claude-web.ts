@@ -4,6 +4,13 @@ const CLAUDE_URL = 'https://claude.ai';
 let claudeWindow: BrowserWindow | null = null;
 
 /**
+ * Get Claude window ID (for checking in browser-window-created event)
+ */
+export function getClaudeWebWindowId(): number | null {
+  return claudeWindow && !claudeWindow.isDestroyed() ? claudeWindow.id : null;
+}
+
+/**
  * Create or focus Claude Web window (similar to OpenClaude)
  * This creates a native Electron window instead of spawning Chrome
  */

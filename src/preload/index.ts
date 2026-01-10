@@ -5,7 +5,15 @@ import { appAPI } from './api';
 const api = {
   app: appAPI,
   invoke: (channel, ...args) => electronAPI.ipcRenderer.invoke(channel, ...args),
-  on: (channel, listener) => electronAPI.ipcRenderer.on(channel, listener),
+  on: (channel, listener) => {
+    // Debug wrapper
+    const wrappedListener = (event, ...args) => {
+      console.log(`[Preload] 📨 IPC event received: ${channel}`, args[0]);
+      listener(event, ...args);
+    };
+    electronAPI.ipcRenderer.on(channel, wrappedListener);
+    return wrappedListener;
+  },
   off: (channel, listener) => electronAPI.ipcRenderer.removeListener(channel, listener),
 };
 

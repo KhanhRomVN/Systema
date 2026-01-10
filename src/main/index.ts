@@ -8,7 +8,6 @@ import { createClaudeWebWindow, closeClaudeWebWindow } from './features/claude-w
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 const proxyServer = new ProxyServer();
 const wsManager = SingletonWSManager.getInstance();
@@ -32,16 +31,27 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window);
 
     // CRITICAL: Only set window for Systema Inspector (main window)
+    // The main window is always the FIRST window created
     // Do NOT set for Claude Web or other target app windows!
-    // Check if this is NOT Claude Web window by checking title
-    const title = window.getTitle();
+    const allWindows = BrowserWindow.getAllWindows();
+    const isMainWindow = allWindows.length === 1;
 
-    if (!title.includes('Claude (Web)')) {
-      console.log('[Main] Setting ProxyServer window for:', title);
+    if (isMainWindow) {
+      console.log(
+        '[Main] ✅ Setting ProxyServer window for window ID:',
+        window.id,
+        'Title:',
+        window.getTitle(),
+      );
       proxyServer.setWindow(window);
       wsManager.setWindow(window);
     } else {
-      console.log('[Main] Skipping ProxyServer.setWindow for target app:', title);
+      console.log(
+        '[Main] ⏭️ Skipping ProxyServer.setWindow for window ID:',
+        window.id,
+        'Title:',
+        window.getTitle(),
+      );
     }
   });
 

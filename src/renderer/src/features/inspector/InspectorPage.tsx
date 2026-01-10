@@ -164,17 +164,12 @@ export default function InspectorPage() {
       );
     };
 
-    console.log('[Inspector] 🎧 Setting up event listeners, isScanning:', isScanning);
-
     window.api.on('proxy:request', handleRequest);
     window.api.on('proxy:request-body', handleRequestBody);
     window.api.on('proxy:response', handleResponse);
     window.api.on('proxy:response-body', handleResponseBody);
 
-    console.log('[Inspector] ✅ Event listeners registered');
-
     return () => {
-      console.log('[Inspector] 🔌 Cleaning up event listeners');
       window.api.off('proxy:request', handleRequest);
       window.api.off('proxy:request-body', handleRequestBody);
       window.api.off('proxy:response', handleResponse);
@@ -186,19 +181,13 @@ export default function InspectorPage() {
 
   const handleSelectApp = async (appName: string, proxyUrl: string) => {
     try {
-      console.log('[Inspector] 🚀 Starting proxy and launching app:', appName, proxyUrl);
-
       await window.api.invoke('proxy:start', 8081);
-      console.log('[Inspector] ✅ Proxy started on port 8081');
-
       const launched = await window.api.invoke('app:launch', appName, proxyUrl);
-      console.log('[Inspector] App launch result:', launched);
 
       if (launched) {
         setIsScanning(true);
         setSelectedApp(appName);
         setRequests([]); // Clear previous session
-        console.log('[Inspector] 📡 Now scanning for requests...');
       } else {
         console.error('[Inspector] ❌ Failed to launch app');
       }

@@ -345,15 +345,14 @@ export class ProxyServer extends EventEmitter {
   }
 
   private sendToRenderer(channel: string, data: any) {
-    console.log(`[ProxyServer] 📤 Sending to renderer: ${channel}`, {
-      hasWindow: !!this.window,
-      isDestroyed: this.window?.isDestroyed(),
-      dataKeys: Object.keys(data),
-    });
-
     if (this.window && !this.window.isDestroyed()) {
+      // Log only request events to avoid spam (response has same ID)
+      if (channel === 'proxy:request') {
+        console.log(
+          `[ProxyServer] 📤 Sending ${channel} to window ID: ${this.window.id}, Title: "${this.window.getTitle()}"`,
+        );
+      }
       this.window.webContents.send(channel, data);
-      console.log(`[ProxyServer] ✅ Event sent successfully: ${channel}`);
     } else {
       console.error(`[ProxyServer] ❌ Cannot send event - window unavailable: ${channel}`);
     }
