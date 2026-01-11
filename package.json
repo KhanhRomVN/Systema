@@ -4,7 +4,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Electron application created with @khanhromvn/create-electron-app",
+  "description": "🚀 Systema: A comprehensive system management dashboard built with Electron, React, and TypeScript.",
   "files": [
     "bin",
     "src",
@@ -14,7 +14,28 @@
     "electron.vite.config.ts"
   ],
   "main": "./out/main/index.js",
-  "author": "KhanhRomVN",
+  "author": {
+    "name": "KhanhRomVN",
+    "email": "khanhromvn@gmail.com",
+    "url": "https://github.com/KhanhRomVN"
+  },
+  "license": "MIT",
+  "keywords": [
+    "electron",
+    "react",
+    "typescript",
+    "dashboard",
+    "system-monitor",
+    "desktop-app"
+  ],
+  "homepage": "https://github.com/KhanhRomVN/Systema#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KhanhRomVN/Systema.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KhanhRomVN/Systema/issues"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",

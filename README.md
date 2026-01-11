@@ -1,100 +1,69 @@
-# Template Electron App
+# Systema
 
-Professional, production-ready Electron application template featuring a modern tech stack and best practices.
+![License](https://img.shields.io/github/license/KhanhRomVN/Systema)
+![Version](https://img.shields.io/github/package-json/v/KhanhRomVN/Systema)
 
-## Usage
+🚀 **Systema**: A comprehensive system management dashboard built with Electron, React, and TypeScript.
 
-This is a CLI tool to bootstrap a new Electron application.
+## 🌟 Features
 
-### Scaffold a new project
+-   **Dashboard**: Real-time traffic and system status monitoring.
+-   **Resizable Panels**: Customizable layout for better workflow.
+-   **Code Editor**: Integrated code block viewing and editing.
+-   **Modern UI**: Sleek dark mode interface using Tailwind CSS and Radix UI.
 
-Use `npx` (recommended) to create a new project in seconds:
+## 🛠️ Tech Stack
 
-```bash
-npx @khanhromvn/create-electron-app
-```
+-   **Runtime**: [Electron](https://www.electronjs.org/)
+-   **Frontend**: [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/)
+-   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+-   **Build Tool**: [Electron Vite](https://electron-vite.org/)
 
-Then follow the interactive prompts to set up your project name.
-
-After scaffolding:
-
-```bash
-cd <your-project-name>
-npm install
-npm run dev
-```
-
-## Features
-
-- 🏗 **Architecture**: Feature-based folder structure for scalability.
-- ⚡ **Tech Stack**: Electron, React, TypeScript, Vite.
-- 🎨 **Styling**: TailwindCSS with shadcn/ui integration.
-- 🎭 **Theming**: Advanced theme system with presets (Light/Dark/System).
-- 🧪 **Testing**: Vitest ready for Unit and Integration tests.
-- 🧹 **Code Quality**: ESLint, Prettier, Husky, lint-staged.
-- 📦 **Build**: efficient build process with electron-builder.
-
-## Project Structure
-
-```bash
-src/
-├── main/           # Main process
-│   ├── core/       # Core logic (WindowManager, Config)
-│   ├── features/   # Main process features
-│   └── index.ts    # Entry point
-├── preload/        # Preload scripts
-│   ├── api/        # Exposed APIs
-│   └── index.ts    # Entry point
-└── renderer/       # Renderer process (React)
-    ├── src/
-    │   ├── core/       # Core providers, routes, theme
-    │   ├── features/   # Feature modules (Dashboard, etc)
-    │   ├── shared/     # Shared components, hooks, utils
-    │   ├── assets/     # Static assets
-    │   └── main.tsx    # Entry point
-```
-
-## Development (Contributing)
-
-If you want to contribute to this template or run it locally as a standalone app:
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js >= 18
-- npm or yarn
+-   Node.js (v18 or higher recommended)
+-   npm or yarn
 
 ### Installation
 
-```bash
-# Clone the repository
-git clone <repository-url>
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/KhanhRomVN/Systema.git
+    cd Systema
+    ```
 
-# Install dependencies
-npm install
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
 
-# Start development server
-npm run dev
-```
+3.  Start the development server:
+    ```bash
+    npm run dev
+    ```
 
-## Scripts
+## 📜 Scripts
 
-- `npm run dev`: Start development server.
-- `npm run build`: Build for production.
-- `npm test`: Run tests.
-- `npm run lint`: Lint code.
-- `npm run format`: Format code.
+-   `npm run dev`: Start development server (Electron + Vite).
+-   `npm run build`: Build for production.
+-   `npm run lint`: Lint code with ESLint.
+-   `npm run format`: Format code with Prettier.
 
-## Documentation
+## 🤝 Contributing
 
-- [Architecture](./docs/ARCHITECTURE.md)
-- [Setup](./docs/SETUP.md)
-- [Development](./docs/DEVELOPMENT.md)
-- [Dependencies](./docs/DEPENDENCIES.md)
+Contributions are always welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
-## Contributing
+## 📄 License
 
-Please read [CONTRIBUTING.md](./docs/CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## License
+## 📬 Contact
 
-MIT
+-   **Author**: KhanhRomVN
+-   **Email**: [khanhromvn@gmail.com](mailto:khanhromvn@gmail.com)
+-   **GitHub**: [KhanhRomVN](https://github.com/KhanhRomVN)
+-   **GitLab**: [KhanhRomVN](https://gitlab.com/KhanhRomVN)
+-   **Facebook**: [KhanhRomVN](https://www.facebook.com/khanhromvn)
+-   **Hugging Face**: [KhanhRomVN](https://huggingface.co/khanhromvn)
