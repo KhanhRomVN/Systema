@@ -256,6 +256,110 @@ app.whenReady().then(async () => {
       return true;
     }
 
+    if (appName === 'google-aistudio') {
+      activeProxyUrl = proxyUrl;
+      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'google-aistudio');
+      fs.mkdirSync(userDataDir, { recursive: true });
+
+      // Find browser (Linux)
+      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
+      let executable = '';
+      for (const b of browsers) {
+        try {
+          execSync(`which ${b}`);
+          executable = b;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!executable) {
+        return false;
+      }
+
+      const child = spawn(
+        executable,
+        [
+          '--proxy-server=' + proxyUrl,
+          '--ignore-certificate-errors',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-http2',
+          '--disable-quic',
+          `--user-data-dir=${userDataDir}`,
+          'https://aistudio.google.com/prompts/new_chat',
+        ],
+        {
+          detached: true,
+          stdio: 'ignore',
+        },
+      );
+      activeChildProcess = child;
+
+      child.on('exit', () => {
+        if (activeChildProcess === child) {
+          activeChildProcess = null;
+          activeProxyUrl = null;
+        }
+      });
+
+      child.unref();
+      return true;
+    }
+
+    if (appName === 'gemini-web') {
+      activeProxyUrl = proxyUrl;
+      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'gemini-web');
+      fs.mkdirSync(userDataDir, { recursive: true });
+
+      // Find browser (Linux)
+      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
+      let executable = '';
+      for (const b of browsers) {
+        try {
+          execSync(`which ${b}`);
+          executable = b;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!executable) {
+        return false;
+      }
+
+      const child = spawn(
+        executable,
+        [
+          '--proxy-server=' + proxyUrl,
+          '--ignore-certificate-errors',
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-http2',
+          '--disable-quic',
+          `--user-data-dir=${userDataDir}`,
+          'https://gemini.google.com/app?hl=vi',
+        ],
+        {
+          detached: true,
+          stdio: 'ignore',
+        },
+      );
+      activeChildProcess = child;
+
+      child.on('exit', () => {
+        if (activeChildProcess === child) {
+          activeChildProcess = null;
+          activeProxyUrl = null;
+        }
+      });
+
+      child.unref();
+      return true;
+    }
+
     if (appName === 'antigravity') {
       activeProxyUrl = proxyUrl;
       // Using 'antigravity' command assuming it's in PATH

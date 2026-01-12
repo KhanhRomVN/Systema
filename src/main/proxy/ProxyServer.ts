@@ -109,7 +109,11 @@ export class ProxyServer extends EventEmitter {
       const requestId = Date.now().toString() + Math.random();
       ctx.requestId = requestId;
 
-      if (url.includes('deepseek.com')) {
+      if (
+        url.includes('deepseek.com') ||
+        url.includes('aistudio.google.com') ||
+        url.includes('gemini.google.com')
+      ) {
         console.log(`[Proxy] Request to ${url}`);
         console.log('[Proxy] Headers:', JSON.stringify(req.headers, null, 2));
       }
