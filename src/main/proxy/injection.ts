@@ -50,10 +50,14 @@ export const INJECT_SCRIPT = `
             
             // Handle headers as object or Headers object
             if (init.headers instanceof Headers) {
-                init.headers.append('X-Systema-Initiator', btoa(stack));
+                try {
+                    init.headers.append('X-Systema-Initiator', btoa(stack));
+                } catch (e) {
+                   // Ignore header errors (some headers are read-only)
+                }
             } else if (Array.isArray(init.headers)) {
                 init.headers.push(['X-Systema-Initiator', btoa(stack)]);
-            } else {
+            } else if (typeof init.headers === 'object') {
                 init.headers['X-Systema-Initiator'] = btoa(stack);
             }
             args[1] = init;

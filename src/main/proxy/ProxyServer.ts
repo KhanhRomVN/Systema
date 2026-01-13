@@ -237,6 +237,8 @@ export class ProxyServer extends EventEmitter {
 
             // Inject Script just before <head> or <body>
             // Simple injection: Append to <head>
+            /* 
+            // DISABLE INJECTION TEMPORARILY
             if (body.includes('<head>')) {
               body = body.replace('<head>', `<head><script>${INJECT_SCRIPT}</script>`);
               console.log('[Proxy] Injected script into <head> for:', url);
@@ -245,6 +247,8 @@ export class ProxyServer extends EventEmitter {
               body = `<script>${INJECT_SCRIPT}</script>` + body;
               console.log('[Proxy] Injected script (fallback) for:', url);
             }
+            */
+            console.log('[Proxy] Injection disabled for:', url);
 
             // Re-compress? For simplicity, we send uncompressed and update headers
             // Removing content-encoding header ensures browser treats it as plain/identity

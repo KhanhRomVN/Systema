@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { CloudflareBypasser } from '../utils/cloudflare-bypass';
+import { attachNetworkDebugger } from './perplexity-cdp';
 
 const PERPLEXITY_URL = 'https://www.perplexity.ai/';
 let perplexityWindow: BrowserWindow | null = null;
@@ -46,8 +47,8 @@ export async function createPerplexityWebWindow(proxyUrl: string): Promise<boole
       partition: 'persist:perplexity-web', // Separate session for Perplexity
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false, // Disable web security for MITM proxy
-      allowRunningInsecureContent: true, // Allow insecure content for proxy
+      // webSecurity: false, // Re-enabled for better security/browser realism
+      // allowRunningInsecureContent: true, // Re-enabled for better security/browser realism
     },
   });
 
@@ -63,18 +64,18 @@ export async function createPerplexityWebWindow(proxyUrl: string): Promise<boole
     console.error('[Perplexity Web] Failed to clear session data:', e);
   }
 
-  // Set proxy for this session
+  // NOTE: Proxy settings REMOVED to avoid TLS fingerprinting issues.
+  // We now use CDP (attachNetworkDebugger) to monitor traffic without intercepting it at the socket layer.
+  // CRITICAL: We must EXPLICITLY set mode to 'direct' to overwrite any cached proxy settings from previous runs
+  // because we are using a 'persist:' partition.
   try {
-    await ses.setProxy({
-      proxyRules: proxyUrl,
-      proxyBypassRules: '<-loopback>', // Bypass proxy for localhost
-    });
-    console.log('[Perplexity Web] Proxy set to:', proxyUrl);
-  } catch (error) {
-    console.error('[Perplexity Web] Failed to set proxy:', error);
-    perplexityWindow.close();
-    return false;
+    await ses.setProxy({ mode: 'direct' });
+    console.log('[Perplexity Web] Proxy explicitly reset to DIRECT connection');
+  } catch (e) {
+    console.error('[Perplexity Web] Failed to reset proxy:', e);
   }
+
+  console.log('[Perplexity Web] Direct connection (No Proxy) - using CDP for monitoring');
 
   // Set user agent to avoid detection (similar to stealth techniques)
   // Using the same UA as Claude Web for consistency, as it simulates a standard Mac Chrome
@@ -82,19 +83,17 @@ export async function createPerplexityWebWindow(proxyUrl: string): Promise<boole
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   perplexityWindow.webContents.setUserAgent(userAgent);
 
-  // Ignore certificate errors for MITM proxy
-  ses.setCertificateVerifyProc((_request, callback) => {
-    callback(0); // 0 = accept, -2 = reject, -3 = use default verification
-  });
+  // NOTE: Certificate verification bypass REMOVED as we are no longer doing MITM.
 
-  console.log(
-    '[Perplexity Web] Window created (NOT registered with ProxyServer - events go to Inspector)',
-  );
+  console.log('[Perplexity Web] Window created');
+
+  // Attach CDP Debugger for Network Monitoring
+  await attachNetworkDebugger(perplexityWindow.webContents);
 
   // Load Perplexity URL
   perplexityWindow.loadURL(PERPLEXITY_URL);
 
-  // Initialize Cloudflare Bypass
+  // Initialize Cloudflare Bypass (Mouse movements etc.)
   const bypasser = new CloudflareBypasser(perplexityWindow);
   bypasser.start().then((success) => {
     if (success) {

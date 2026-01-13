@@ -19,6 +19,28 @@ import { createDeepSeekWebWindow, closeDeepSeekWebWindow } from './features/deep
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as dns from 'dns';
+
+// Fix EAI_AGAIN DNS errors by preferring IPv4
+try {
+  if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+  }
+} catch (e) {
+  console.error('[Main] Failed to set DNS order:', e);
+}
+
+// Ignore all certificate errors globally (fixes Proxy CA issues)
+app.commandLine.appendSwitch('ignore-certificate-errors');
+app.commandLine.appendSwitch('allow-insecure-localhost', 'true');
+
+// Global certificate error handler
+app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
+  // On certificate error we disable default behaviour (stop loading the page)
+  // and we then say "it is all fine - true" to the callback
+  event.preventDefault();
+  callback(true);
+});
 
 const proxyServer = new ProxyServer();
 const wsManager = SingletonWSManager.getInstance();

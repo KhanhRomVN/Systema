@@ -83,8 +83,16 @@ export async function createChatGPTWebWindow(proxyUrl: string): Promise<boolean>
   chatgptWindow.webContents.setUserAgent(userAgent);
 
   // Ignore certificate errors for MITM proxy
-  ses.setCertificateVerifyProc((_request, callback) => {
-    callback(0); // 0 = accept, -2 = reject, -3 = use default verification
+  ses.setCertificateVerifyProc((request, callback) => {
+    // console.log('[ChatGPT Web] VerifyProc for:', request.hostname); // Log if needed
+    callback(0); // 0 = accept
+  });
+
+  // Explicitly handle certificate errors for this window
+  chatgptWindow.webContents.on('certificate-error', (event, url, error, _certificate, callback) => {
+    console.log(`[ChatGPT Web] Certificate error for ${url}: ${error}. Trusting...`);
+    event.preventDefault();
+    callback(true);
   });
 
   console.log(

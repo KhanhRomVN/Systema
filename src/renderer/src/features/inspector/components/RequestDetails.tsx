@@ -115,10 +115,12 @@ export function RequestDetails({
           response: request.responseHeaders,
         };
       case 'cookies':
-        return {
-          request: request.requestCookies,
-          response: request.responseCookies,
-        };
+        return (
+          request.analysis?.cookies || {
+            request: request.requestCookies,
+            response: request.responseCookies,
+          }
+        );
       case 'body':
         return {
           request: request.requestBody,
