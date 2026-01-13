@@ -5,6 +5,17 @@ import { setupEventHandlers } from './core/events';
 import { ProxyServer } from './proxy/ProxyServer';
 import { SingletonWSManager } from './server/SingletonWSManager';
 import { createClaudeWebWindow, closeClaudeWebWindow } from './features/claude-web';
+import { createMistralWebWindow, closeMistralWebWindow } from './features/mistral-web';
+import { createKimiWebWindow, closeKimiWebWindow } from './features/kimi-web';
+import { createChatGPTWebWindow, closeChatGPTWebWindow } from './features/chatgpt-web';
+import { createQwenWebWindow, closeQwenWebWindow } from './features/qwen-web';
+import { createGrokWebWindow, closeGrokWebWindow } from './features/grok-web';
+import { createGroqWebWindow, closeGroqWebWindow } from './features/groq-web';
+import { createCohereWebWindow, closeCohereWebWindow } from './features/cohere-web';
+import { createPerplexityWebWindow, closePerplexityWebWindow } from './features/perplexity-web';
+import { createPhindWebWindow, closePhindWebWindow } from './features/phind-web';
+import { createGeminiWebWindow, closeGeminiWebWindow } from './features/gemini-web';
+import { createDeepSeekWebWindow, closeDeepSeekWebWindow } from './features/deepseek-web';
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -80,6 +91,17 @@ app.whenReady().then(async () => {
   ipcMain.handle('proxy:stop', async () => {
     proxyServer.stop();
     closeClaudeWebWindow(); // Close Claude Web window if open
+    closeMistralWebWindow(); // Close Mistral Web window if open
+    closeKimiWebWindow(); // Close Kimi Web window if open
+    closeChatGPTWebWindow();
+    closeQwenWebWindow();
+    closeGrokWebWindow();
+    closeGroqWebWindow();
+    closeCohereWebWindow();
+    closePerplexityWebWindow();
+    closePhindWebWindow();
+    closeGeminiWebWindow();
+    closeDeepSeekWebWindow();
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -93,6 +115,17 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('app:terminate', async () => {
     closeClaudeWebWindow(); // Close Claude Web window if open
+    closeMistralWebWindow(); // Close Mistral Web window if open
+    closeKimiWebWindow(); // Close Kimi Web window if open
+    closeChatGPTWebWindow();
+    closeQwenWebWindow();
+    closeGrokWebWindow();
+    closeGroqWebWindow();
+    closeCohereWebWindow();
+    closePerplexityWebWindow();
+    closePhindWebWindow();
+    closeGeminiWebWindow();
+    closeDeepSeekWebWindow();
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -103,6 +136,59 @@ app.whenReady().then(async () => {
     }
     return true;
   });
+
+  // Helper to launch browser
+  const launchBrowser = (url: string, profileName: string, proxyUrl: string) => {
+    activeProxyUrl = proxyUrl;
+    const userDataDir = path.join(app.getPath('userData'), 'profiles', profileName);
+    fs.mkdirSync(userDataDir, { recursive: true });
+
+    // Find browser (Linux)
+    const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
+    let executable = '';
+    for (const b of browsers) {
+      try {
+        execSync(`which ${b}`);
+        executable = b;
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    if (!executable) {
+      return false;
+    }
+
+    const child = spawn(
+      executable,
+      [
+        '--proxy-server=' + proxyUrl,
+        '--ignore-certificate-errors',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-http2',
+        '--disable-quic',
+        `--user-data-dir=${userDataDir}`,
+        url,
+      ],
+      {
+        detached: true,
+        stdio: 'ignore',
+      },
+    );
+    activeChildProcess = child;
+
+    child.on('exit', () => {
+      if (activeChildProcess === child) {
+        activeChildProcess = null;
+        activeProxyUrl = null;
+      }
+    });
+
+    child.unref();
+    return true;
+  };
 
   // App Launcher IPC
   ipcMain.handle('app:launch', async (_, appName: string, proxyUrl: string) => {
@@ -138,57 +224,6 @@ app.whenReady().then(async () => {
       child.unref();
       return true;
     }
-    if (appName === 'deepseek-web') {
-      activeProxyUrl = proxyUrl;
-      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'deepseek-web');
-      fs.mkdirSync(userDataDir, { recursive: true });
-
-      // Find browser (Linux)
-      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
-      let executable = '';
-      for (const b of browsers) {
-        try {
-          execSync(`which ${b}`);
-          executable = b;
-          break;
-        } catch {
-          continue;
-        }
-      }
-
-      if (!executable) {
-        return false;
-      }
-
-      const child = spawn(
-        executable,
-        [
-          '--proxy-server=' + proxyUrl,
-          '--ignore-certificate-errors',
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--disable-http2',
-          '--disable-quic',
-          `--user-data-dir=${userDataDir}`,
-          'https://chat.deepseek.com',
-        ],
-        {
-          detached: true,
-          stdio: 'ignore',
-        },
-      );
-      activeChildProcess = child;
-
-      child.on('exit', () => {
-        if (activeChildProcess === child) {
-          activeChildProcess = null;
-          activeProxyUrl = null;
-        }
-      });
-
-      child.unref();
-      return true;
-    }
 
     if (appName === 'claude-web') {
       // Use Electron BrowserWindow instead of spawning Chrome (like OpenClaude)
@@ -202,161 +237,6 @@ app.whenReady().then(async () => {
       }
 
       console.log('[Systema] Claude Web window created successfully');
-      return true;
-    }
-    if (appName === 'chatgpt-web') {
-      activeProxyUrl = proxyUrl;
-      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'chatgpt-web');
-      fs.mkdirSync(userDataDir, { recursive: true });
-
-      // Find browser (Linux)
-      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
-      let executable = '';
-      for (const b of browsers) {
-        try {
-          execSync(`which ${b}`);
-          executable = b;
-          break;
-        } catch {
-          continue;
-        }
-      }
-
-      if (!executable) {
-        return false;
-      }
-
-      const child = spawn(
-        executable,
-        [
-          '--proxy-server=' + proxyUrl,
-          '--ignore-certificate-errors',
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--disable-http2',
-          '--disable-quic',
-          `--user-data-dir=${userDataDir}`,
-          'https://chatgpt.com',
-        ],
-        {
-          detached: true,
-          stdio: 'ignore',
-        },
-      );
-      activeChildProcess = child;
-
-      child.on('exit', () => {
-        if (activeChildProcess === child) {
-          activeChildProcess = null;
-          activeProxyUrl = null;
-        }
-      });
-
-      child.unref();
-      return true;
-    }
-
-    if (appName === 'google-aistudio') {
-      activeProxyUrl = proxyUrl;
-      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'google-aistudio');
-      fs.mkdirSync(userDataDir, { recursive: true });
-
-      // Find browser (Linux)
-      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
-      let executable = '';
-      for (const b of browsers) {
-        try {
-          execSync(`which ${b}`);
-          executable = b;
-          break;
-        } catch {
-          continue;
-        }
-      }
-
-      if (!executable) {
-        return false;
-      }
-
-      const child = spawn(
-        executable,
-        [
-          '--proxy-server=' + proxyUrl,
-          '--ignore-certificate-errors',
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--disable-http2',
-          '--disable-quic',
-          `--user-data-dir=${userDataDir}`,
-          'https://aistudio.google.com/prompts/new_chat',
-        ],
-        {
-          detached: true,
-          stdio: 'ignore',
-        },
-      );
-      activeChildProcess = child;
-
-      child.on('exit', () => {
-        if (activeChildProcess === child) {
-          activeChildProcess = null;
-          activeProxyUrl = null;
-        }
-      });
-
-      child.unref();
-      return true;
-    }
-
-    if (appName === 'gemini-web') {
-      activeProxyUrl = proxyUrl;
-      const userDataDir = path.join(app.getPath('userData'), 'profiles', 'gemini-web');
-      fs.mkdirSync(userDataDir, { recursive: true });
-
-      // Find browser (Linux)
-      const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
-      let executable = '';
-      for (const b of browsers) {
-        try {
-          execSync(`which ${b}`);
-          executable = b;
-          break;
-        } catch {
-          continue;
-        }
-      }
-
-      if (!executable) {
-        return false;
-      }
-
-      const child = spawn(
-        executable,
-        [
-          '--proxy-server=' + proxyUrl,
-          '--ignore-certificate-errors',
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--disable-http2',
-          '--disable-quic',
-          `--user-data-dir=${userDataDir}`,
-          'https://gemini.google.com/app?hl=vi',
-        ],
-        {
-          detached: true,
-          stdio: 'ignore',
-        },
-      );
-      activeChildProcess = child;
-
-      child.on('exit', () => {
-        if (activeChildProcess === child) {
-          activeChildProcess = null;
-          activeProxyUrl = null;
-        }
-      });
-
-      child.unref();
       return true;
     }
 
@@ -393,6 +273,153 @@ app.whenReady().then(async () => {
       return true;
     }
 
+    if (appName === 'deepseek-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createDeepSeekWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create DeepSeek Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'mistral-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createMistralWebWindow(proxyUrl);
+
+      if (!success) {
+        console.error('[Systema] Failed to create Mistral Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+
+      console.log('[Systema] Mistral Web window created successfully');
+      return true;
+    }
+
+    if (appName === 'kimi-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createKimiWebWindow(proxyUrl);
+
+      if (!success) {
+        console.error('[Systema] Failed to create Kimi Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+
+      console.log('[Systema] Kimi Web window created successfully');
+      return true;
+    }
+
+    if (appName === 'chatgpt-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createChatGPTWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create ChatGPT Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'qwen-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createQwenWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Qwen Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'grok-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createGrokWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Grok Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'groq-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createGroqWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Groq Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'cohere-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createCohereWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Cohere Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'perplexity-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createPerplexityWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Perplexity Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'phind-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createPhindWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Phind Web window');
+        activeProxyUrl = null;
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'gemini-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createGeminiWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Gemini Web window');
+        return false;
+      }
+      return true;
+    }
+
+    // Web Apps
+    const webApps: Record<string, string> = {
+      'deepseek-browser': 'https://chat.deepseek.com',
+      'chatgpt-browser': 'https://chatgpt.com',
+      'google-aistudio': 'https://aistudio.google.com/prompts/new_chat',
+      'gemini-browser': 'https://gemini.google.com/app?hl=vi',
+      'kimi-browser': 'https://www.kimi.com/',
+      duckduckgo: 'https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat&duckai=1',
+      'qwen-browser': 'https://chat.qwen.ai/',
+      'groq-browser': 'https://console.groq.com/playground',
+      'grok-browser': 'https://grok.com/',
+      'cohere-browser': 'https://dashboard.cohere.com/playground/chat',
+      'mistral-browser': 'https://console.mistral.ai/build/playground',
+      'perplexity-browser': 'https://www.perplexity.ai/',
+      'phind-browser': 'https://www.phind.com/',
+    };
+
+    if (webApps[appName]) {
+      return launchBrowser(webApps[appName], appName, proxyUrl);
+    }
+
     return false;
   });
 
@@ -424,6 +451,17 @@ app.whenReady().then(async () => {
 const cleanup = () => {
   proxyServer.stop();
   closeClaudeWebWindow(); // Close Claude Web window if open
+  closeMistralWebWindow(); // Close Mistral Web window if open
+  closeKimiWebWindow(); // Close Kimi Web window if open
+  closeChatGPTWebWindow();
+  closeQwenWebWindow();
+  closeGrokWebWindow();
+  closeGroqWebWindow();
+  closeCohereWebWindow();
+  closePerplexityWebWindow();
+  closePhindWebWindow();
+  closeGeminiWebWindow();
+  closeDeepSeekWebWindow();
   if (activeChildProcess) {
     activeChildProcess.kill();
     activeChildProcess = null;
