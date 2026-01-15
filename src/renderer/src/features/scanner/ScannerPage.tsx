@@ -5,13 +5,13 @@ import { TrafficDashboard } from '../../components/TrafficDashboard';
 const ScannerPage: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
 
-  const handleSelectApp = async (appName: string, proxyUrl: string) => {
+  const handleSelectApp = async (appName: string, proxyUrl: string, customUrl?: string) => {
     // Start proxy
     // Extract port from url for now, hardcoded 8081
     await window.api.invoke('proxy:start', 8081);
 
     // Launch App
-    const launched = await window.api.invoke('app:launch', appName, proxyUrl);
+    const launched = await window.api.invoke('app:launch', appName, proxyUrl, customUrl);
 
     if (launched) {
       setIsScanning(true);

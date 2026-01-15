@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface AppSelectorProps {
-  onSelect: (appName: string, proxyUrl: string) => void;
+  onSelect: (appName: string, proxyUrl: string, customUrl?: string) => void;
 }
 
 interface AppDefinition {
@@ -114,12 +114,21 @@ const APPS: AppDefinition[] = [
     proxyPort: ':8081',
   },
   {
-    id: 'duckduckgo',
-    name: 'DuckDuckGo AI',
+    id: 'duckduckgo-browser',
+    name: 'DuckDuckGo (Real Browser)',
     description:
-      'Launches a trusted browser pointing to DuckDuckGo AI Chat. Intercepts HTTPS traffic.',
-    initials: 'DD',
+      'Launches an external Chrome browser pointing to DuckDuckGo. Better compatibility.',
+    initials: 'DDB',
     color: 'bg-orange-600',
+    proxyPort: ':8081',
+  },
+  {
+    id: 'duckduckgo-electron',
+    name: 'DuckDuckGo (Electron Window)',
+    description:
+      'Launches an internal Electron window pointing to DuckDuckGo. Integrated experience.',
+    initials: 'DDE',
+    color: 'bg-orange-700',
     proxyPort: ':8081',
   },
   {
@@ -238,12 +247,98 @@ const APPS: AppDefinition[] = [
     color: 'bg-orange-400',
     proxyPort: ':8081',
   },
+  {
+    id: 'context7-browser',
+    name: 'Context7 (Real Browser)',
+    description: 'Launches an external Chrome browser pointing to Context7. Better compatibility.',
+    initials: 'C7B',
+    color: 'bg-purple-500',
+    proxyPort: ':8081',
+  },
+  {
+    id: 'context7-electron',
+    name: 'Context7 (Electron Window)',
+    description:
+      'Launches an internal Electron window pointing to Context7. Integrated experience.',
+    initials: 'C7E',
+    color: 'bg-purple-600',
+    proxyPort: ':8081',
+  },
+  {
+    id: 'askcodi-browser',
+    name: 'AskCodi (Real Browser)',
+    description: 'Launches an external Chrome browser pointing to AskCodi. Better compatibility.',
+    initials: 'AcB',
+    color: 'bg-pink-500',
+    proxyPort: ':8081',
+  },
+  {
+    id: 'askcodi-electron',
+    name: 'AskCodi (Electron Window)',
+    description: 'Launches an internal Electron window pointing to AskCodi. Integrated experience.',
+    initials: 'AcE',
+    color: 'bg-pink-600',
+    proxyPort: ':8081',
+  },
+  {
+    id: 'deepseek-r1-together-browser',
+    name: 'DeepSeek R1 (Together AI) (Real Browser)',
+    description:
+      'Launches an external Chrome browser pointing to DeepSeek R1 (Together AI). Better compatibility.',
+    initials: 'R1B',
+    color: 'bg-blue-500',
+    proxyPort: ':8081',
+  },
+  {
+    id: 'deepseek-r1-together-electron',
+    name: 'DeepSeek R1 (Together AI) (Electron Window)',
+    description:
+      'Launches an internal Electron window pointing to DeepSeek R1 (Together AI). Integrated experience.',
+    initials: 'R1E',
+    color: 'bg-blue-600',
+    proxyPort: ':8081',
+  },
+
+  {
+    id: 'zai-browser',
+    name: 'Z.AI (Real Browser)',
+    description: 'Launches an external Chrome browser pointing to Z.AI. Better compatibility.',
+    initials: 'ZB',
+    color: 'bg-cyan-600',
+    proxyPort: ':8081',
+  },
+  {
+    id: 'zai-electron',
+    name: 'Z.AI (Electron Window)',
+    description: 'Launches an internal Electron window pointing to Z.AI. Integrated experience.',
+    initials: 'ZE',
+    color: 'bg-cyan-700',
+    proxyPort: ':8081',
+  },
 ];
 
 export const AppSelector: React.FC<AppSelectorProps> = ({ onSelect }) => {
   const [selectedAppId, setSelectedAppId] = useState<string>(APPS[0].id);
+  const [customUrl, setCustomUrl] = useState<string>('');
 
   const selectedApp = APPS.find((app) => app.id === selectedAppId);
+
+  // Clear custom URL when app changes
+  React.useEffect(() => {
+    setCustomUrl('');
+  }, [selectedAppId]);
+
+  const handleLaunch = () => {
+    if (!selectedApp) return;
+
+    if (selectedApp.id === 'groq-electron') {
+      onSelect(selectedApp.id, 'http://127.0.0.1:8081', customUrl);
+    } else {
+      onSelect(selectedApp.id, 'http://127.0.0.1:8081');
+    }
+  };
+
+  const isLaunchDisabled = selectedApp?.id === 'groq-electron' && !customUrl.trim();
 
   return (
     <div className="flex h-full w-full bg-gray-900 text-white overflow-hidden">
@@ -303,9 +398,26 @@ export const AppSelector: React.FC<AppSelectorProps> = ({ onSelect }) => {
                 <span className="font-mono">{selectedApp.proxyPort}</span>
               </div>
 
+              {selectedApp.id === 'groq-electron' && (
+                <div className="w-full max-w-md">
+                  <input
+                    type="text"
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    placeholder="Enter Groq URL (e.g., https://console.groq.com/playground)"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none text-white placeholder-gray-500"
+                  />
+                </div>
+              )}
+
               <button
-                onClick={() => onSelect(selectedApp.id, 'http://127.0.0.1:8081')}
-                className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-blue-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 hover:bg-blue-700 hover:scale-105"
+                onClick={handleLaunch}
+                disabled={isLaunchDisabled}
+                className={`group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-blue-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 ${
+                  isLaunchDisabled
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-blue-700 hover:scale-105'
+                }`}
               >
                 Launch Application
                 <svg

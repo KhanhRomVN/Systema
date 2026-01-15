@@ -14,7 +14,7 @@ export function getGroqWebWindowId(): number | null {
 /**
  * Create or focus Groq Web window
  */
-export async function createGroqWebWindow(proxyUrl: string): Promise<boolean> {
+export async function createGroqWebWindow(proxyUrl: string, customUrl?: string): Promise<boolean> {
   // If window already exists, focus it
   if (groqWindow && !groqWindow.isDestroyed()) {
     groqWindow.focus();
@@ -92,7 +92,8 @@ export async function createGroqWebWindow(proxyUrl: string): Promise<boolean> {
   );
 
   // Load Groq URL
-  groqWindow.loadURL(GROQ_URL);
+  const targetUrl = customUrl || GROQ_URL;
+  groqWindow.loadURL(targetUrl);
 
   // Initialize Cloudflare Bypass
   const bypasser = new CloudflareBypasser(groqWindow);

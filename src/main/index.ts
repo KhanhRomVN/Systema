@@ -16,6 +16,14 @@ import { createPerplexityWebWindow, closePerplexityWebWindow } from './features/
 import { createPhindWebWindow, closePhindWebWindow } from './features/phind-web';
 import { createGeminiWebWindow, closeGeminiWebWindow } from './features/gemini-web';
 import { createDeepSeekWebWindow, closeDeepSeekWebWindow } from './features/deepseek-web';
+import { createDuckDuckGoWebWindow, closeDuckDuckGoWebWindow } from './features/duckduckgo-web';
+import { createContext7WebWindow, closeContext7WebWindow } from './features/context7-web';
+import { createAskCodiWebWindow, closeAskCodiWebWindow } from './features/askcodi-web';
+import {
+  createDeepSeekR1TogetherWebWindow,
+  closeDeepSeekR1TogetherWebWindow,
+} from './features/deepseek-r1-together-web';
+import { createZaiWebWindow, closeZaiWebWindow } from './features/zai-web';
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -124,6 +132,12 @@ app.whenReady().then(async () => {
     closePhindWebWindow();
     closeGeminiWebWindow();
     closeDeepSeekWebWindow();
+    closeDeepSeekWebWindow();
+    closeDuckDuckGoWebWindow();
+    closeContext7WebWindow();
+    closeAskCodiWebWindow();
+    closeDeepSeekR1TogetherWebWindow();
+    closeZaiWebWindow();
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -148,6 +162,12 @@ app.whenReady().then(async () => {
     closePhindWebWindow();
     closeGeminiWebWindow();
     closeDeepSeekWebWindow();
+    closeDeepSeekWebWindow();
+    closeDuckDuckGoWebWindow();
+    closeContext7WebWindow();
+    closeAskCodiWebWindow();
+    closeDeepSeekR1TogetherWebWindow();
+    closeZaiWebWindow();
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -213,7 +233,7 @@ app.whenReady().then(async () => {
   };
 
   // App Launcher IPC
-  ipcMain.handle('app:launch', async (_, appName: string, proxyUrl: string) => {
+  ipcMain.handle('app:launch', async (_, appName: string, proxyUrl: string, customUrl?: string) => {
     if (appName === 'vscode') {
       activeProxyUrl = proxyUrl;
       // Using 'code' command assuming it's in PATH
@@ -264,25 +284,59 @@ app.whenReady().then(async () => {
 
     if (appName === 'antigravity') {
       activeProxyUrl = proxyUrl;
-      // Using 'antigravity' command assuming it's in PATH
-      const child = spawn(
-        'antigravity',
-        [
-          '--wait',
-          '--new-window',
-          '--proxy-server=' + proxyUrl,
-          '--ignore-certificate-errors',
-          '.',
-        ],
-        {
-          detached: true,
-          stdio: 'ignore',
-          shell: true, // For Windows/Linux compatibility with command resolution
-        },
-      );
+      console.log('[Systema] Launching Antigravity with proxy:', proxyUrl);
+
+      // Create a clean environment by copying process.env and removing Electron-specific variables
+      const env = { ...process.env };
+      delete env.ELECTRON_RUN_AS_NODE;
+      delete env.ELECTRON_NO_ATTACH_CONSOLE;
+      delete env.ELECTRON_EXEC_PATH;
+      delete env.ATOM_SHELL_INTERNAL_RUN_AS_NODE; // often used by Electron
+
+      console.log('[Systema] Sanitized env vars for Antigravity:', {
+        ELECTRON_RUN_AS_NODE: env.ELECTRON_RUN_AS_NODE,
+        ELECTRON_NO_ATTACH_CONSOLE: env.ELECTRON_NO_ATTACH_CONSOLE,
+        ELECTRON_EXEC_PATH: env.ELECTRON_EXEC_PATH,
+        PATH: env.PATH,
+      });
+
+      const args = [
+        '--wait',
+        '--new-window',
+        '--verbose', // Add verbose flag for better debugging
+        '--proxy-server=' + proxyUrl,
+        '--ignore-certificate-errors',
+        '.',
+      ];
+      console.log('[Systema] Spawning Antigravity with args:', args);
+
+      // Using absolute path to ensure we find the executable
+      const child = spawn('/usr/bin/antigravity', args, {
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe'], // Capture stdio for debugging
+        shell: false, // execute directly
+        env, // Use the sanitized environment
+      });
       activeChildProcess = child;
 
-      child.on('exit', () => {
+      if (child.stdout) {
+        child.stdout.on('data', (data) => {
+          console.log(`[Antigravity stdout]: ${data}`);
+        });
+      }
+
+      if (child.stderr) {
+        child.stderr.on('data', (data) => {
+          console.error(`[Antigravity stderr]: ${data}`);
+        });
+      }
+
+      child.on('error', (err) => {
+        console.error('[Antigravity] Failed to start process:', err);
+      });
+
+      child.on('exit', (code, signal) => {
+        console.log(`[Antigravity] Process exited with code ${code} and signal ${signal}`);
         if (activeChildProcess === child) {
           activeChildProcess = null;
           // Don't clear activeProxyUrl here immediately, as we might want to ensure cleanup on explicit stop
@@ -369,7 +423,7 @@ app.whenReady().then(async () => {
 
     if (appName === 'groq-electron') {
       activeProxyUrl = proxyUrl;
-      const success = await createGroqWebWindow(proxyUrl);
+      const success = await createGroqWebWindow(proxyUrl, customUrl);
       if (!success) {
         console.error('[Systema] Failed to create Groq Web window');
         activeProxyUrl = null;
@@ -421,6 +475,56 @@ app.whenReady().then(async () => {
       return true;
     }
 
+    if (appName === 'duckduckgo-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createDuckDuckGoWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create DuckDuckGo Web window');
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'context7-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createContext7WebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Context7 Web window');
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'askcodi-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createAskCodiWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create AskCodi Web window');
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'deepseek-r1-together-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createDeepSeekR1TogetherWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create DeepSeek R1 (Together AI) Web window');
+        return false;
+      }
+      return true;
+    }
+
+    if (appName === 'zai-electron') {
+      activeProxyUrl = proxyUrl;
+      const success = await createZaiWebWindow(proxyUrl);
+      if (!success) {
+        console.error('[Systema] Failed to create Z.AI Web window');
+        return false;
+      }
+      return true;
+    }
+
     // Web Apps
     const webApps: Record<string, string> = {
       'deepseek-browser': 'https://chat.deepseek.com',
@@ -428,7 +532,7 @@ app.whenReady().then(async () => {
       'google-aistudio': 'https://aistudio.google.com/prompts/new_chat',
       'gemini-browser': 'https://gemini.google.com/app?hl=vi',
       'kimi-browser': 'https://www.kimi.com/',
-      duckduckgo: 'https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat&duckai=1',
+      'duckduckgo-browser': 'https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat&duckai=1',
       'qwen-browser': 'https://chat.qwen.ai/',
       'groq-browser': 'https://console.groq.com/playground',
       'grok-browser': 'https://grok.com/',
@@ -436,6 +540,11 @@ app.whenReady().then(async () => {
       'mistral-browser': 'https://console.mistral.ai/build/playground',
       'perplexity-browser': 'https://www.perplexity.ai/',
       'phind-browser': 'https://www.phind.com/',
+      'context7-browser': 'https://context7.com/chat',
+      'askcodi-browser': 'https://www.askcodi.com/chat',
+      'deepseek-r1-together-browser':
+        'https://api.together.ai/playground/deepseek-ai/DeepSeek-R1-0528-tput',
+      'zai-browser': 'https://chat.z.ai/',
     };
 
     if (webApps[appName]) {
@@ -484,6 +593,11 @@ const cleanup = () => {
   closePhindWebWindow();
   closeGeminiWebWindow();
   closeDeepSeekWebWindow();
+  closeDuckDuckGoWebWindow();
+  closeContext7WebWindow();
+  closeAskCodiWebWindow();
+  closeDeepSeekR1TogetherWebWindow();
+  closeZaiWebWindow();
   if (activeChildProcess) {
     activeChildProcess.kill();
     activeChildProcess = null;

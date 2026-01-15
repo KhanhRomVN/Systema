@@ -179,10 +179,10 @@ export default function InspectorPage() {
     };
   }, [isScanning]);
 
-  const handleSelectApp = async (appName: string, proxyUrl: string) => {
+  const handleSelectApp = async (appName: string, proxyUrl: string, customUrl?: string) => {
     try {
       await window.api.invoke('proxy:start', 8081);
-      const launched = await window.api.invoke('app:launch', appName, proxyUrl);
+      const launched = await window.api.invoke('app:launch', appName, proxyUrl, customUrl);
 
       if (launched) {
         setIsScanning(true);
