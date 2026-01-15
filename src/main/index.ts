@@ -4,26 +4,12 @@ import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
 import { ProxyServer } from './proxy/ProxyServer';
 import { SingletonWSManager } from './server/SingletonWSManager';
-import { createClaudeWebWindow, closeClaudeWebWindow } from './features/claude-web';
-import { createMistralWebWindow, closeMistralWebWindow } from './features/mistral-web';
-import { createKimiWebWindow, closeKimiWebWindow } from './features/kimi-web';
-import { createChatGPTWebWindow, closeChatGPTWebWindow } from './features/chatgpt-web';
-import { createQwenWebWindow, closeQwenWebWindow } from './features/qwen-web';
-import { createGrokWebWindow, closeGrokWebWindow } from './features/grok-web';
-import { createGroqWebWindow, closeGroqWebWindow } from './features/groq-web';
-import { createCohereWebWindow, closeCohereWebWindow } from './features/cohere-web';
-import { createPerplexityWebWindow, closePerplexityWebWindow } from './features/perplexity-web';
-import { createPhindWebWindow, closePhindWebWindow } from './features/phind-web';
-import { createGeminiWebWindow, closeGeminiWebWindow } from './features/gemini-web';
-import { createDeepSeekWebWindow, closeDeepSeekWebWindow } from './features/deepseek-web';
-import { createDuckDuckGoWebWindow, closeDuckDuckGoWebWindow } from './features/duckduckgo-web';
-import { createContext7WebWindow, closeContext7WebWindow } from './features/context7-web';
-import { createAskCodiWebWindow, closeAskCodiWebWindow } from './features/askcodi-web';
 import {
-  createDeepSeekR1TogetherWebWindow,
-  closeDeepSeekR1TogetherWebWindow,
-} from './features/deepseek-r1-together-web';
-import { createZaiWebWindow, closeZaiWebWindow } from './features/zai-web';
+  createGenericWebWindow,
+  closeAllGenericWebWindows,
+  GenericWebWindowOptions,
+} from './features/generic-web';
+import { userAppStore, UserApp } from './store/apps';
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -34,9 +20,7 @@ try {
   if (dns.setDefaultResultOrder) {
     dns.setDefaultResultOrder('ipv4first');
   }
-} catch (e) {
-  console.error('[Main] Failed to set DNS order:', e);
-}
+} catch (e) {}
 
 // Ignore all certificate errors globally (fixes Proxy CA issues)
 app.commandLine.appendSwitch('ignore-certificate-errors');
@@ -78,21 +62,8 @@ app.whenReady().then(async () => {
     const isMainWindow = allWindows.length === 1;
 
     if (isMainWindow) {
-      console.log(
-        '[Main] ✅ Setting ProxyServer window for window ID:',
-        window.id,
-        'Title:',
-        window.getTitle(),
-      );
       proxyServer.setWindow(window);
       wsManager.setWindow(window);
-    } else {
-      console.log(
-        '[Main] ⏭️ Skipping ProxyServer.setWindow for window ID:',
-        window.id,
-        'Title:',
-        window.getTitle(),
-      );
     }
   });
 
@@ -120,24 +91,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('proxy:stop', async () => {
     proxyServer.stop();
-    closeClaudeWebWindow(); // Close Claude Web window if open
-    closeMistralWebWindow(); // Close Mistral Web window if open
-    closeKimiWebWindow(); // Close Kimi Web window if open
-    closeChatGPTWebWindow();
-    closeQwenWebWindow();
-    closeGrokWebWindow();
-    closeGroqWebWindow();
-    closeCohereWebWindow();
-    closePerplexityWebWindow();
-    closePhindWebWindow();
-    closeGeminiWebWindow();
-    closeDeepSeekWebWindow();
-    closeDeepSeekWebWindow();
-    closeDuckDuckGoWebWindow();
-    closeContext7WebWindow();
-    closeAskCodiWebWindow();
-    closeDeepSeekR1TogetherWebWindow();
-    closeZaiWebWindow();
+    closeAllGenericWebWindows();
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -150,24 +104,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('app:terminate', async () => {
-    closeClaudeWebWindow(); // Close Claude Web window if open
-    closeMistralWebWindow(); // Close Mistral Web window if open
-    closeKimiWebWindow(); // Close Kimi Web window if open
-    closeChatGPTWebWindow();
-    closeQwenWebWindow();
-    closeGrokWebWindow();
-    closeGroqWebWindow();
-    closeCohereWebWindow();
-    closePerplexityWebWindow();
-    closePhindWebWindow();
-    closeGeminiWebWindow();
-    closeDeepSeekWebWindow();
-    closeDeepSeekWebWindow();
-    closeDuckDuckGoWebWindow();
-    closeContext7WebWindow();
-    closeAskCodiWebWindow();
-    closeDeepSeekR1TogetherWebWindow();
-    closeZaiWebWindow();
+    closeAllGenericWebWindows();
     if (activeChildProcess) {
       activeChildProcess.kill();
       activeChildProcess = null;
@@ -267,38 +204,14 @@ app.whenReady().then(async () => {
       return true;
     }
 
-    if (appName === 'claude-web') {
-      // Use Electron BrowserWindow instead of spawning Chrome (like OpenClaude)
-      activeProxyUrl = proxyUrl;
-      const success = await createClaudeWebWindow(proxyUrl);
-
-      if (!success) {
-        console.error('[Systema] Failed to create Claude Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-
-      console.log('[Systema] Claude Web window created successfully');
-      return true;
-    }
-
     if (appName === 'antigravity') {
       activeProxyUrl = proxyUrl;
-      console.log('[Systema] Launching Antigravity with proxy:', proxyUrl);
-
       // Create a clean environment by copying process.env and removing Electron-specific variables
       const env = { ...process.env };
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.ELECTRON_NO_ATTACH_CONSOLE;
       delete env.ELECTRON_EXEC_PATH;
       delete env.ATOM_SHELL_INTERNAL_RUN_AS_NODE; // often used by Electron
-
-      console.log('[Systema] Sanitized env vars for Antigravity:', {
-        ELECTRON_RUN_AS_NODE: env.ELECTRON_RUN_AS_NODE,
-        ELECTRON_NO_ATTACH_CONSOLE: env.ELECTRON_NO_ATTACH_CONSOLE,
-        ELECTRON_EXEC_PATH: env.ELECTRON_EXEC_PATH,
-        PATH: env.PATH,
-      });
 
       const args = [
         '--wait',
@@ -308,7 +221,6 @@ app.whenReady().then(async () => {
         '--ignore-certificate-errors',
         '.',
       ];
-      console.log('[Systema] Spawning Antigravity with args:', args);
 
       // Using absolute path to ensure we find the executable
       const child = spawn('/usr/bin/antigravity', args, {
@@ -320,9 +232,7 @@ app.whenReady().then(async () => {
       activeChildProcess = child;
 
       if (child.stdout) {
-        child.stdout.on('data', (data) => {
-          console.log(`[Antigravity stdout]: ${data}`);
-        });
+        child.stdout.on('data', () => {});
       }
 
       if (child.stderr) {
@@ -335,12 +245,9 @@ app.whenReady().then(async () => {
         console.error('[Antigravity] Failed to start process:', err);
       });
 
-      child.on('exit', (code, signal) => {
-        console.log(`[Antigravity] Process exited with code ${code} and signal ${signal}`);
+      child.on('exit', () => {
         if (activeChildProcess === child) {
           activeChildProcess = null;
-          // Don't clear activeProxyUrl here immediately, as we might want to ensure cleanup on explicit stop
-          // But effectively if it exits, it's gone.
           activeProxyUrl = null;
         }
       });
@@ -349,180 +256,48 @@ app.whenReady().then(async () => {
       return true;
     }
 
-    if (appName === 'deepseek-electron') {
+    // App Configurations Map for Electron Mode
+    const electronApps: Record<string, { url: string; options?: GenericWebWindowOptions }> = {
+      'claude-web': { url: 'https://claude.ai' },
+      'deepseek-electron': {
+        url: 'https://chat.deepseek.com',
+        options: { clearSession: true, useCloudflareBypass: true },
+      },
+      'mistral-electron': { url: 'https://console.mistral.ai/build/playground' },
+      'kimi-electron': { url: 'https://www.kimi.com/' },
+      'chatgpt-electron': { url: 'https://chatgpt.com', options: { useCloudflareBypass: true } },
+      'qwen-electron': { url: 'https://chat.qwen.ai/' },
+      'grok-electron': { url: 'https://grok.com/' },
+      'groq-electron': {
+        url: customUrl || 'https://console.groq.com/playground',
+      },
+      'cohere-electron': { url: 'https://dashboard.cohere.com/playground/chat' },
+      'perplexity-electron': { url: 'https://www.perplexity.ai/' },
+      'phind-electron': { url: 'https://www.phind.com/' },
+      'gemini-electron': { url: 'https://gemini.google.com/app?hl=vi' },
+      'duckduckgo-electron': {
+        url: 'https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat&duckai=1',
+      },
+      'context7-electron': { url: 'https://context7.com/chat' },
+      'askcodi-electron': { url: 'https://www.askcodi.com/chat' },
+      'deepseek-r1-together-electron': {
+        url: 'https://api.together.ai/playground/deepseek-ai/DeepSeek-R1-0528-tput',
+      },
+      'zai-electron': {
+        url: 'https://chat.z.ai/',
+        options: { clearSession: true }, // Ensure fresh login for Zai
+      },
+      'huggingface-electron': { url: 'https://huggingface.co/chat/' },
+      'poe-electron': { url: 'https://poe.com/' },
+      'elicit-electron': { url: 'https://elicit.com/' },
+      'lmarena-electron': { url: 'https://lmarena.ai/vi/c/new?mode=direct' },
+    };
+
+    if (electronApps[appName]) {
       activeProxyUrl = proxyUrl;
-      const success = await createDeepSeekWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create DeepSeek Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'mistral-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createMistralWebWindow(proxyUrl);
-
-      if (!success) {
-        console.error('[Systema] Failed to create Mistral Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-
-      console.log('[Systema] Mistral Web window created successfully');
-      return true;
-    }
-
-    if (appName === 'kimi-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createKimiWebWindow(proxyUrl);
-
-      if (!success) {
-        console.error('[Systema] Failed to create Kimi Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-
-      console.log('[Systema] Kimi Web window created successfully');
-      return true;
-    }
-
-    if (appName === 'chatgpt-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createChatGPTWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create ChatGPT Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'qwen-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createQwenWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Qwen Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'grok-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createGrokWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Grok Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'groq-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createGroqWebWindow(proxyUrl, customUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Groq Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'cohere-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createCohereWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Cohere Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'perplexity-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createPerplexityWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Perplexity Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'phind-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createPhindWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Phind Web window');
-        activeProxyUrl = null;
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'gemini-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createGeminiWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Gemini Web window');
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'duckduckgo-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createDuckDuckGoWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create DuckDuckGo Web window');
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'context7-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createContext7WebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Context7 Web window');
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'askcodi-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createAskCodiWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create AskCodi Web window');
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'deepseek-r1-together-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createDeepSeekR1TogetherWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create DeepSeek R1 (Together AI) Web window');
-        return false;
-      }
-      return true;
-    }
-
-    if (appName === 'zai-electron') {
-      activeProxyUrl = proxyUrl;
-      const success = await createZaiWebWindow(proxyUrl);
-      if (!success) {
-        console.error('[Systema] Failed to create Z.AI Web window');
-        return false;
-      }
-      return true;
+      const config = electronApps[appName];
+      const win = await createGenericWebWindow(appName, config.url, proxyUrl, config.options);
+      return !!win;
     }
 
     // Web Apps
@@ -545,10 +320,32 @@ app.whenReady().then(async () => {
       'deepseek-r1-together-browser':
         'https://api.together.ai/playground/deepseek-ai/DeepSeek-R1-0528-tput',
       'zai-browser': 'https://chat.z.ai/',
+      'huggingface-browser': 'https://huggingface.co/chat/',
+      'poe-browser': 'https://poe.com/',
+      'elicit-browser': 'https://elicit.com/',
+      'lmarena-browser': 'https://lmarena.ai/vi/c/new?mode=direct',
     };
 
     if (webApps[appName]) {
       return launchBrowser(webApps[appName], appName, proxyUrl);
+    }
+
+    // Check User Apps
+    const userApp = userAppStore.getAppById(appName);
+    if (userApp) {
+      if (userApp.platform === 'web' && userApp.url) {
+        if (userApp.mode === 'browser') {
+          return launchBrowser(userApp.url, userApp.id, proxyUrl);
+        } else if (userApp.mode === 'electron') {
+          activeProxyUrl = proxyUrl;
+          const win = await createGenericWebWindow(userApp.id, userApp.url, proxyUrl, {
+            title: userApp.name,
+            // Add logical defaults for user apps if needed, e.g. CF bypass
+            useCloudflareBypass: true, // often needed for modern AI sites
+          });
+          return !!win;
+        }
+      }
     }
 
     return false;
@@ -562,6 +359,19 @@ app.whenReady().then(async () => {
   ipcMain.handle('ws:send', (_, message: any) => {
     wsManager.sendToClients(message);
     return true;
+  });
+
+  // User Apps IPC
+  ipcMain.handle('apps:get-all', () => {
+    return userAppStore.getAllApps();
+  });
+
+  ipcMain.handle('apps:create', (_, appData: Omit<UserApp, 'id' | 'createdAt'>) => {
+    return userAppStore.addApp(appData);
+  });
+
+  ipcMain.handle('apps:delete', (_, id: string) => {
+    return userAppStore.deleteApp(id);
   });
 
   // Create main window
@@ -581,23 +391,7 @@ app.whenReady().then(async () => {
 // explicitly with Cmd + Q.
 const cleanup = () => {
   proxyServer.stop();
-  closeClaudeWebWindow(); // Close Claude Web window if open
-  closeMistralWebWindow(); // Close Mistral Web window if open
-  closeKimiWebWindow(); // Close Kimi Web window if open
-  closeChatGPTWebWindow();
-  closeQwenWebWindow();
-  closeGrokWebWindow();
-  closeGroqWebWindow();
-  closeCohereWebWindow();
-  closePerplexityWebWindow();
-  closePhindWebWindow();
-  closeGeminiWebWindow();
-  closeDeepSeekWebWindow();
-  closeDuckDuckGoWebWindow();
-  closeContext7WebWindow();
-  closeAskCodiWebWindow();
-  closeDeepSeekR1TogetherWebWindow();
-  closeZaiWebWindow();
+  closeAllGenericWebWindows();
   if (activeChildProcess) {
     activeChildProcess.kill();
     activeChildProcess = null;
@@ -606,8 +400,11 @@ const cleanup = () => {
     // Attempt to kill VS Code launched with this specific proxy
     try {
       execSync(`pkill -f -- "--proxy-server=${activeProxyUrl}"`);
-    } catch (e) {
-      console.error('Failed to pkill VS Code during cleanup:', e);
+    } catch (e: any) {
+      // pkill returns exit code 1 if no matched processes are found, which is fine
+      if (e.status !== 1) {
+        console.error('Failed to pkill VS Code during cleanup:', e);
+      }
     }
     activeProxyUrl = null;
   }

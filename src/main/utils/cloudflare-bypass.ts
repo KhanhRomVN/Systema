@@ -19,12 +19,9 @@ export class CloudflareBypasser {
     if (this.isBypassing) return false;
     this.isBypassing = true;
 
-    console.log('[CloudflareBypasser] Starting bypass...');
-
     for (let i = 0; i < this.maxRetries; i++) {
       // Check if window is destroyed
       if (this.window.isDestroyed()) {
-        console.log('[CloudflareBypasser] Window destroyed, stopping.');
         this.isBypassing = false;
         return false;
       }
@@ -32,20 +29,14 @@ export class CloudflareBypasser {
       // Check if already bypassed based on title
       const title = this.window.getTitle().toLowerCase();
       if (!title.includes('just a moment')) {
-        console.log('[CloudflareBypasser] Page seems to be bypassed (Title mismatch). Success?');
         this.isBypassing = false;
         return true;
       }
-
-      console.log(
-        `[CloudflareBypasser] Attempt ${i + 1}/${this.maxRetries}: Searching for challenge...`,
-      );
 
       // Inject logic to find and click button
       const clicked = await this.clickVerificationButton();
 
       if (clicked) {
-        console.log('[CloudflareBypasser] Button clicked! Waiting for navigation...');
         // Wait longer if clicked
         await new Promise((resolve) => setTimeout(resolve, 5000));
       } else {
@@ -54,7 +45,6 @@ export class CloudflareBypasser {
       }
     }
 
-    console.log('[CloudflareBypasser] Exceeded max retries.');
     this.isBypassing = false;
     return false;
   }

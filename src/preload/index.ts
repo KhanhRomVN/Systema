@@ -1,20 +1,20 @@
-import { contextBridge } from 'electron';
+import { contextBridge, IpcRendererEvent } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
 import { appAPI } from './api';
 
 const api = {
   app: appAPI,
-  invoke: (channel, ...args) => electronAPI.ipcRenderer.invoke(channel, ...args),
-  on: (channel, listener) => {
+  invoke: (channel: string, ...args: any[]) => electronAPI.ipcRenderer.invoke(channel, ...args),
+  on: (channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) => {
     // Debug wrapper
-    const wrappedListener = (event, ...args) => {
-      console.log(`[Preload] 📨 IPC event received: ${channel}`, args[0]);
+    const wrappedListener = (event: IpcRendererEvent, ...args: any[]) => {
       listener(event, ...args);
     };
     electronAPI.ipcRenderer.on(channel, wrappedListener);
     return wrappedListener;
   },
-  off: (channel, listener) => electronAPI.ipcRenderer.removeListener(channel, listener),
+  off: (channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) =>
+    electronAPI.ipcRenderer.removeListener(channel, listener),
 };
 
 if (process.contextIsolated) {

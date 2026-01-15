@@ -14,8 +14,6 @@ export const INJECT_SCRIPT = `
     } catch (e) {
       // Split lines, remove the first "Error" line and the current function call
       const stack = e.stack || '';
-      console.log('[Systema Debug] Raw Stack Length:', stack.split('\\n').length);
-      console.log('[Systema Debug] Raw Stack:', stack);
       const lines = stack.split('\\n');
       
       // We want to find the first line that is NOT inside this script
@@ -27,7 +25,6 @@ export const INJECT_SCRIPT = `
 
   // Hook Fetch
   window.fetch = function(...args) {
-    // console.log('[Systema] fetch called'); // Too noisy
     const stack = getStackTrace();
     
     // args[0] is input (URL or Request object)
@@ -81,7 +78,5 @@ export const INJECT_SCRIPT = `
     }
     return originalXhrSend.apply(this, arguments);
   };
-
-  console.log('[Systema] Initiator Hook Injected');
 })();
 `;

@@ -67,7 +67,6 @@ export function SourceCodeView({
       }
     };
 
-    console.log('Attempting to format file:', fileName, 'Language:', language);
     formatCode();
   }, [content, language, autoFormat]);
 

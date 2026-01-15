@@ -73,7 +73,6 @@ export function FileTree({ requests, onSelectFile }: FileTreeProps) {
         NOISE_SUBSTRINGS.some((s) => req.host.includes(s));
 
       if (isIgnored) {
-        // console.log('Filtering out:', req.host);
         return;
       }
 

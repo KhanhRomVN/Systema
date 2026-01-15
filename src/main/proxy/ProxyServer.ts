@@ -14,13 +14,10 @@ export class ProxyServer extends EventEmitter {
 
   constructor() {
     super();
-    console.log('[ProxyServer] Constructor called');
     try {
       // Fix: Destructure Proxy and use new keyword
       const { Proxy } = require('http-mitm-proxy');
-      console.log('[ProxyServer] http-mitm-proxy required:', typeof Proxy);
       this.proxy = new Proxy();
-      console.log('[ProxyServer] this.proxy initialized:', !!this.proxy);
 
       // Initialize zstd
       try {
@@ -28,22 +25,12 @@ export class ProxyServer extends EventEmitter {
         ZstdInit()
           .then(({ ZstdSimple }: any) => {
             this.zstd = ZstdSimple;
-            console.log('[ProxyServer] Zstd loaded successfully');
           })
-          .catch((err: any) => {
-            console.error('[ProxyServer] Zstd init failed:', err);
-          });
-      } catch (e) {
-        console.error(
-          '[ProxyServer] Failed to require zstd-js (Normal if not installed yet, but required for DeepSeek):',
-          e,
-        );
-      }
+          .catch(() => {});
+      } catch (e) {}
 
       this.proxy.use(Proxy.gunzip);
-    } catch (e) {
-      console.error('[ProxyServer] CRITICAL CONSTRUCTOR ERROR:', e);
-    }
+    } catch (e) {}
   }
 
   public setWindow(window: BrowserWindow) {
@@ -108,15 +95,6 @@ export class ProxyServer extends EventEmitter {
       const url = (ctx.isSSL ? 'https://' : 'http://') + req.headers.host + req.url;
       const requestId = Date.now().toString() + Math.random();
       ctx.requestId = requestId;
-
-      if (
-        url.includes('deepseek.com') ||
-        url.includes('aistudio.google.com') ||
-        url.includes('gemini.google.com')
-      ) {
-        console.log(`[Proxy] Request to ${url}`);
-        console.log('[Proxy] Headers:', JSON.stringify(req.headers, null, 2));
-      }
 
       const initiatorStackBase64 = req.headers['x-systema-initiator'];
       let initiator = null;
@@ -196,7 +174,6 @@ export class ProxyServer extends EventEmitter {
         // Strip CSP headers to allow injection
         delete res.headers['content-security-policy'];
         delete res.headers['content-security-policy-report-only'];
-        console.log('[Proxy] Stripped CSP for:', url);
       }
 
       ctx.onResponseData((ctx: any, chunk: any, callback: any) => {
@@ -235,23 +212,6 @@ export class ProxyServer extends EventEmitter {
               body = buffer.toString('utf8');
             }
 
-            // Inject Script just before <head> or <body>
-            // Simple injection: Append to <head>
-            /* 
-            // DISABLE INJECTION TEMPORARILY
-            if (body.includes('<head>')) {
-              body = body.replace('<head>', `<head><script>${INJECT_SCRIPT}</script>`);
-              console.log('[Proxy] Injected script into <head> for:', url);
-            } else {
-              // Fallback
-              body = `<script>${INJECT_SCRIPT}</script>` + body;
-              console.log('[Proxy] Injected script (fallback) for:', url);
-            }
-            */
-            console.log('[Proxy] Injection disabled for:', url);
-
-            // Re-compress? For simplicity, we send uncompressed and update headers
-            // Removing content-encoding header ensures browser treats it as plain/identity
             if (res.headers['content-encoding']) {
               delete res.headers['content-encoding'];
             }
@@ -354,15 +314,7 @@ export class ProxyServer extends EventEmitter {
 
   private sendToRenderer(channel: string, data: any) {
     if (this.window && !this.window.isDestroyed()) {
-      // Log only request events to avoid spam (response has same ID)
-      if (channel === 'proxy:request') {
-        console.log(
-          `[ProxyServer] 📤 Sending ${channel} to window ID: ${this.window.id}, Title: "${this.window.getTitle()}"`,
-        );
-      }
       this.window.webContents.send(channel, data);
-    } else {
-      console.error(`[ProxyServer] ❌ Cannot send event - window unavailable: ${channel}`);
     }
   }
 }

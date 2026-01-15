@@ -1,5 +1,5 @@
 import { InspectorLayout } from './components/InspectorLayout';
-import { AppSelector } from '../../components/AppSelector';
+import Dashboard from '../../features/dashboard';
 import { useState, useEffect } from 'react';
 import { NetworkRequest } from './types';
 import { generateRequestAnalysis } from './utils/analysisGenerator';
@@ -13,14 +13,6 @@ export default function InspectorPage() {
     if (!isScanning) return;
 
     const handleRequest = (_: any, data: any) => {
-      console.log('[Inspector] 📥 Received proxy:request event', {
-        id: data.id,
-        method: data.method,
-        url: data.url,
-        timestamp: data.timestamp,
-        isIntercepted: data.isIntercepted,
-      });
-
       const newRequest: NetworkRequest = {
         id: data.id || Math.random().toString(36).substr(2, 9), // Use ID from proxy if available
         method: data.method,
@@ -45,10 +37,8 @@ export default function InspectorPage() {
       setRequests((prev) => {
         // Prevent duplicates if same ID comes through (e.g. IPC echo)
         if (prev.some((req) => req.id === newRequest.id)) {
-          console.log('[Inspector] ⚠️ Duplicate request ID, skipping:', data.id);
           return prev;
         }
-        console.log('[Inspector] ✅ Adding new request to state:', data.id);
         return [{ ...newRequest, analysis }, ...prev];
       });
     };
@@ -211,7 +201,7 @@ export default function InspectorPage() {
   };
 
   if (!isScanning) {
-    return <AppSelector onSelect={handleSelectApp} />;
+    return <Dashboard onSelect={handleSelectApp} />;
   }
 
   return (
