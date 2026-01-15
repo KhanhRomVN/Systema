@@ -1,4 +1,4 @@
-export type AppMode = 'browser' | 'electron';
+export type AppMode = 'browser' | 'electron' | 'native';
 export type AppPlatform = 'web' | 'pc' | 'android';
 
 export interface UserApp {
@@ -26,4 +26,12 @@ export interface AppDefinition {
   mode?: AppMode;
   url?: string;
   isCustom?: boolean;
+}
+
+export interface DiscoveredApp {
+  name: string;
+  exec: string;
+  icon?: string;
+  description?: string;
+  path: string;
 }

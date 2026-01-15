@@ -169,10 +169,26 @@ export default function InspectorPage() {
     };
   }, [isScanning]);
 
-  const handleSelectApp = async (appName: string, proxyUrl: string, customUrl?: string) => {
+  const handleSelectApp = async (
+    appName: string,
+    _proxyUrl: string,
+    customUrl?: string,
+    mode?: 'browser' | 'electron',
+  ) => {
     try {
-      await window.api.invoke('proxy:start', 8081);
-      const launched = await window.api.invoke('app:launch', appName, proxyUrl, customUrl);
+      // Request dynamic session from backend
+      const port = await window.api.invoke('proxy:create-session', appName);
+      const dynamicProxyUrl = `http://127.0.0.1:${port}`;
+
+      console.log(`[Inspector] Starting session for ${appName} on port ${port}`);
+
+      const launched = await window.api.invoke(
+        'app:launch',
+        appName,
+        dynamicProxyUrl,
+        customUrl,
+        mode,
+      );
 
       if (launched) {
         setIsScanning(true);

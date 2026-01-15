@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserApp, AppPlatform, AppMode } from '../../types/apps'; // Updated import path
+import { AddAppModal } from './components/AddAppModal';
 import { Plus, Globe, Monitor, Smartphone, Search, Trash2, ExternalLink } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -9,7 +10,12 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 interface DashboardProps {
-  onSelect: (appName: string, proxyUrl: string, customUrl?: string) => void;
+  onSelect: (
+    appName: string,
+    proxyUrl: string,
+    customUrl?: string,
+    mode?: 'browser' | 'electron',
+  ) => void;
 }
 
 const getFaviconUrl = (url?: string) => {
@@ -27,6 +33,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
   const [activeAppId, setActiveAppId] = useState<string>('');
   const [apps, setApps] = useState<UserApp[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPcAddModal, setShowPcAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Form State
@@ -82,6 +89,27 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
     }
   };
 
+  const handleAddPcApp = async (app: {
+    name: string;
+    url?: string;
+    executablePath?: string;
+    mode: AppMode;
+    platform: AppPlatform;
+    icon?: string;
+  }) => {
+    try {
+      await window.api.invoke('apps:create', {
+        ...app,
+        category: 'Development',
+        tags: [],
+      });
+      setShowPcAddModal(false);
+      fetchApps();
+    } catch (e) {
+      console.error('Failed to create app', e);
+    }
+  };
+
   const handleDeleteApp = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Are you sure you want to delete this custom app?')) {
@@ -102,9 +130,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
 
   const selectedApp = apps.find((app) => app.id === activeAppId);
 
-  const handleLaunch = () => {
+  const handleLaunch = (mode?: 'browser' | 'electron') => {
     if (!selectedApp) return;
-    onSelect(selectedApp.id, 'http://127.0.0.1:8081', selectedApp.url);
+    onSelect(selectedApp.id, 'http://127.0.0.1:8081', selectedApp.url, mode);
   };
 
   return (
@@ -164,6 +192,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
             </button>
           )}
 
+          {activeTab === 'pc' && (
+            <button
+              onClick={() => setShowPcAddModal(true)}
+              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-gray-700 text-gray-400 hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 transition-all duration-200 group"
+            >
+              <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium">Add Application</span>
+            </button>
+          )}
+
           {filteredApps.map((app) => {
             const faviconUrl = getFaviconUrl(app.url);
             const initials = app.name.slice(0, 2).toUpperCase();
@@ -198,6 +236,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
                         {initials}
                       </span>
                     </>
+                  ) : app.icon && app.platform === 'pc' ? (
+                    <img
+                      src={`media://${app.icon}`}
+                      alt={app.name}
+                      className="w-full h-full object-contain p-1"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : app.icon && app.platform === 'pc' ? (
+                    <img
+                      src={`media://${app.icon}`}
+                      alt={app.name}
+                      className="w-full h-full object-contain p-1"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                   ) : (
                     initials
                   )}
@@ -253,6 +309,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
                         e.currentTarget.style.display = 'none';
                       }}
                     />
+                  ) : selectedApp.icon && selectedApp.platform === 'pc' ? (
+                    <img
+                      src={`media://${selectedApp.icon}`}
+                      alt={selectedApp.name}
+                      className="w-full h-full object-contain p-4"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : selectedApp.icon && selectedApp.platform === 'pc' ? (
+                    <img
+                      src={`media://${selectedApp.icon}`}
+                      alt={selectedApp.name}
+                      className="w-full h-full object-contain p-4"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                   ) : (
                     selectedApp.name.slice(0, 2).toUpperCase()
                   )}
@@ -281,13 +355,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
                   <span className="text-sm font-medium text-gray-300">Proxy Ready: :8081</span>
                 </div>
 
-                <button
-                  onClick={handleLaunch}
-                  className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-blue-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 hover:bg-blue-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
-                >
-                  Launch {selectedApp.mode === 'browser' ? 'Browser' : 'Application'}
-                  <ExternalLink className="w-5 h-5 ml-2 -mr-1 transition-transform group-hover:translate-x-1" />
-                </button>
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() => handleLaunch('browser')}
+                    className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-blue-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 hover:bg-blue-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
+                  >
+                    Launch Browser
+                    <Globe className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
+                  </button>
+                  <button
+                    onClick={() => handleLaunch('electron')}
+                    className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-indigo-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:bg-indigo-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(79,70,229,0.5)]"
+                  >
+                    Launch App
+                    <Monitor className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
+                  </button>
+                </div>
 
                 {selectedApp.url && (
                   <div className="text-sm text-gray-600 font-mono bg-gray-900/50 px-3 py-1 rounded">
@@ -351,14 +434,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1.5">Mode</label>
-                  <select
-                    value={newItemMode}
-                    onChange={(e) => setNewItemMode(e.target.value as AppMode)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none"
-                  >
-                    <option value="browser">Real Browser</option>
-                    <option value="electron">Electron Window</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setNewItemMode('browser')}
+                      className={cn(
+                        'flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg border transition-all duration-200',
+                        newItemMode === 'browser'
+                          ? 'bg-blue-600/10 border-blue-500 text-blue-400'
+                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300',
+                      )}
+                    >
+                      <Globe className="w-4 h-4" />
+                      <span className="text-sm font-medium">Real Browser</span>
+                    </button>
+                    <button
+                      onClick={() => setNewItemMode('electron')}
+                      className={cn(
+                        'flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg border transition-all duration-200',
+                        newItemMode === 'electron'
+                          ? 'bg-blue-600/10 border-blue-500 text-blue-400'
+                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300',
+                      )}
+                    >
+                      <Monitor className="w-4 h-4" />
+                      <span className="text-sm font-medium">Electron Window</span>
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1.5">Category</label>
@@ -391,6 +492,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
           </div>
         </div>
       )}
+
+      <AddAppModal
+        isOpen={showPcAddModal}
+        onClose={() => setShowPcAddModal(false)}
+        onAdd={handleAddPcApp}
+      />
     </div>
   );
 };
