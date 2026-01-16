@@ -18,6 +18,7 @@ import {
   Filter,
   ScanEye,
   PlayCircle,
+  KeyRound,
 } from 'lucide-react';
 
 import { RequestOverview } from './RequestDetails/RequestOverview';
@@ -60,6 +61,71 @@ interface RequestDetailsProps {
   filter: InspectorFilter;
   onFilterChange: (filter: InspectorFilter) => void;
   requests?: NetworkRequest[];
+  onSearchTermChange?: (term: string) => void;
+}
+
+// Text Selection Menu Component
+function TextSelectionMenu({
+  x,
+  y,
+  selectedText,
+  onAddToCrypto,
+  onUseInSearch,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  selectedText: string;
+  onAddToCrypto: () => void;
+  onUseInSearch: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleClickOutside = () => onClose();
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+      style={{
+        left: `${x}px`,
+        top: `${y}px`,
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={() => {
+          onAddToCrypto();
+          onClose();
+        }}
+        className="w-full px-3 py-1.5 text-xs text-left hover:bg-pink-500/10 hover:text-pink-500 transition-colors flex items-center gap-2"
+      >
+        <KeyRound className="w-3 h-3" />
+        Add to Crypto
+      </button>
+      <button
+        onClick={() => {
+          onUseInSearch();
+          onClose();
+        }}
+        className="w-full px-3 py-1.5 text-xs text-left hover:bg-blue-500/10 hover:text-blue-500 transition-colors flex items-center gap-2"
+      >
+        <Filter className="w-3 h-3" />
+        Use in Search
+      </button>
+    </div>
+  );
 }
 
 export function RequestDetails({
@@ -72,9 +138,23 @@ export function RequestDetails({
   filter,
   onFilterChange,
   requests = [],
+  onSearchTermChange,
 }: RequestDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview');
   const [isRawMode, setIsRawMode] = useState(false);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    selectedText: string;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    selectedText: '',
+  });
 
   // Ref for the content container to search for highlights
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +172,11 @@ export function RequestDetails({
     setCurrentMatchIndex(-1);
   }, [activeTab, searchTerm]);
 
+  // Close context menu when tab changes
+  useEffect(() => {
+    setContextMenu({ visible: false, x: 0, y: 0, selectedText: '' });
+  }, [activeTab, request]);
+
   const setActiveTab = (tab: string) => {
     setIsRawMode(false);
     if (onTabChange) {
@@ -99,6 +184,41 @@ export function RequestDetails({
     } else {
       setInternalActiveTab(tab);
     }
+  };
+
+  // Context Menu Handlers
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const selection = window.getSelection();
+    const selectedText = selection?.toString().trim() || '';
+
+    if (selectedText) {
+      setContextMenu({
+        visible: true,
+        x: e.clientX,
+        y: e.clientY,
+        selectedText,
+      });
+    }
+  };
+
+  const handleAddToCrypto = () => {
+    // Dispatch custom event to communicate with CryptoTab
+    window.dispatchEvent(
+      new CustomEvent('add-to-crypto', {
+        detail: { text: contextMenu.selectedText },
+      }),
+    );
+  };
+
+  const handleUseInSearch = () => {
+    if (onSearchTermChange) {
+      onSearchTermChange(contextMenu.selectedText);
+    }
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu({ visible: false, x: 0, y: 0, selectedText: '' });
   };
 
   const getTabContent = (tabId: string) => {
@@ -451,7 +571,7 @@ export function RequestDetails({
   };
 
   const content = (
-    <div className="flex-1 overflow-hidden h-full">
+    <div className="flex-1 overflow-hidden h-full" onContextMenu={handleContextMenu}>
       {!request ? (
         <div className="h-full flex items-center justify-center text-muted-foreground bg-background/50">
           Select a request to view details
@@ -494,116 +614,130 @@ export function RequestDetails({
     searchTerm && !isRawMode && (matches[activeTab as keyof typeof matches] || 0) > 0;
 
   return (
-    <div className="h-full flex flex-col bg-background/50 border-t border-border/50">
-      <div className="flex items-center border-b border-border/50 bg-muted/20">
-        <div className="flex-1 overflow-x-auto no-scrollbar flex items-center px-2">
-          {request &&
-            tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
+    <div>
+      <div className="h-full flex flex-col bg-background/50 border-t border-border/50">
+        <div className="flex items-center border-b border-border/50 bg-muted/20">
+          <div className="flex-1 overflow-x-auto no-scrollbar flex items-center px-2">
+            {request &&
+              tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
 
-              if (isActive) {
-                return (
-                  <div
-                    key={tab.id}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors',
-                      tab.colors.border,
-                      tab.colors.text,
-                    )}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
-                    <Badge count={tab.count} className={tab.colors.badge} />
-
+                if (isActive) {
+                  return (
                     <div
+                      key={tab.id}
                       className={cn(
-                        'ml-2 pl-2 border-l flex items-center gap-1 transition-colors',
-                        'border-current/20', // use current text color for divider
+                        'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors',
+                        tab.colors.border,
+                        tab.colors.text,
                       )}
                     >
-                      {/* ScanEye Button - Only show if current tab has matches logic */}
-                      {currentTabHasMatches && (
+                      <Icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                      <Badge count={tab.count} className={tab.colors.badge} />
+
+                      <div
+                        className={cn(
+                          'ml-2 pl-2 border-l flex items-center gap-1 transition-colors',
+                          'border-current/20', // use current text color for divider
+                        )}
+                      >
+                        {/* ScanEye Button - Only show if current tab has matches logic */}
+                        {currentTabHasMatches && (
+                          <button
+                            onClick={scrollToNextMatch}
+                            className={cn(
+                              'p-0.5 rounded transition-colors text-muted-foreground',
+                              'hover:text-current',
+                              tab.colors.hover,
+                              'animate-in fade-in zoom-in duration-200',
+                            )}
+                            title="Next Match"
+                          >
+                            <ScanEye className="w-3 h-3" />
+                          </button>
+                        )}
+
                         <button
-                          onClick={scrollToNextMatch}
+                          onClick={handleCopy}
                           className={cn(
                             'p-0.5 rounded transition-colors text-muted-foreground',
                             'hover:text-current',
                             tab.colors.hover,
-                            'animate-in fade-in zoom-in duration-200',
                           )}
-                          title="Next Match"
+                          title="Copy Tab Content"
                         >
-                          <ScanEye className="w-3 h-3" />
+                          <Copy className="w-3 h-3" />
                         </button>
-                      )}
-
-                      <button
-                        onClick={handleCopy}
-                        className={cn(
-                          'p-0.5 rounded transition-colors text-muted-foreground',
-                          'hover:text-current',
-                          tab.colors.hover,
-                        )}
-                        title="Copy Tab Content"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => setIsRawMode(!isRawMode)}
-                        className={cn(
-                          'p-0.5 rounded transition-colors text-muted-foreground',
-                          'hover:text-current',
-                          tab.colors.hover,
-                          isRawMode && tab.colors.activeAction,
-                        )}
-                        title="Toggle Raw View"
-                      >
-                        <Flower2 className="w-3 h-3" />
-                      </button>
+                        <button
+                          onClick={() => setIsRawMode(!isRawMode)}
+                          className={cn(
+                            'p-0.5 rounded transition-colors text-muted-foreground',
+                            'hover:text-current',
+                            tab.colors.hover,
+                            isRawMode && tab.colors.activeAction,
+                          )}
+                          title="Toggle Raw View"
+                        >
+                          <Flower2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  );
+                }
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground text-muted-foreground whitespace-nowrap"
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                    <Badge count={tab.count} />
+                  </button>
                 );
-              }
-
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground text-muted-foreground whitespace-nowrap"
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                  <Badge count={tab.count} />
-                </button>
-              );
-            })}
+              })}
+          </div>
+          {onToggleFilter && (
+            <button
+              onClick={onToggleFilter}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
+                isFilterOpen ? 'border-primary text-primary' : 'text-muted-foreground',
+              )}
+              title={isFilterOpen ? 'Collapse Filters' : 'Expand Filters'}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              Filter
+            </button>
+          )}
         </div>
-        {onToggleFilter && (
-          <button
-            onClick={onToggleFilter}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
-              isFilterOpen ? 'border-primary text-primary' : 'text-muted-foreground',
-            )}
-            title={isFilterOpen ? 'Collapse Filters' : 'Expand Filters'}
-          >
-            <Filter className="w-3.5 h-3.5" />
-            Filter
-          </button>
-        )}
+
+        <div className="flex-1 overflow-hidden relative">
+          {isFilterOpen ? (
+            <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
+              {content}
+              <FilterPanel filter={filter} onChange={onFilterChange} requests={requests} />
+            </ResizableSplit>
+          ) : (
+            content
+          )}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-hidden relative">
-        {isFilterOpen ? (
-          <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
-            {content}
-            <FilterPanel filter={filter} onChange={onFilterChange} requests={requests} />
-          </ResizableSplit>
-        ) : (
-          content
-        )}
-      </div>
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <TextSelectionMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          selectedText={contextMenu.selectedText}
+          onAddToCrypto={handleAddToCrypto}
+          onUseInSearch={handleUseInSearch}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </div>
   );
 }

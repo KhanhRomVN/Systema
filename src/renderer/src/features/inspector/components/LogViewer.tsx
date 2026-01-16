@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Trash2, Copy, Pause, Play, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Search, Trash2, Copy, Pause, Play, Download, Filter } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 
 interface LogEntry {
@@ -15,6 +15,8 @@ interface LogViewerProps {
   emulatorSerial?: string;
 }
 
+const MAX_LOGS = 10000;
+
 export function LogViewer({ emulatorSerial }: LogViewerProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -28,8 +30,12 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
     E: true,
     F: true,
   });
+  const [showFilters, setShowFilters] = useState(false);
+  const [packageFilter, setPackageFilter] = useState('');
+  const [hiddenTags, setHiddenTags] = useState<Set<string>>(new Set());
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const logBufferRef = useRef<LogEntry[]>([]);
 
   useEffect(() => {
     console.log('[LogViewer] Mounted with emulatorSerial:', emulatorSerial);
@@ -37,6 +43,7 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
     if (!emulatorSerial) return;
 
     let removeListener: (() => void) | null = null;
+    let flushInterval: NodeJS.Timeout | null = null;
 
     const startLogcat = async () => {
       try {
@@ -46,21 +53,31 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
         console.log('[LogViewer] Logcat started successfully');
 
         removeListener = window.api.on('mobile:logcat-output', (_, data: string) => {
-          // console.log('[LogViewer] Received log line:', data.substring(0, 50) + '...');
-
           if (isPaused) {
-            // console.log('[LogViewer] Paused, skipping');
             return;
           }
 
           const entry = parseLogLine(data);
           if (entry) {
-            // console.log('[LogViewer] Parsed entry:', entry.level, entry.tag);
-            setLogs((prev) => [...prev.slice(-999), entry]);
-          } else {
-            console.log('[LogViewer] Failed to parse line:', data);
+            logBufferRef.current.push(entry);
           }
         });
+
+        // Flush buffer every 100ms to prevent UI freezing
+        flushInterval = setInterval(() => {
+          if (logBufferRef.current.length > 0) {
+            setLogs((prev) => {
+              const newLogs = [...prev, ...logBufferRef.current];
+              // Limit buffer size
+              if (newLogs.length > MAX_LOGS) {
+                return newLogs.slice(newLogs.length - MAX_LOGS);
+              }
+              return newLogs;
+            });
+            logBufferRef.current = [];
+          }
+        }, 100);
+
         console.log('[LogViewer] Event listener attached');
       } catch (e) {
         console.error('[LogViewer] Failed to start logcat:', e);
@@ -73,6 +90,9 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       console.log('[LogViewer] Cleanup - stopping logcat');
       if (removeListener) {
         window.api.off('mobile:logcat-output', removeListener);
+      }
+      if (flushInterval) {
+        clearInterval(flushInterval);
       }
       window.api.invoke('mobile:stop-logcat', emulatorSerial).catch(console.error);
       setIsRunning(false);
@@ -116,6 +136,22 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       };
     }
 
+    // Format: MM-DD HH:MM:SS.mmm L/Tag(PID): Msg
+    // Example: 01-16 19:01:42.123 I/WifiService(1234): message
+    const timeMatch = line.match(
+      /^(\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+([VDIWEF])\/(.+?)\(\s*(\d+)\):\s+(.*)$/,
+    );
+    if (timeMatch) {
+      return {
+        timestamp: timeMatch[1],
+        pid: timeMatch[4],
+        level: timeMatch[2] as LogEntry['level'],
+        tag: timeMatch[3],
+        message: timeMatch[5],
+        raw: line,
+      };
+    }
+
     // Fallback for unparsed lines (show as Info)
     return {
       timestamp: new Date().toLocaleTimeString(),
@@ -147,8 +183,42 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
     URL.revokeObjectURL(url);
   };
 
+  // Tag grouping and counting
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    logs.forEach((log) => {
+      counts.set(log.tag, (counts.get(log.tag) || 0) + 1);
+    });
+    // Sort by count descending
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [logs]);
+
+  const toggleTagVisibility = (tag: string) => {
+    setHiddenTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) {
+        next.delete(tag);
+      } else {
+        next.add(tag);
+      }
+      return next;
+    });
+  };
+
   const filteredLogs = logs.filter((log) => {
     if (!levelFilter[log.level]) return false;
+    if (hiddenTags.has(log.tag)) return false;
+
+    // Package/Tag filter
+    if (packageFilter) {
+      if (
+        !log.tag.toLowerCase().includes(packageFilter.toLowerCase()) &&
+        !log.pid.includes(packageFilter)
+      ) {
+        return false;
+      }
+    }
+
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       return (
@@ -309,23 +379,19 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
           />
         </div>
 
-        {/* Level Filters */}
-        <div className="flex items-center gap-1">
-          {(['E', 'W', 'I', 'D', 'V'] as const).map((level) => (
-            <button
-              key={level}
-              onClick={() => setLevelFilter((prev) => ({ ...prev, [level]: !prev[level] }))}
-              className={cn(
-                'px-2 py-1 text-xs font-mono rounded border transition-all',
-                levelFilter[level]
-                  ? `${getLevelColor(level)} border-current bg-current/10`
-                  : 'text-muted-foreground border-border bg-background',
-              )}
-            >
-              {level}
-            </button>
-          ))}
-        </div>
+        {/* Filter Toggle */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={cn(
+            'p-1.5 rounded transition-all',
+            showFilters
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          )}
+          title="Toggle filters"
+        >
+          <Filter className="w-3.5 h-3.5" />
+        </button>
 
         <div className="w-px h-6 bg-border" />
 
@@ -374,6 +440,104 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
           <Download className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* Filter Section */}
+      {showFilters && (
+        <div className="border-b border-border bg-muted/20 p-2 space-y-2">
+          <div className="flex items-center gap-4">
+            {/* Level Filters */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground mr-1">Level:</span>
+              {(['V', 'D', 'I', 'W', 'E'] as const).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => setLevelFilter((prev) => ({ ...prev, [level]: !prev[level] }))}
+                  className={cn(
+                    'px-2 py-1 text-xs font-mono rounded border transition-all',
+                    levelFilter[level]
+                      ? `${getLevelColor(level)} border-current bg-current/10`
+                      : 'text-muted-foreground border-border bg-background',
+                  )}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-4 bg-border" />
+
+            {/* Package Filter */}
+            <div className="flex items-center gap-2 flex-1 max-w-xs">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                Package / Tag:
+              </span>
+              <input
+                type="text"
+                value={packageFilter}
+                onChange={(e) => setPackageFilter(e.target.value)}
+                placeholder="Filter by tag or PID..."
+                className="flex-1 px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary h-6"
+              />
+            </div>
+          </div>
+
+          <div className="h-px bg-border/50" />
+
+          {/* Tag Groups */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Detected Tags ({tagCounts.length})</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setHiddenTags(new Set())}
+                  className="hover:text-foreground hover:underline"
+                >
+                  Show All
+                </button>
+                <button
+                  onClick={() => {
+                    const allTags = tagCounts.map(([tag]) => tag);
+                    setHiddenTags(new Set(allTags));
+                  }}
+                  className="hover:text-foreground hover:underline"
+                >
+                  Hide All
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 max-h-[120px] overflow-y-auto pr-1">
+              {tagCounts.map(([tag, count]) => (
+                <label
+                  key={tag}
+                  className={cn(
+                    'flex items-center gap-2 px-2 py-1 rounded text-xs border cursor-pointer select-none transition-colors',
+                    hiddenTags.has(tag)
+                      ? 'bg-muted/30 text-muted-foreground border-transparent opacity-60'
+                      : 'bg-background border-border hover:border-primary/50',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="w-3 h-3 rounded border-border"
+                    checked={!hiddenTags.has(tag)}
+                    onChange={() => toggleTagVisibility(tag)}
+                  />
+                  <span
+                    className="truncate flex-1"
+                    style={{ color: !hiddenTags.has(tag) ? getTagColor(tag) : undefined }}
+                  >
+                    {tag}
+                  </span>
+                  <span className="text-[10px] bg-muted px-1 rounded-full text-muted-foreground">
+                    {count}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Logs */}
       <div

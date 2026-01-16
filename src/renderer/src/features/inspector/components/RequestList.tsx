@@ -68,6 +68,9 @@ export function RequestList({
           );
         },
         cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('id')}</span>,
+        // Hiding detailed ID column to save space, but keeping it in data model
+        size: 0,
+        enableHiding: true,
       },
       {
         accessorKey: 'method',
@@ -93,10 +96,11 @@ export function RequestList({
         accessorKey: 'path',
         header: 'Path',
         cell: ({ row }) => (
-          <span className="truncate block max-w-[300px]" title={row.getValue('path')}>
+          <span className="truncate block max-w-[500px]" title={row.getValue('path')}>
             {row.getValue('path')}
           </span>
         ),
+        size: 500, // Hint for table sizing
       },
       {
         accessorKey: 'status',
@@ -200,6 +204,7 @@ export function RequestList({
     state: {
       sorting,
       globalFilter: searchTerm,
+      columnVisibility: { id: false },
     },
     onGlobalFilterChange: onSearchChange,
     globalFilterFn: (row, _columnId, filterValue) => {

@@ -75,11 +75,11 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
     };
 
     return (
-      <div className="h-full">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+      <div className="h-full overflow-hidden flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full overflow-hidden">
           {/* Request Body */}
-          <div className="flex flex-col h-full space-y-1.5 min-h-[300px]">
-            <div className="flex justify-between items-center border-b border-border/50 pb-1.5">
+          <div className="flex flex-col h-full space-y-1.5 overflow-hidden">
+            <div className="flex justify-between items-center border-b border-border/50 pb-1.5 flex-shrink-0">
               <h3 className="text-[10px] font-bold text-muted-foreground uppercase">
                 Request Body
               </h3>
@@ -101,7 +101,7 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
               </div>
             </div>
 
-            <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden flex flex-col relative">
+            <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
               <CodeBlock
                 ref={requestBlockRef}
                 code={requestBodyContent}
@@ -115,8 +115,8 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
           </div>
 
           {/* Response Body */}
-          <div className="flex flex-col h-full space-y-1.5 min-h-[300px]">
-            <div className="flex justify-between items-center border-b border-border/50 pb-1.5">
+          <div className="flex flex-col h-full space-y-1.5 overflow-hidden">
+            <div className="flex justify-between items-center border-b border-border/50 pb-1.5 flex-shrink-0">
               <h3 className="text-[10px] font-bold text-muted-foreground uppercase">
                 Response Body
               </h3>
@@ -144,7 +144,7 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
               </div>
             </div>
 
-            <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden flex flex-col relative">
+            <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
               <CodeBlock
                 ref={responseBlockRef}
                 code={responseBodyContent}

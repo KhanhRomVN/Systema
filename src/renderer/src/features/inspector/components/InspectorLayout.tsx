@@ -5,6 +5,8 @@ import { initialFilterState, InspectorFilter } from './FilterPanel';
 import { ChatContainer } from './ChatContainer';
 import { MemoryMonitor } from './MemoryMonitor';
 import { SaveProfileModal } from './SaveProfileModal';
+import { formatDistanceToNow } from 'date-fns';
+import { Play, Pause, Clock, LayoutList, GanttChartSquare } from 'lucide-react';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
@@ -43,6 +45,43 @@ export function InspectorLayout({
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   const [detailsTab, setDetailsTab] = useState('overview');
   const [isSaveProfileModalOpen, setIsSaveProfileModalOpen] = useState(false);
+
+  // New Features State
+  const [isPaused, setIsPaused] = useState(false);
+  const [displayedRequests, setDisplayedRequests] = useState<NetworkRequest[]>([]);
+  const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table');
+
+  // Auto-save State
+  const [autoSaveInterval, setAutoSaveInterval] = useState<number>(0); // 0 = off, minutes
+  const [nextSaveTime, setNextSaveTime] = useState<number | null>(null);
+
+  const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
+
+  // Sync requests to displayedRequests when not paused
+  useEffect(() => {
+    if (!isPaused) {
+      setDisplayedRequests(requests);
+    }
+  }, [requests, isPaused]);
+
+  // Helper for countdown display
+  const getCountdownString = () => {
+    if (!nextSaveTime) return '';
+    const diff = Math.max(0, Math.ceil((nextSaveTime - Date.now()) / 1000));
+    const mins = Math.floor(diff / 60);
+    const secs = diff % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Force re-render for countdown
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (autoSaveInterval > 0) {
+      const timer = setInterval(() => setTick((t) => t + 1), 1000);
+      return () => clearInterval(timer);
+    }
+    return undefined;
+  }, [autoSaveInterval]);
 
   // Intercept state
   const [isIntercepting, setIsIntercepting] = useState(false);
@@ -150,8 +189,38 @@ export function InspectorLayout({
     localStorage.setItem(`inspector-filter-state-${appName}`, JSON.stringify(filter));
   }, [filter, appName]);
 
+  // Auto-save Logic (Moved here to access 'filter')
+  useEffect(() => {
+    if (autoSaveInterval === 0) {
+      setNextSaveTime(null);
+      return;
+    }
+
+    // Initialize next save time if needed
+    if (!nextSaveTime) {
+      setNextSaveTime(Date.now() + autoSaveInterval * 60 * 1000);
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      if (nextSaveTime && now >= nextSaveTime) {
+        // Trigger Save
+        const name = `Auto-save ${format(new Date(), 'HH:mm:ss')}`;
+        // Note: createProfile is synchronous
+        createProfile(name, appName, appId, requests, filter, selectedId, platform);
+        setLastSavedTime(Date.now());
+
+        // Reset timer
+        setNextSaveTime(now + autoSaveInterval * 60 * 1000);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [autoSaveInterval, nextSaveTime, requests, appName, appId, filter, selectedId, platform]);
+
   const filteredRequests = useMemo(() => {
-    const result = requests.filter((req) => {
+    // Use displayedRequests instead of requests
+    const result = displayedRequests.filter((req) => {
       // Method
       if (!filter.methods[req.method as keyof typeof filter.methods]) {
         return false;
@@ -254,9 +323,9 @@ export function InspectorLayout({
     });
 
     return result;
-  }, [requests, filter]);
+  }, [displayedRequests, filter]);
 
-  const selectedRequest = requests.find((r) => r.id === selectedId) || null;
+  const selectedRequest = displayedRequests.find((r) => r.id === selectedId) || null;
 
   return (
     <div className="h-full w-full bg-background text-foreground flex flex-col overflow-hidden">
@@ -291,15 +360,71 @@ export function InspectorLayout({
             {appName}
           </span>
           {requests.length > 0 && (
-            <span className="text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-500 flex items-center gap-1 whitespace-nowrap">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              Tracking
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsPaused(!isPaused)}
+                className={cn(
+                  'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-all',
+                  isPaused
+                    ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/20'
+                    : 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20',
+                )}
+                title={isPaused ? 'Resume Tracking' : 'Pause Tracking'}
+              >
+                {isPaused ? (
+                  <Pause className="w-3 h-3 fill-current" />
+                ) : (
+                  <Play className="w-3 h-3 fill-current" />
+                )}
+                {isPaused ? 'Paused' : 'Tracking'}
+              </button>
+            </div>
           )}
+
+          {/* Auto-save & Profile Status */}
+          <div className="flex items-center gap-2 ml-2">
+            {/* Auto-save Config */}
+            <div className="flex items-center rounded-md border border-border/50 p-0.5 bg-background/50">
+              <button
+                onClick={() => {
+                  // Cycle modes: 0 -> 1 -> 5 -> 10 -> 0
+                  const modes = [0, 1, 5, 10];
+                  const next = modes[(modes.indexOf(autoSaveInterval) + 1) % modes.length];
+                  setAutoSaveInterval(next);
+                  if (next > 0) setNextSaveTime(Date.now() + next * 60 * 1000);
+                  else setNextSaveTime(null);
+                }}
+                className={cn(
+                  'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors',
+                  autoSaveInterval > 0
+                    ? 'text-blue-400 bg-blue-500/10'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                title="Toggle Auto-save Interval (Off, 1m, 5m, 10m)"
+              >
+                <Clock className="w-3 h-3" />
+                {autoSaveInterval > 0 ? `${autoSaveInterval}m` : 'Off'}
+              </button>
+              {autoSaveInterval > 0 && (
+                <span className="text-[10px] text-muted-foreground px-1.5 border-l border-border/50 tabular-nums">
+                  {getCountdownString()}
+                </span>
+              )}
+            </div>
+
+            {/* Last Saved Profile Badge */}
+            {lastSavedTime && (
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                Saved {formatDistanceToNow(lastSavedTime, { addSuffix: true })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Center - Toolbar Menu */}
-        <div className="flex items-center gap-1 border-x border-border/50 px-2">
+        <div className="flex items-center gap-1 border-x border-border/50 px-2 min-w-fit">
+          {/* View Switcher */}
           <button
             onClick={() => handleSetIntercept(!isIntercepting)}
             className={cn(
@@ -447,6 +572,7 @@ export function InspectorLayout({
               filter={filter}
               onFilterChange={setFilter}
               requests={requests}
+              onSearchTermChange={setSearchTerm}
             />
           </ResizableSplit>
 
@@ -480,6 +606,14 @@ export function InspectorLayout({
       />
     </div>
   );
+}
+
+function format(date: Date, _fmt: string) {
+  // Simple formatter to avoid pulling in date-fns format if not needed,
+  // but the Imports added formatDistanceToNow from date-fns, so date-fns IS available.
+  // However, for just HH:mm:ss, native is fine or minimal logic.
+  // Let's just use local time string for now to be safe.
+  return date.toLocaleTimeString();
 }
 
 function parseSize(sizeStr: string): number {

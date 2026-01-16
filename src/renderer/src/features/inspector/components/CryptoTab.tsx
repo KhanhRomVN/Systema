@@ -144,6 +144,23 @@ export function CryptoTab() {
     }
   });
 
+  // Listen for add-to-crypto events from RequestDetails
+  useEffect(() => {
+    const handleAddToCrypto = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const text = customEvent.detail?.text;
+      if (text) {
+        setInput(text);
+      }
+    };
+
+    window.addEventListener('add-to-crypto', handleAddToCrypto);
+
+    return () => {
+      window.removeEventListener('add-to-crypto', handleAddToCrypto);
+    };
+  }, []);
+
   const groupedMethods = methods.reduce(
     (acc, method) => {
       if (!acc[method.category]) {
@@ -275,4 +292,7 @@ export function CryptoTab() {
       </div>
     </div>
   );
+}
+function useEffect(arg0: () => () => void, arg1: never[]) {
+  throw new Error('Function not implemented.');
 }
