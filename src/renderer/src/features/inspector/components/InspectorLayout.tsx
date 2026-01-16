@@ -8,6 +8,7 @@ import { MemoryMonitor } from './MemoryMonitor';
 import { SaveProfileModal } from './SaveProfileModal';
 import { formatDistanceToNow } from 'date-fns';
 import { Play, Pause, Clock } from 'lucide-react';
+import { RequestComposer } from './RequestComposer';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
@@ -332,6 +333,8 @@ export function InspectorLayout({
 
   const selectedRequest = displayedRequests.find((r) => r.id === selectedId) || null;
 
+  const [composerRequest, setComposerRequest] = useState<NetworkRequest | null>(null);
+
   return (
     <div className="h-full w-full bg-background text-foreground flex flex-col overflow-hidden">
       {/* Enhanced Toolbar */}
@@ -347,7 +350,20 @@ export function InspectorLayout({
 
         {/* Current URL & App Info */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {selectedRequest ? (
+          {composerRequest ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-500 font-medium whitespace-nowrap">
+                Composer
+              </span>
+              <span
+                className="text-xs text-muted-foreground truncate max-w-[300px]"
+                title={`${composerRequest.protocol}://${composerRequest.host}${composerRequest.path}`}
+              >
+                {composerRequest.protocol}://{composerRequest.host}
+                {composerRequest.path}
+              </span>
+            </div>
+          ) : selectedRequest ? (
             <div className="flex items-center gap-2 min-w-0">
               <span
                 className="text-xs text-muted-foreground truncate max-w-[300px]"
@@ -552,7 +568,10 @@ export function InspectorLayout({
               <RequestList
                 requests={filteredRequests}
                 selectedId={selectedId}
-                onSelect={setSelectedId}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                  setComposerRequest(null);
+                }}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 interceptedIds={interceptedIds}
@@ -563,18 +582,25 @@ export function InspectorLayout({
               />
             </div>
 
-            <RequestDetails
-              request={selectedRequest}
-              searchTerm={searchTerm}
-              activeTab={detailsTab}
-              onTabChange={setDetailsTab}
-              onToggleFilter={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-              isFilterOpen={isFilterPanelOpen}
-              filter={filter}
-              onFilterChange={setFilter}
-              requests={requests}
-              onSearchTermChange={setSearchTerm}
-            />
+            {composerRequest ? (
+              <RequestComposer
+                initialRequest={composerRequest}
+                onBack={() => setComposerRequest(null)}
+              />
+            ) : (
+              <RequestDetails
+                request={selectedRequest}
+                searchTerm={searchTerm}
+                activeTab={detailsTab}
+                onTabChange={setDetailsTab}
+                onToggleFilter={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+                isFilterOpen={isFilterPanelOpen}
+                filter={filter}
+                onFilterChange={setFilter}
+                requests={requests}
+                onSearchTermChange={setSearchTerm}
+              />
+            )}
           </ResizableSplit>
 
           <ChatContainer
@@ -585,6 +611,7 @@ export function InspectorLayout({
               filter,
               onSetFilter: setFilter,
               onSelectRequest: setSelectedId,
+              onSelectSavedRequest: setComposerRequest,
               targetApp: appName,
               emulatorSerial,
             }}

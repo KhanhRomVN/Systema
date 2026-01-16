@@ -614,7 +614,7 @@ export function RequestDetails({
     searchTerm && !isRawMode && (matches[activeTab as keyof typeof matches] || 0) > 0;
 
   return (
-    <div>
+    <div className="h-full">
       <div className="h-full flex flex-col bg-background/50 border-t border-border/50">
         <div className="flex items-center border-b border-border/50 bg-muted/20">
           <div className="flex-1 overflow-x-auto no-scrollbar flex items-center px-2">

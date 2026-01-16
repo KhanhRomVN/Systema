@@ -20,6 +20,7 @@ export interface InspectorContext {
   filter: InspectorFilter;
   onSetFilter: (filter: InspectorFilter) => void;
   onSelectRequest: (id: string) => void;
+  onSelectSavedRequest?: (request: NetworkRequest) => void;
   targetApp: string;
   emulatorSerial?: string;
 }
@@ -95,7 +96,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       return (
         <CollectionsTab
           currentRequest={selectedRequest}
-          onSelectRequest={inspectorContext.onSelectRequest}
+          onSelectRequest={inspectorContext.onSelectSavedRequest}
         />
       );
     }

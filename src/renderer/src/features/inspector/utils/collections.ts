@@ -27,9 +27,16 @@ export function loadCollections(): RequestCollection[] {
   }
 }
 
+export const COLLECTIONS_UPDATED_EVENT = 'systema-collections-updated';
+
+function notifyCollectionsUpdated() {
+  window.dispatchEvent(new Event(COLLECTIONS_UPDATED_EVENT));
+}
+
 export function saveCollections(collections: RequestCollection[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(collections));
+    notifyCollectionsUpdated();
   } catch (error) {
     console.error('Failed to save collections:', error);
   }
@@ -120,4 +127,27 @@ export async function replayRequest(request: SavedRequest): Promise<Response> {
 
   // Make the request
   return fetch(url, options);
+}
+
+export function getOrCreateDefaultCollection(): RequestCollection {
+  const collections = loadCollections();
+  if (collections.length > 0) {
+    return collections[0];
+  }
+
+  const defaultCollection: RequestCollection = {
+    id: 'default',
+    name: 'Saved Requests',
+    requests: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  saveCollections([defaultCollection]);
+  return defaultCollection;
+}
+
+export function addRequestToDefaultCollection(request: NetworkRequest, notes?: string): void {
+  const collection = getOrCreateDefaultCollection();
+  addRequestToCollection(collection.id, request, notes);
 }

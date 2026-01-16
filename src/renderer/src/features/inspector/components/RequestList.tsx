@@ -9,10 +9,113 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { NetworkRequest } from '../types';
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { cn } from '../../../shared/lib/utils';
-import { ArrowUpDown, Search, Copy, Trash2, CaseSensitive, Type, Regex } from 'lucide-react';
+import {
+  ArrowUpDown,
+  Search,
+  Copy,
+  Trash2,
+  CaseSensitive,
+  Type,
+  Regex,
+  MoreVertical,
+  BookmarkPlus,
+  Star,
+} from 'lucide-react';
 import { useDebounce } from 'use-debounce';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '../../../components/ui/dropdown-menu';
+import { addRequestToDefaultCollection } from '../utils/collections';
+
+interface RequestActionsProps {
+  request: NetworkRequest;
+  isHighlighted: boolean;
+  onToggleHighlight: (id: string) => void;
+  onDelete?: (id: string) => void;
+}
+
+function RequestActions({
+  request,
+  isHighlighted,
+  onToggleHighlight,
+  onDelete,
+}: RequestActionsProps) {
+  return (
+    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(
+            `${request.method} ${request.protocol}://${request.host}${request.path}`,
+          );
+        }}
+        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
+        title="Copy Request URL"
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground outline-none"
+            title="More Actions"
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              addRequestToDefaultCollection(request);
+            }}
+          >
+            <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
+            <span>Add to Collection</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleHighlight(request.id);
+            }}
+          >
+            <Star
+              className={cn(
+                'mr-2 h-3.5 w-3.5',
+                isHighlighted ? 'fill-yellow-500 text-yellow-500' : '',
+              )}
+            />
+            <span>{isHighlighted ? 'Unhighlight' : 'Highlight'}</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(request.id);
+            }}
+            className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
 
 interface RequestListProps {
   requests: NetworkRequest[];
@@ -45,6 +148,17 @@ export function RequestList({
   const [useRegex, setUseRegex] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  // Feature: Highlighted Rows
+  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
+  const toggleHighlight = useCallback((id: string) => {
+    setHighlightedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   // Debounce search term to reduce re-renders
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
@@ -71,6 +185,7 @@ export function RequestList({
       {
         accessorKey: 'method',
         header: 'Method',
+        size: 80,
         cell: ({ row }) => {
           const method = row.getValue('method') as string;
           let colorClass = 'text-foreground';
@@ -84,24 +199,28 @@ export function RequestList({
       {
         accessorKey: 'host',
         header: 'Host',
+        size: 200,
         cell: ({ row }) => (
-          <span className="truncate block max-w-[200px]">{row.getValue('host')}</span>
+          <span className="truncate block w-full" title={row.getValue('host')}>
+            {row.getValue('host')}
+          </span>
         ),
       },
       {
         accessorKey: 'path',
         header: 'Path',
+        size: 400,
         cell: ({ row }) => (
-          <span className="truncate block max-w-[500px]" title={row.getValue('path')}>
+          <span className="truncate block w-full" title={row.getValue('path')}>
             {row.getValue('path')}
           </span>
         ),
-        size: 500, // Hint for table sizing
       },
       {
         accessorKey: 'status',
         header: 'Status',
         id: 'status', // Explicitly set ID for the column
+        size: 100,
         cell: ({ row }) => {
           const id = row.original.id;
           const isPending = pendingActionIds?.has(id);
@@ -145,49 +264,35 @@ export function RequestList({
       {
         accessorKey: 'type',
         header: 'Type',
+        size: 80,
       },
       {
         accessorKey: 'size',
         header: 'Size',
+        size: 80,
         cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('size')}</span>,
       },
       {
         accessorKey: 'time',
         header: 'Time',
+        size: 80,
         cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('time')}</span>,
       },
       {
         id: 'actions',
         header: 'Actions',
+        size: 80,
         cell: ({ row }) => (
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(
-                  `${row.original.method} ${row.original.protocol}://${row.original.host}${row.original.path}`,
-                );
-              }}
-              className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-              title="Copy Request URL"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.(row.original.id);
-              }}
-              className="p-1 hover:bg-red-500/20 rounded text-muted-foreground hover:text-red-500"
-              title="Delete Request"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <RequestActions
+            request={row.original}
+            isHighlighted={highlightedIds.has(row.original.id)}
+            onToggleHighlight={toggleHighlight}
+            onDelete={onDelete}
+          />
         ),
       },
     ],
-    [pendingActionIds, onForward, onDrop, onDelete],
+    [pendingActionIds, onForward, onDrop, onDelete, highlightedIds, toggleHighlight],
   );
 
   // Memoized global filter function with pre-compiled regex
@@ -288,14 +393,14 @@ export function RequestList({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 35,
+    estimateSize: () => 32, // Slightly tighter rows
     overscan: 10,
   });
 
   return (
     <div className="h-full w-full flex flex-col bg-background/50 text-sm overflow-hidden">
       {/* Filter Bar */}
-      <div className="h-10 flex items-center px-2 border-b border-border/40 gap-2">
+      <div className="h-10 flex items-center px-2 border-b border-border/40 gap-2 shrink-0">
         <Search className="w-4 h-4 text-muted-foreground" />
         <input
           placeholder="Filter requests..."
@@ -343,67 +448,110 @@ export function RequestList({
         </div>
       </div>
 
-      <div ref={tableContainerRef} className="flex-1 overflow-auto">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-muted/50 sticky top-0 z-10 text-xs font-medium text-muted-foreground">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-4 py-2 font-normal">
+      <div ref={tableContainerRef} className="flex-1 flex flex-col overflow-auto relative">
+        {/* Header - Moved inside scroll container for horizontal scrolling */}
+        <div className="flex bg-muted/50 text-xs font-medium text-muted-foreground border-b border-border/20 sticky top-0 z-10 w-full min-w-max">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <div key={headerGroup.id} className="flex w-full">
+              {headerGroup.headers.map((header) => {
+                // Skip hidden columns totally from layout to avoid empty space if size is not 0
+                if (header.column.getIsVisible() === false) return null;
+
+                const isHost = header.id === 'host';
+                const isPath = header.id === 'path';
+                const isFixed = !isHost && !isPath;
+
+                return (
+                  <div
+                    key={header.id}
+                    className={cn(
+                      'px-4 py-2 flex items-center font-normal shrink-0',
+                      // No flex-1/2 classes to avoid confusion, styles handle it
+                    )}
+                    style={{
+                      width: isFixed ? header.getSize() : 0, // Should be 0 for flex cols to allow flex-grow to work properly from 0 basis
+                      flex: isHost ? '1 1 0px' : isPath ? '2 1 0px' : undefined,
+                      minWidth: isHost ? '150px' : isPath ? '300px' : undefined,
+                    }}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const row = rows[virtualRow.index];
-              const isIntercepted = interceptedIds?.has(row.original.id);
-              const isPending = pendingActionIds?.has(row.original.id);
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
 
-              return (
-                <tr
-                  key={row.id}
-                  data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
-                  className={cn(
-                    'border-b border-border/20 transition-colors cursor-pointer text-xs absolute w-full',
-                    isPending
-                      ? 'bg-orange-500/10 hover:bg-orange-500/20'
-                      : isIntercepted
-                        ? 'bg-red-500/10 hover:bg-red-500/20'
+        {/* Rows */}
+        <div
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            position: 'relative',
+            minWidth: 'max-content',
+            width: '100%',
+          }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const row = rows[virtualRow.index];
+            const isIntercepted = interceptedIds?.has(row.original.id);
+            const isPending = pendingActionIds?.has(row.original.id);
+            const isHighlighted = highlightedIds.has(row.original.id);
+
+            return (
+              <div
+                key={row.id}
+                data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
+                className={cn(
+                  'flex items-center border-b border-border/20 transition-colors cursor-pointer text-xs absolute left-0 top-0',
+                  isPending
+                    ? 'bg-orange-500/10 hover:bg-orange-500/20'
+                    : isIntercepted
+                      ? 'bg-red-500/10 hover:bg-red-500/20'
+                      : isHighlighted
+                        ? 'bg-blue-500/10 hover:bg-blue-500/20 border-l-2 border-l-blue-500' // Highlight style
                         : 'hover:bg-muted/50',
-                    row.original.id === selectedId &&
-                      'bg-accent text-accent-foreground hover:bg-accent',
-                  )}
-                  style={{
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                  onClick={() => onSelect(row.original.id)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
+                  row.original.id === selectedId &&
+                    'bg-accent text-accent-foreground hover:bg-accent',
+                )}
+                style={{
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  width: '100%',
+                  minWidth: 'max-content',
+                }}
+                onClick={() => onSelect(row.original.id)}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const isHost = cell.column.id === 'host';
+                  const isPath = cell.column.id === 'path';
+                  const isFixed = !isHost && !isPath;
+
+                  return (
+                    <div
+                      key={cell.id}
+                      className="px-4 py-1.5 whitespace-nowrap overflow-hidden shrink-0 flex items-center"
+                      style={{
+                        width: isFixed ? cell.column.getSize() : 0,
+                        flex: isHost ? '1 1 0px' : isPath ? '2 1 0px' : undefined,
+                        minWidth: isHost ? '150px' : isPath ? '300px' : undefined,
+                      }}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-            {rows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-8 text-center text-muted-foreground"
-                >
-                  No requests found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {rows.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground w-full">
+              No requests found
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

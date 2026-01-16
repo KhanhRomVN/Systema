@@ -13,7 +13,8 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: syfer
+  executableName: updaterCacheDirName: systema-updater
+
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

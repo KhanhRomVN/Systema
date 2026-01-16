@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Trash2, Copy, Pause, Play, Download, Filter } from 'lucide-react';
+import { Search, Trash2, Copy, Pause, Play, Download, Filter, ChevronDown, X } from 'lucide-react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { cn } from '../../../shared/lib/utils';
 
@@ -34,6 +34,11 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [packageFilter, setPackageFilter] = useState('');
   const [hiddenTags, setHiddenTags] = useState<Set<string>>(new Set());
+  const [installedPackages, setInstalledPackages] = useState<string[]>([]);
+  const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
+  const [showPackageDropdown, setShowPackageDropdown] = useState(false);
+  const [packageSearchTerm, setPackageSearchTerm] = useState('');
+  const packageDropdownRef = useRef<HTMLDivElement>(null);
   const logContainerRef = useRef<VirtuosoHandle>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const logBufferRef = useRef<LogEntry[]>([]);
@@ -113,6 +118,36 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       setIsRunning(false);
     };
   }, [emulatorSerial, isPaused]);
+
+  // Fetch installed packages
+  useEffect(() => {
+    const fetchPackages = async () => {
+      if (!emulatorSerial) return;
+      try {
+        const packages = await window.api.invoke('mobile:list-packages', emulatorSerial);
+        setInstalledPackages(packages.sort());
+      } catch (e) {
+        console.error('[LogViewer] Failed to fetch packages:', e);
+      }
+    };
+    fetchPackages();
+  }, [emulatorSerial]);
+
+  // Close package dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        packageDropdownRef.current &&
+        !packageDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowPackageDropdown(false);
+      }
+    };
+    if (showPackageDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showPackageDropdown]);
 
   const parseLogLine = (line: string): LogEntry | null => {
     // Android logcat format: MM-DD HH:MM:SS.mmm PID TID LEVEL TAG: message
@@ -217,19 +252,18 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
   const filteredLogs = useMemo(() => {
     // Pre-compile search term
     const lowerSearch = searchTerm ? searchTerm.toLowerCase() : null;
-    const lowerPackageFilter = packageFilter ? packageFilter.toLowerCase() : null;
 
     return logs.filter((log) => {
       // Fast-path checks first
       if (!levelFilter[log.level]) return false;
       if (hiddenTags.has(log.tag)) return false;
 
-      // Package/Tag filter
-      if (lowerPackageFilter) {
-        const lowerTag = log.tag.toLowerCase();
-        if (!lowerTag.includes(lowerPackageFilter) && !log.pid.includes(packageFilter)) {
-          return false;
-        }
+      // Package filter - check if log tag matches any selected packages
+      if (selectedPackages.size > 0) {
+        const matchesPackage = Array.from(selectedPackages).some((pkg) =>
+          log.tag.toLowerCase().includes(pkg.toLowerCase()),
+        );
+        if (!matchesPackage) return false;
       }
 
       // Search filter
@@ -245,7 +279,7 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
 
       return true;
     });
-  }, [logs, levelFilter, hiddenTags, packageFilter, searchTerm]);
+  }, [logs, levelFilter, hiddenTags, selectedPackages, searchTerm]);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -505,18 +539,109 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
 
             <div className="w-px h-4 bg-border" />
 
-            {/* Package Filter */}
-            <div className="flex items-center gap-2 flex-1 max-w-xs">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                Package / Tag:
-              </span>
-              <input
-                type="text"
-                value={packageFilter}
-                onChange={(e) => setPackageFilter(e.target.value)}
-                placeholder="Filter by tag or PID..."
-                className="flex-1 px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary h-6"
-              />
+            {/* Package Multi-Select Dropdown */}
+            <div className="flex items-center gap-2 flex-1 max-w-xs" ref={packageDropdownRef}>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Package:</span>
+              <div className="relative flex-1">
+                <button
+                  onClick={() => setShowPackageDropdown(!showPackageDropdown)}
+                  className="w-full px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary h-6 flex items-center justify-between text-left"
+                >
+                  <span className="truncate">
+                    {selectedPackages.size === 0
+                      ? 'Select packages...'
+                      : `${selectedPackages.size} selected`}
+                  </span>
+                  <ChevronDown className="w-3 h-3 ml-1 flex-shrink-0" />
+                </button>
+
+                {showPackageDropdown && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border rounded shadow-lg max-h-[200px] overflow-hidden flex flex-col">
+                    {/* Dropdown Header */}
+                    <div className="p-2 border-b border-border space-y-1">
+                      <input
+                        type="text"
+                        value={packageSearchTerm}
+                        onChange={(e) => setPackageSearchTerm(e.target.value)}
+                        placeholder="Search packages..."
+                        className="w-full px-2 py-1 text-xs bg-muted border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPackages(new Set(installedPackages));
+                          }}
+                          className="flex-1 px-2 py-0.5 text-[10px] bg-primary/10 text-primary rounded hover:bg-primary/20"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPackages(new Set());
+                          }}
+                          className="flex-1 px-2 py-0.5 text-[10px] bg-muted text-muted-foreground rounded hover:bg-muted/80"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Package List */}
+                    <div className="overflow-y-auto">
+                      {installedPackages
+                        .filter((pkg) =>
+                          packageSearchTerm
+                            ? pkg.toLowerCase().includes(packageSearchTerm.toLowerCase())
+                            : true,
+                        )
+                        .map((pkg) => (
+                          <label
+                            key={pkg}
+                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted cursor-pointer text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              className="w-3 h-3 rounded border-border"
+                              checked={selectedPackages.has(pkg)}
+                              onChange={(e) => {
+                                const newSelected = new Set(selectedPackages);
+                                if (e.target.checked) {
+                                  newSelected.add(pkg);
+                                } else {
+                                  newSelected.delete(pkg);
+                                }
+                                setSelectedPackages(newSelected);
+                              }}
+                            />
+                            <span className="truncate flex-1">{pkg}</span>
+                          </label>
+                        ))}
+                      {installedPackages.filter((pkg) =>
+                        packageSearchTerm
+                          ? pkg.toLowerCase().includes(packageSearchTerm.toLowerCase())
+                          : true,
+                      ).length === 0 && (
+                        <div className="px-2 py-4 text-xs text-muted-foreground text-center">
+                          No packages found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {selectedPackages.size > 0 && (
+                <button
+                  onClick={() => setSelectedPackages(new Set())}
+                  className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+                  title="Clear package filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -545,7 +670,7 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 max-h-[120px] overflow-y-auto pr-1">
+            <div className="flex flex-wrap gap-1 max-h-[120px] overflow-y-auto pr-1">
               {tagCounts.map(([tag, count]) => (
                 <label
                   key={tag}
