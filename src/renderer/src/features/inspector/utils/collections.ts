@@ -1,9 +1,21 @@
 import { NetworkRequest } from '../types';
 
+export interface RequestHistory {
+  timestamp: number;
+  status: number;
+  statusText: string;
+  time: number;
+  size: number;
+  headers: Record<string, string>;
+  body: string;
+}
+
 export interface SavedRequest extends NetworkRequest {
   savedAt: number;
   collectionId: string;
   notes?: string;
+  lastResponse?: RequestHistory;
+  history?: RequestHistory[];
 }
 
 export interface RequestCollection {
@@ -12,13 +24,18 @@ export interface RequestCollection {
   requests: SavedRequest[];
   createdAt: number;
   updatedAt: number;
+  appId: string; // Add appId to collection
 }
 
-const STORAGE_KEY = 'systema-request-collections';
+const STORAGE_KEY_PREFIX = 'systema-request-collections';
 
-export function loadCollections(): RequestCollection[] {
+function getStorageKey(appId: string): string {
+  return `${STORAGE_KEY_PREFIX}-${appId}`;
+}
+
+export function loadCollections(appId: string): RequestCollection[] {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(getStorageKey(appId));
     if (!data) return [];
     return JSON.parse(data);
   } catch (error) {
@@ -33,37 +50,39 @@ function notifyCollectionsUpdated() {
   window.dispatchEvent(new Event(COLLECTIONS_UPDATED_EVENT));
 }
 
-export function saveCollections(collections: RequestCollection[]): void {
+export function saveCollections(appId: string, collections: RequestCollection[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(collections));
+    localStorage.setItem(getStorageKey(appId), JSON.stringify(collections));
     notifyCollectionsUpdated();
   } catch (error) {
     console.error('Failed to save collections:', error);
   }
 }
 
-export function createCollection(name: string): RequestCollection {
+export function createCollection(appId: string, name: string): RequestCollection {
   const collection: RequestCollection = {
     id: Date.now().toString(),
     name,
     requests: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    appId,
   };
 
-  const collections = loadCollections();
+  const collections = loadCollections(appId);
   collections.push(collection);
-  saveCollections(collections);
+  saveCollections(appId, collections);
 
   return collection;
 }
 
 export function addRequestToCollection(
+  appId: string,
   collectionId: string,
   request: NetworkRequest,
   notes?: string,
 ): void {
-  const collections = loadCollections();
+  const collections = loadCollections(appId);
   const collection = collections.find((c) => c.id === collectionId);
 
   if (!collection) {
@@ -79,35 +98,39 @@ export function addRequestToCollection(
 
   collection.requests.push(savedRequest);
   collection.updatedAt = Date.now();
-  saveCollections(collections);
+  saveCollections(appId, collections);
 }
 
-export function deleteCollection(collectionId: string): void {
-  const collections = loadCollections();
+export function deleteCollection(appId: string, collectionId: string): void {
+  const collections = loadCollections(appId);
   const filtered = collections.filter((c) => c.id !== collectionId);
-  saveCollections(filtered);
+  saveCollections(appId, filtered);
 }
 
-export function deleteRequestFromCollection(collectionId: string, requestId: string): void {
-  const collections = loadCollections();
+export function deleteRequestFromCollection(
+  appId: string,
+  collectionId: string,
+  requestId: string,
+): void {
+  const collections = loadCollections(appId);
   const collection = collections.find((c) => c.id === collectionId);
 
   if (!collection) return;
 
   collection.requests = collection.requests.filter((r) => r.id !== requestId);
   collection.updatedAt = Date.now();
-  saveCollections(collections);
+  saveCollections(appId, collections);
 }
 
-export function renameCollection(collectionId: string, newName: string): void {
-  const collections = loadCollections();
+export function renameCollection(appId: string, collectionId: string, newName: string): void {
+  const collections = loadCollections(appId);
   const collection = collections.find((c) => c.id === collectionId);
 
   if (!collection) return;
 
   collection.name = newName;
   collection.updatedAt = Date.now();
-  saveCollections(collections);
+  saveCollections(appId, collections);
 }
 
 export async function replayRequest(request: SavedRequest): Promise<Response> {
@@ -129,8 +152,8 @@ export async function replayRequest(request: SavedRequest): Promise<Response> {
   return fetch(url, options);
 }
 
-export function getOrCreateDefaultCollection(): RequestCollection {
-  const collections = loadCollections();
+export function getOrCreateDefaultCollection(appId: string): RequestCollection {
+  const collections = loadCollections(appId);
   if (collections.length > 0) {
     return collections[0];
   }
@@ -141,13 +164,18 @@ export function getOrCreateDefaultCollection(): RequestCollection {
     requests: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    appId,
   };
 
-  saveCollections([defaultCollection]);
+  saveCollections(appId, [defaultCollection]);
   return defaultCollection;
 }
 
-export function addRequestToDefaultCollection(request: NetworkRequest, notes?: string): void {
-  const collection = getOrCreateDefaultCollection();
-  addRequestToCollection(collection.id, request, notes);
+export function addRequestToDefaultCollection(
+  appId: string,
+  request: NetworkRequest,
+  notes?: string,
+): void {
+  const collection = getOrCreateDefaultCollection(appId);
+  addRequestToCollection(appId, collection.id, request, notes);
 }

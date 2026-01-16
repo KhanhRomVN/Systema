@@ -579,14 +579,12 @@ export function InspectorLayout({
                 onForward={handleForward}
                 onDrop={handleDrop}
                 onDelete={onDelete}
+                appId={appId || 'unknown'}
               />
             </div>
 
             {composerRequest ? (
-              <RequestComposer
-                initialRequest={composerRequest}
-                onBack={() => setComposerRequest(null)}
-              />
+              <RequestComposer initialRequest={composerRequest} />
             ) : (
               <RequestDetails
                 request={selectedRequest}
@@ -614,6 +612,7 @@ export function InspectorLayout({
               onSelectSavedRequest: setComposerRequest,
               targetApp: appName,
               emulatorSerial,
+              appId,
             }}
           />
         </ResizableSplit>

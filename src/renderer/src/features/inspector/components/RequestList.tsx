@@ -41,6 +41,7 @@ interface RequestActionsProps {
   isHighlighted: boolean;
   onToggleHighlight: (id: string) => void;
   onDelete?: (id: string) => void;
+  appId: string;
 }
 
 function RequestActions({
@@ -48,6 +49,7 @@ function RequestActions({
   isHighlighted,
   onToggleHighlight,
   onDelete,
+  appId,
 }: RequestActionsProps) {
   return (
     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -77,7 +79,7 @@ function RequestActions({
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
-              addRequestToDefaultCollection(request);
+              addRequestToDefaultCollection(appId, request);
             }}
           >
             <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
@@ -128,6 +130,7 @@ interface RequestListProps {
   onForward?: (id: string) => void;
   onDrop?: (id: string) => void;
   onDelete?: (id: string) => void;
+  appId: string;
 }
 
 export function RequestList({
@@ -141,6 +144,7 @@ export function RequestList({
   onForward,
   onDrop,
   onDelete,
+  appId,
 }: RequestListProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
@@ -288,6 +292,7 @@ export function RequestList({
             isHighlighted={highlightedIds.has(row.original.id)}
             onToggleHighlight={toggleHighlight}
             onDelete={onDelete}
+            appId={appId}
           />
         ),
       },

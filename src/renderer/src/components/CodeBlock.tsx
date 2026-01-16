@@ -39,6 +39,7 @@ interface CodeBlockProps {
   searchTerm?: string;
   onEditorMounted?: (editor: any) => void;
   editorOptions?: any;
+  onChange?: (value: string) => void;
 }
 
 const SYSTEMA_THEME = {
@@ -71,6 +72,7 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
       searchTerm,
       onEditorMounted,
       editorOptions,
+      onChange,
     },
     ref,
   ) => {
@@ -156,7 +158,7 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
             value: code,
             language: language,
             theme: themeName,
-            readOnly: true,
+            readOnly: editorOptions?.readOnly ?? false,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             fontSize: 12,
@@ -166,6 +168,13 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
             wordWrap: wordWrap,
             lineNumbers: showLineNumbers ? 'on' : 'off',
             ...editorOptions,
+          });
+
+          // Handle content changes
+          editorInstance.current.onDidChangeModelContent(() => {
+            if (onChange) {
+              onChange(editorInstance.current.getValue());
+            }
           });
 
           if (mounted) {

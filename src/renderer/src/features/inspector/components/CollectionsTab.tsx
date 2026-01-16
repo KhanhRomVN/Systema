@@ -15,10 +15,12 @@ import { NetworkRequest } from '../types';
 interface CollectionsTabProps {
   onSelectRequest?: (request: NetworkRequest) => void;
   currentRequest?: NetworkRequest | null;
+  appId: string;
 }
 
-export function CollectionsTab({ onSelectRequest, currentRequest }: CollectionsTabProps) {
+export function CollectionsTab({ onSelectRequest, currentRequest, appId }: CollectionsTabProps) {
   const [collection, setCollection] = useState<RequestCollection | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -29,12 +31,12 @@ export function CollectionsTab({ onSelectRequest, currentRequest }: CollectionsT
   }, []);
 
   const loadData = () => {
-    setCollection(getOrCreateDefaultCollection());
+    setCollection(getOrCreateDefaultCollection(appId));
   };
 
   const handleAddCurrentRequest = () => {
     if (!currentRequest) return;
-    addRequestToDefaultCollection(currentRequest);
+    addRequestToDefaultCollection(appId, currentRequest);
     loadData();
   };
 
@@ -50,7 +52,7 @@ export function CollectionsTab({ onSelectRequest, currentRequest }: CollectionsT
 
   const handleDeleteRequest = (requestId: string) => {
     if (!collection) return;
-    deleteRequestFromCollection(collection.id, requestId);
+    deleteRequestFromCollection(appId, collection.id, requestId);
     loadData();
   };
 
@@ -87,8 +89,16 @@ export function CollectionsTab({ onSelectRequest, currentRequest }: CollectionsT
             {[...collection.requests].reverse().map((request) => (
               <div
                 key={request.id}
-                className="p-3 bg-muted/30 hover:bg-muted/50 rounded border border-border/50 transition-colors cursor-pointer group"
-                onClick={() => onSelectRequest?.(request)}
+                className={cn(
+                  'p-3 rounded transition-all cursor-pointer group',
+                  selectedId === request.id
+                    ? 'bg-muted/50 border-2 border-dashed border-primary'
+                    : 'bg-muted/30 hover:bg-muted/50 border border-border/50',
+                )}
+                onClick={() => {
+                  setSelectedId(request.id);
+                  onSelectRequest?.(request);
+                }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
@@ -104,18 +114,6 @@ export function CollectionsTab({ onSelectRequest, currentRequest }: CollectionsT
                       >
                         {request.method}
                       </span>
-                      <span
-                        className={cn(
-                          'text-[10px] font-medium',
-                          request.status >= 200 && request.status < 300
-                            ? 'text-green-500'
-                            : request.status >= 400
-                              ? 'text-red-500'
-                              : 'text-yellow-500',
-                        )}
-                      >
-                        {request.status}
-                      </span>
                     </div>
                     <div className="text-xs font-mono truncate text-foreground/90">
                       {request.protocol}://{request.host}
@@ -127,7 +125,7 @@ export function CollectionsTab({ onSelectRequest, currentRequest }: CollectionsT
                       e.stopPropagation();
                       handleDeleteRequest(request.id);
                     }}
-                    className="p-1.5 hover:bg-red-500/20 text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-1.5 text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
                     title="Delete"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

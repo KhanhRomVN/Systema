@@ -23,6 +23,7 @@ export interface InspectorContext {
   onSelectSavedRequest?: (request: NetworkRequest) => void;
   targetApp: string;
   emulatorSerial?: string;
+  appId?: string;
 }
 
 interface ChatContainerProps {
@@ -97,6 +98,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
         <CollectionsTab
           currentRequest={selectedRequest}
           onSelectRequest={inspectorContext.onSelectSavedRequest}
+          appId={inspectorContext.appId || 'unknown'}
         />
       );
     }
