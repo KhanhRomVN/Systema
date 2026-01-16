@@ -3,7 +3,7 @@ import { ElectronAPI } from '@electron-toolkit/preload';
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface API {
   invoke(channel: string, ...args: any[]): Promise<any>;
-  on(channel: string, func: (...args: any[]) => void): void;
+  on(channel: string, func: (...args: any[]) => void): (...args: any[]) => void;
   off(channel: string, func: (...args: any[]) => void): void;
 }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

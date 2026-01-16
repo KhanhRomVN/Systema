@@ -15,6 +15,8 @@ export interface UserApp {
   tags?: string[];
   description?: string;
   createdAt: number;
+  packageName?: string;
+  emulatorSerial?: string;
 }
 
 const DEFAULT_APPS: UserApp[] = [

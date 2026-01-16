@@ -12,9 +12,24 @@ interface InspectorLayoutProps {
   requests: NetworkRequest[];
   appName: string;
   onDelete: (id: string) => void;
+  platform?: 'web' | 'pc' | 'android';
+  fridaStatus?: 'running' | 'stopped' | 'unknown';
+  onInstallFrida?: () => void;
+  onStartFrida?: () => void;
+  onInjectBypass?: () => void;
 }
 
-export function InspectorLayout({ onBack, requests, appName, onDelete }: InspectorLayoutProps) {
+export function InspectorLayout({
+  onBack,
+  requests,
+  appName,
+  onDelete,
+  platform,
+  fridaStatus,
+  onInstallFrida,
+  onStartFrida,
+  onInjectBypass,
+}: InspectorLayoutProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
@@ -262,6 +277,46 @@ export function InspectorLayout({ onBack, requests, appName, onDelete }: Inspect
           />
           {isIntercepting ? 'Intercepting (Blocking)' : 'Intercept'}
         </button>
+
+        {platform === 'android' && (
+          <div className="flex items-center gap-2 ml-2 border-l border-border/50 pl-2">
+            <span className="text-xs text-muted-foreground mr-1">Frida:</span>
+
+            {fridaStatus === 'running' ? (
+              <span className="text-xs text-green-500 font-medium flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                Running
+              </span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={onInstallFrida}
+                  className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80 border border-border transition-colors"
+                  title="Install Frida Server on Device"
+                >
+                  Install
+                </button>
+                <button
+                  onClick={onStartFrida}
+                  className="px-2 py-1 rounded text-xs bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 border border-blue-500/30 transition-colors"
+                  title="Start Frida Server"
+                >
+                  Start
+                </button>
+              </div>
+            )}
+
+            {fridaStatus === 'running' && (
+              <button
+                onClick={onInjectBypass}
+                className="px-2 py-1 rounded text-xs bg-purple-600/10 text-purple-500 hover:bg-purple-600/20 border border-purple-500/30 transition-colors ml-1"
+                title="Inject Universal SSL Pinning Bypass"
+              >
+                Inject SSL Bypass
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="ml-auto text-xs text-muted-foreground">
           {filteredRequests.length} / {requests.length} requests

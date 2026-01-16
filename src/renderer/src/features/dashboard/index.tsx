@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserApp, AppPlatform, AppMode } from '../../types/apps'; // Updated import path
 import { AddAppModal } from './components/AddAppModal';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -36,6 +36,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
   const [showPcAddModal, setShowPcAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Track previous tab to prevent infinite loops
+  const prevTabRef = useRef<AppPlatform>(activeTab);
+
   // Form State
   const [newItemName, setNewItemName] = useState('');
   const [newItemUrl, setNewItemUrl] = useState('');
@@ -56,14 +59,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
   }, []);
 
   useEffect(() => {
-    // Select first app of active tab by default if current selection is invalid
+    // Only auto-select when tab changes or apps load
     const appsInTab = apps.filter((app) => app.platform === activeTab);
-    if (!appsInTab.find((app) => app.id === activeAppId) && appsInTab.length > 0) {
+    const currentAppValid = appsInTab.find((app) => app.id === activeAppId);
+
+    if (!currentAppValid && appsInTab.length > 0) {
       setActiveAppId(appsInTab[0].id);
     } else if (appsInTab.length === 0) {
       setActiveAppId('');
     }
-  }, [activeTab, apps, activeAppId]);
+
+    prevTabRef.current = activeTab;
+  }, [activeTab, apps]); // Removed activeAppId from dependencies to prevent infinite loop
 
   const handleAddCustomApp = async () => {
     if (!newItemName || !newItemUrl) return;
@@ -135,6 +142,56 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
     onSelect(selectedApp.id, 'http://127.0.0.1:8081', selectedApp.url, mode);
   };
 
+  const handleAndroidConnect = async () => {
+    if (!selectedApp || selectedApp.platform !== 'android') return;
+
+    try {
+      const emulators = await window.api.invoke('mobile:detect-emulators');
+      const vmName = selectedApp.emulatorSerial;
+
+      if (!vmName) {
+        alert('Emulator name is missing.');
+        return;
+      }
+
+      // Check if VM is running (either by name, serial, or id with fuzzy match)
+      const isRunning = emulators.some((e: any) => {
+        if (e.status !== 'running') return false;
+
+        const storedName = vmName.toLowerCase();
+        const runningName = (e.name || '').toLowerCase();
+        const runningSerial = (e.serial || '').toLowerCase();
+        const runningId = (e.id || '').toLowerCase();
+
+        // Exact match
+        if (runningName === storedName || runningSerial === storedName || runningId === storedName)
+          return true;
+
+        // Fuzzy match (except for UUIDs to avoid false positives)
+        const isStoredUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          storedName,
+        );
+        if (
+          !isStoredUUID &&
+          (storedName.includes(runningName) || runningName.includes(storedName))
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+      if (isRunning) {
+        handleLaunch('electron');
+      } else {
+        alert(`Emulator '${vmName}' is not running.\nPlease launch it via Genymotion first.`);
+      }
+    } catch (e) {
+      console.error('Failed to check emulator status', e);
+      alert('Failed to check emulator status.');
+    }
+  };
+
   return (
     <div className="flex h-full w-full bg-gray-950 text-white overflow-hidden font-sans">
       {/* Sidebar */}
@@ -199,6 +256,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
             >
               <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium">Add Application</span>
+            </button>
+          )}
+
+          {activeTab === 'android' && (
+            <button
+              onClick={() => setShowPcAddModal(true)}
+              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-gray-700 text-gray-400 hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 transition-all duration-200 group"
+            >
+              <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium">Add Mobile App</span>
             </button>
           )}
 
@@ -276,7 +343,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
                       ? 'Real Browser'
                       : app.mode === 'electron'
                         ? 'Electron Window'
-                        : 'Native App'}
+                        : app.platform === 'android'
+                          ? 'Mobile App'
+                          : 'Native App'}
                   </div>
                 </div>
               </div>
@@ -356,20 +425,35 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => handleLaunch('browser')}
-                    className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-blue-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 hover:bg-blue-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
-                  >
-                    Launch Browser
-                    <Globe className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
-                  </button>
-                  <button
-                    onClick={() => handleLaunch('electron')}
-                    className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-indigo-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:bg-indigo-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(79,70,229,0.5)]"
-                  >
-                    Launch App
-                    <Monitor className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
-                  </button>
+                  {selectedApp.platform === 'android' ? (
+                    <button
+                      onClick={handleAndroidConnect}
+                      className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-emerald-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600 hover:bg-emerald-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+                    >
+                      Connect & Inspect
+                      <Smartphone className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleLaunch('browser')}
+                        className={cn(
+                          'group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 hover:scale-105',
+                          'bg-blue-600 hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]',
+                        )}
+                      >
+                        Launch Browser
+                        <Globe className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
+                      </button>
+                      <button
+                        onClick={() => handleLaunch('electron')}
+                        className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-indigo-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:bg-indigo-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(79,70,229,0.5)]"
+                      >
+                        Launch App
+                        <Monitor className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {selectedApp.url && (
