@@ -8,7 +8,9 @@ import { NetworkRequest } from '../types';
 import { ChatSession } from './TabPanel/TabList';
 import { SourcesPanel } from './SourcesPanel';
 import { LogViewer } from './LogViewer';
-import { MessageSquare, FileCode, TerminalSquare } from 'lucide-react';
+import { CollectionsTab } from './CollectionsTab';
+import { CryptoTab } from './CryptoTab';
+import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, KeyRound } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 
 export interface InspectorContext {
@@ -26,7 +28,7 @@ interface ChatContainerProps {
   inspectorContext: InspectorContext;
 }
 
-type TabType = 'chat' | 'sources' | 'logs';
+type TabType = 'chat' | 'sources' | 'logs' | 'collections' | 'crypto';
 
 export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
@@ -82,6 +84,22 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   }, []);
 
   const renderContent = () => {
+    if (activeTab === 'crypto') {
+      return <CryptoTab />;
+    }
+
+    if (activeTab === 'collections') {
+      const selectedRequest = inspectorContext.requests.find(
+        (r) => r.id === inspectorContext.selectedRequestId,
+      );
+      return (
+        <CollectionsTab
+          currentRequest={selectedRequest}
+          onSelectRequest={inspectorContext.onSelectRequest}
+        />
+      );
+    }
+
     if (activeTab === 'logs') {
       return <LogViewer emulatorSerial={inspectorContext.emulatorSerial} />;
     }
@@ -161,10 +179,10 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           <button
             onClick={() => setActiveTab('chat')}
             className={cn(
-              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all',
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all border-b-2',
               activeTab === 'chat'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
+                ? 'bg-background text-foreground shadow-sm border-blue-500'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50 border-transparent',
             )}
           >
             <MessageSquare className="w-3.5 h-3.5" />
@@ -173,10 +191,10 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           <button
             onClick={() => setActiveTab('sources')}
             className={cn(
-              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all',
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all border-b-2',
               activeTab === 'sources'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
+                ? 'bg-background text-foreground shadow-sm border-purple-500'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50 border-transparent',
             )}
           >
             <FileCode className="w-3.5 h-3.5" />
@@ -185,14 +203,38 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           <button
             onClick={() => setActiveTab('logs')}
             className={cn(
-              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all',
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all border-b-2',
               activeTab === 'logs'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
+                ? 'bg-background text-foreground shadow-sm border-green-500'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50 border-transparent',
             )}
           >
             <TerminalSquare className="w-3.5 h-3.5" />
             Log
+          </button>
+          <button
+            onClick={() => setActiveTab('collections')}
+            className={cn(
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all border-b-2',
+              activeTab === 'collections'
+                ? 'bg-background text-foreground shadow-sm border-orange-500'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50 border-transparent',
+            )}
+          >
+            <BookmarkPlus className="w-3.5 h-3.5" />
+            Collections
+          </button>
+          <button
+            onClick={() => setActiveTab('crypto')}
+            className={cn(
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all border-b-2',
+              activeTab === 'crypto'
+                ? 'bg-background text-foreground shadow-sm border-pink-500'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50 border-transparent',
+            )}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            Crypto
           </button>
         </div>
       </div>

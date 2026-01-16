@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserApp, AppPlatform, AppMode } from '../../types/apps'; // Updated import path
 import { AddAppModal } from './components/AddAppModal';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2 } from 'lucide-react';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Database } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { SavedProfiles } from './components/SavedProfiles';
+import { InspectorProfile } from '../inspector/utils/profiles';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -16,6 +18,7 @@ interface DashboardProps {
     customUrl?: string,
     mode?: 'browser' | 'electron',
   ) => void;
+  onLoadProfile?: (profile: InspectorProfile) => void;
 }
 
 const getFaviconUrl = (url?: string) => {
@@ -28,8 +31,8 @@ const getFaviconUrl = (url?: string) => {
   }
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
-  const [activeTab, setActiveTab] = useState<AppPlatform>('web');
+const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
+  const [activeTab, setActiveTab] = useState<AppPlatform | 'profiles'>('web');
   const [activeAppId, setActiveAppId] = useState<string>('');
   const [apps, setApps] = useState<UserApp[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -37,7 +40,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Track previous tab to prevent infinite loops
-  const prevTabRef = useRef<AppPlatform>(activeTab);
+  const prevTabRef = useRef<AppPlatform | 'profiles'>(activeTab);
 
   // Form State
   const [newItemName, setNewItemName] = useState('');
@@ -60,6 +63,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
 
   useEffect(() => {
     // Only auto-select when tab changes or apps load
+    if (activeTab === 'profiles') {
+      setActiveAppId('');
+      return;
+    }
     const appsInTab = apps.filter((app) => app.platform === activeTab);
     const currentAppValid = appsInTab.find((app) => app.id === activeAppId);
 
@@ -223,6 +230,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
+            <button
+              onClick={() => setActiveTab('profiles')}
+              className={cn(
+                'flex-1 flex items-center justify-center py-2 rounded-md text-sm font-medium transition-all duration-200',
+                activeTab === 'profiles'
+                  ? 'bg-gray-700 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50',
+              )}
+            >
+              <Database className="w-4 h-4 mr-1.5" />
+              Profiles
+            </button>
           </div>
 
           <div className="relative">
@@ -239,6 +258,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
 
         {/* App List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+          {activeTab === 'profiles' && (
+            <div className="p-4 text-center text-gray-500 text-sm">
+              Select stored profiles below to restore your work session.
+            </div>
+          )}
+
           {activeTab === 'web' && (
             <button
               onClick={() => setShowAddModal(true)}
@@ -352,15 +377,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect }) => {
             );
           })}
 
-          {filteredApps.length === 0 && (
+          {activeTab !== 'profiles' && filteredApps.length === 0 && (
             <div className="text-center text-gray-500 py-8 text-sm">No apps found</div>
           )}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative bg-gradient-to-br from-gray-900 to-gray-950">
-        {selectedApp ? (
+      <div className="flex-1 flex flex-col relative bg-gradient-to-br from-gray-900 to-gray-950 overflow-y-auto">
+        {activeTab === 'profiles' ? (
+          <SavedProfiles onLoadProfile={(profile) => onLoadProfile && onLoadProfile(profile)} />
+        ) : selectedApp ? (
           <div className="flex-1 flex flex-col items-center justify-center p-12 animate-in fade-in duration-500">
             <div className="max-w-2xl w-full text-center">
               <div className="relative inline-block mb-8 group">

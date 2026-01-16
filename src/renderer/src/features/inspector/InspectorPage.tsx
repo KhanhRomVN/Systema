@@ -2,6 +2,7 @@ import { InspectorLayout } from './components/InspectorLayout';
 import Dashboard from '../../features/dashboard';
 import { useState, useEffect, useCallback } from 'react';
 import { NetworkRequest } from './types';
+import { InspectorProfile } from './utils/profiles';
 import { generateRequestAnalysis } from './utils/analysisGenerator';
 
 export default function InspectorPage() {
@@ -12,6 +13,15 @@ export default function InspectorPage() {
   const [fridaStatus, setFridaStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
   const [targetPackage, setTargetPackage] = useState<string>('');
   const [emulatorSerial, setEmulatorSerial] = useState<string>('');
+
+  const handleLoadProfile = useCallback((profile: InspectorProfile) => {
+    // Restore state from profile
+    setRequests(profile.requests);
+    setSelectedApp(profile.appName);
+    setPlatform(profile.metadata.platform);
+    setIsScanning(true);
+    // Note: We don't launch proxy/app here, just viewing the static data
+  }, []);
 
   // Check platform and Frida status when app changes
   useEffect(() => {
@@ -301,7 +311,7 @@ export default function InspectorPage() {
   };
 
   if (!isScanning) {
-    return <Dashboard onSelect={handleSelectApp} />;
+    return <Dashboard onSelect={handleSelectApp} onLoadProfile={handleLoadProfile} />;
   }
 
   return (

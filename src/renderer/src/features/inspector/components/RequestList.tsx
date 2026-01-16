@@ -10,7 +10,7 @@ import {
 import { NetworkRequest } from '../types';
 import { useState, useMemo } from 'react';
 import { cn } from '../../../shared/lib/utils';
-import { ArrowUpDown, Search, Copy, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Search, Copy, Trash2, CaseSensitive, Type, Regex } from 'lucide-react';
 
 interface RequestListProps {
   requests: NetworkRequest[];
@@ -38,6 +38,9 @@ export function RequestList({
   onDelete,
 }: RequestListProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [matchCase, setMatchCase] = useState(false);
+  const [matchWholeWord, setMatchWholeWord] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
 
   const handleSearch = () => {
     // No-op or additional logic if needed, currently state is managed by parent
@@ -204,10 +207,24 @@ export function RequestList({
       if (!searchTerm) return true;
 
       let regex: RegExp | null = null;
-      try {
-        regex = new RegExp(searchTerm, 'i');
-      } catch {
-        // invalid regex, ignore
+
+      // Build regex based on options
+      if (useRegex) {
+        try {
+          const flags = matchCase ? 'g' : 'gi';
+          regex = new RegExp(searchTerm, flags);
+        } catch {
+          // invalid regex, fallback to literal
+          const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          regex = new RegExp(escaped, matchCase ? '' : 'i');
+        }
+      } else {
+        // Literal search
+        let pattern = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (matchWholeWord) {
+          pattern = `\\b${pattern}\\b`;
+        }
+        regex = new RegExp(pattern, matchCase ? '' : 'i');
       }
 
       const match = (value: unknown): boolean => {
@@ -216,7 +233,9 @@ export function RequestList({
         if (regex) {
           return regex.test(str);
         }
-        return str.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchCase
+          ? str.includes(searchTerm)
+          : str.toLowerCase().includes(searchTerm.toLowerCase());
       };
 
       const request = row.original;
@@ -257,7 +276,7 @@ export function RequestList({
   return (
     <div className="h-full w-full flex flex-col bg-background/50 text-sm overflow-hidden">
       {/* Filter Bar */}
-      <div className="flex items-center p-2 border-b border-border/40 gap-2">
+      <div className="h-10 flex items-center px-2 border-b border-border/40 gap-2">
         <Search className="w-4 h-4 text-muted-foreground" />
         <input
           placeholder="Filter requests..."
@@ -266,6 +285,44 @@ export function RequestList({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={handleKeyDown}
         />
+        <div className="flex items-center gap-1 border-l border-border/40 pl-2">
+          <button
+            onClick={() => setMatchCase(!matchCase)}
+            className={cn(
+              'p-1.5 rounded transition-colors',
+              matchCase
+                ? 'bg-blue-500/20 text-blue-500 hover:bg-blue-500/30'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+            title="Match Case"
+          >
+            <CaseSensitive className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setMatchWholeWord(!matchWholeWord)}
+            className={cn(
+              'p-1.5 rounded transition-colors',
+              matchWholeWord
+                ? 'bg-purple-500/20 text-purple-500 hover:bg-purple-500/30'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+            title="Match Whole Word"
+          >
+            <Type className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setUseRegex(!useRegex)}
+            className={cn(
+              'p-1.5 rounded transition-colors',
+              useRegex
+                ? 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+            title="Use Regular Expression"
+          >
+            <Regex className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">

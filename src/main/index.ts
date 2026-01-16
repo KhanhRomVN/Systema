@@ -552,6 +552,11 @@ app.whenReady().then(async () => {
     return true;
   });
 
+  // IPC for memory usage monitoring
+  ipcMain.handle('app:get-memory-usage', () => {
+    return process.memoryUsage();
+  });
+
   // User Apps IPC
   ipcMain.handle('apps:get-all', () => {
     return userAppStore.getAllApps();

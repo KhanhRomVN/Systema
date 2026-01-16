@@ -3,6 +3,7 @@ import { RequestList } from './RequestList';
 import { RequestDetails } from './RequestDetails';
 import { initialFilterState, InspectorFilter } from './FilterPanel';
 import { ChatContainer } from './ChatContainer';
+import { MemoryMonitor } from './MemoryMonitor';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
@@ -254,8 +255,9 @@ export function InspectorLayout({
 
   return (
     <div className="h-full w-full bg-background text-foreground flex flex-col overflow-hidden">
-      {/* Toolbar */}
-      <div className="h-10 border-b border-border flex items-center px-4 bg-muted/40 gap-4">
+      {/* Enhanced Toolbar */}
+      <div className="h-10 border-b border-border flex items-center px-3 bg-muted/40 gap-3">
+        {/* Left Section */}
         <button
           onClick={onBack}
           className="text-muted-foreground hover:text-foreground hover:bg-muted/50 px-2 py-1 rounded text-xs border border-transparent hover:border-border transition-all"
@@ -264,35 +266,128 @@ export function InspectorLayout({
         </button>
         <div className="h-4 w-px bg-border/50" />
 
-        {/* Intercept Button */}
-        <button
-          onClick={() => handleSetIntercept(!isIntercepting)}
-          className={cn(
-            'ml-2 px-3 py-1 rounded text-xs font-medium border transition-all flex items-center gap-2',
-            isIntercepting
-              ? 'bg-red-500/10 text-red-500 border-red-500/30 animate-pulse'
-              : 'bg-transparent text-muted-foreground border-border hover:bg-muted/50',
+        {/* Current URL & App Info */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {selectedRequest ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="text-xs text-muted-foreground truncate max-w-[300px]"
+                title={`${selectedRequest.protocol}://${selectedRequest.host}${selectedRequest.path}`}
+              >
+                {selectedRequest.protocol}://{selectedRequest.host}
+                {selectedRequest.path}
+              </span>
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground italic">No request selected</span>
           )}
-        >
-          <div
-            className={cn('w-2 h-2 rounded-full', isIntercepting ? 'bg-red-500' : 'bg-gray-400')}
-          />
-          {isIntercepting ? 'Intercepting (Blocking)' : 'Intercept'}
-        </button>
+          <div className="h-4 w-px bg-border/50 mx-1" />
+          <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
+            {appName}
+          </span>
+          {requests.length > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded bg-green-500/10 text-green-500 flex items-center gap-1 whitespace-nowrap">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              Tracking
+            </span>
+          )}
+        </div>
 
-        <div className="ml-auto text-xs text-muted-foreground">
-          {filteredRequests.length} / {requests.length} requests
+        {/* Center - Toolbar Menu */}
+        <div className="flex items-center gap-1 border-x border-border/50 px-2">
+          <button
+            onClick={() => handleSetIntercept(!isIntercepting)}
+            className={cn(
+              'p-1.5 rounded text-xs font-medium transition-all',
+              isIntercepting
+                ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+            title={isIntercepting ? 'Stop Intercepting' : 'Start Intercepting'}
+          >
+            <div
+              className={cn(
+                'w-4 h-4 rounded-full border-2',
+                isIntercepting ? 'border-red-500 bg-red-500' : 'border-muted-foreground',
+              )}
+            />
+          </button>
+          <button
+            className="p-1.5 rounded text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+            title="Clear All Requests"
+            onClick={() => {
+              if (confirm('Clear all requests?')) {
+                requests.forEach((req) => onDelete(req.id));
+              }
+            }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+          <button
+            className="p-1.5 rounded text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+            title="Save Profile"
+            onClick={() => {
+              const profileName = prompt('Enter profile name:');
+              if (profileName) {
+                const { createProfile } = require('../utils/profiles');
+                createProfile(profileName, appName, requests, filter, selectedId, platform);
+                alert(`Profile "${profileName}" saved successfully!`);
+              }
+            }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Right Section - Metrics */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-xs whitespace-nowrap">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+            <span className="font-medium">
+              {requests.filter((r) => r.protocol === 'https').length}
+            </span>
+          </div>
+          <MemoryMonitor />
         </div>
 
         {platform === 'android' && (
-          <div className="flex items-center gap-2 ml-2 border-l border-border/50 pl-2">
-            <span className="text-xs text-muted-foreground mr-1">Frida:</span>
-
+          <div className="flex items-center gap-2 border-l border-border/50 pl-2">
+            <span className="text-xs text-muted-foreground">Frida:</span>
             {fridaStatus === 'running' ? (
-              <span className="text-xs text-green-500 font-medium flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                Running
-              </span>
+              <>
+                <span className="text-xs text-green-500 font-medium flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  Running
+                </span>
+                <button
+                  onClick={onInjectBypass}
+                  className="px-2 py-1 rounded text-xs bg-purple-600/10 text-purple-500 hover:bg-purple-600/20 border border-purple-500/30 transition-colors"
+                  title="Inject Universal SSL Pinning Bypass"
+                >
+                  SSL Bypass
+                </button>
+              </>
             ) : (
               <div className="flex items-center gap-1">
                 <button
@@ -310,16 +405,6 @@ export function InspectorLayout({
                   Start
                 </button>
               </div>
-            )}
-
-            {fridaStatus === 'running' && (
-              <button
-                onClick={onInjectBypass}
-                className="px-2 py-1 rounded text-xs bg-purple-600/10 text-purple-500 hover:bg-purple-600/20 border border-purple-500/30 transition-colors ml-1"
-                title="Inject Universal SSL Pinning Bypass"
-              >
-                Inject SSL Bypass
-              </button>
             )}
           </div>
         )}
