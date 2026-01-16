@@ -6,7 +6,6 @@ interface DocsEditorProps {
 export function DocsEditor({ value, onChange }: DocsEditorProps) {
   return (
     <div className="h-full flex flex-col">
-      <div className="mb-2 text-xs text-muted-foreground">Documentation for this request.</div>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

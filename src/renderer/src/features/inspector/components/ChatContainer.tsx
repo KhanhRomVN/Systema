@@ -33,15 +33,17 @@ interface ChatContainerProps {
 type TabType = 'chat' | 'sources' | 'logs' | 'collections' | 'crypto';
 
 export function ChatContainer({ inspectorContext }: ChatContainerProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('chat');
+  const [activeTab, setActiveTab] = useState<string>('chat');
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   // Lifted state from TabPanel
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [port, setPort] = useState(3000);
+  const [port, setPort] = useState<number | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [collectionCount, setCollectionCount] = useState(0);
   const lastActiveSessionRef = useRef<ChatSession | null>(null);
 
   useEffect(() => {
@@ -85,15 +87,44 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     return undefined;
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'collections') {
+      const loadCount = async () => {
+        const { loadCollections } = await import('../utils/collections');
+        const collections = loadCollections(inspectorContext.appId || 'unknown');
+        const totalCount = collections.reduce((sum, col) => sum + col.requests.length, 0);
+        setCollectionCount(totalCount);
+      };
+
+      loadCount();
+
+      const handleUpdate = () => loadCount();
+      let COLLECTIONS_UPDATED_EVENT: string;
+
+      // Dynamically import to get the event name
+      import('../utils/collections').then(({ COLLECTIONS_UPDATED_EVENT: eventName }) => {
+        COLLECTIONS_UPDATED_EVENT = eventName;
+        window.addEventListener(COLLECTIONS_UPDATED_EVENT, handleUpdate);
+      });
+
+      return () => {
+        if (COLLECTIONS_UPDATED_EVENT) {
+          window.removeEventListener(COLLECTIONS_UPDATED_EVENT, handleUpdate);
+        }
+      };
+    }
+  }, [activeTab, inspectorContext.appId]);
+
   const renderContent = () => {
     if (activeTab === 'crypto') {
       return <CryptoTab />;
     }
 
     if (activeTab === 'collections') {
-      const selectedRequest = inspectorContext.requests.find(
+      const selectedRequest = inspectorContext.filteredRequests?.find(
         (r) => r.id === inspectorContext.selectedRequestId,
       );
+
       return (
         <CollectionsTab
           currentRequest={selectedRequest}
@@ -226,6 +257,18 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           >
             <BookmarkPlus className="w-3.5 h-3.5" />
             Collections
+            {collectionCount > 0 && (
+              <span
+                className={cn(
+                  'ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold',
+                  activeTab === 'collections'
+                    ? 'bg-orange-500/20 text-orange-500'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {collectionCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('crypto')}

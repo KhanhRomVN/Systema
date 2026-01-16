@@ -62,25 +62,6 @@ export function CollectionsTab({ onSelectRequest, currentRequest, appId }: Colle
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-medium">Saved Requests</h3>
-          <p className="text-xs text-muted-foreground">
-            {collection.requests.length} saved requests
-          </p>
-        </div>
-        {currentRequest && (
-          <button
-            onClick={handleAddCurrentRequest}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs bg-blue-500/20 text-blue-500 hover:bg-blue-500/30 rounded transition-colors"
-          >
-            <BookmarkPlus className="w-3.5 h-3.5" />
-            Save Current Request
-          </button>
-        )}
-      </div>
-
       <div className="flex-1 overflow-auto p-2">
         {collection.requests.length === 0 ? (
           <div className="text-center text-muted-foreground text-xs p-4">No requests saved yet</div>

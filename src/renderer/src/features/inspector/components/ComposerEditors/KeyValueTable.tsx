@@ -35,7 +35,7 @@ export function KeyValueTable({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border border-border rounded-md overflow-hidden bg-background flex flex-col max-h-full">
+      <div className="flex flex-col max-h-full bg-background">
         {/* Table Header */}
         <div className="flex bg-muted/30 text-[10px] font-medium text-muted-foreground border-b border-border flex-shrink-0">
           <div className="w-8 flex items-center justify-center py-1.5"></div>

@@ -179,3 +179,26 @@ export function addRequestToDefaultCollection(
   const collection = getOrCreateDefaultCollection(appId);
   addRequestToCollection(appId, collection.id, request, notes);
 }
+
+export function updateSavedRequest(
+  appId: string,
+  collectionId: string,
+  requestId: string,
+  updates: Partial<SavedRequest>,
+): void {
+  const collections = loadCollections(appId);
+  const collection = collections.find((c) => c.id === collectionId);
+
+  if (!collection) return;
+
+  const requestIndex = collection.requests.findIndex((r) => r.id === requestId);
+  if (requestIndex === -1) return;
+
+  collection.requests[requestIndex] = {
+    ...collection.requests[requestIndex],
+    ...updates,
+  };
+
+  collection.updatedAt = Date.now();
+  saveCollections(appId, collections);
+}

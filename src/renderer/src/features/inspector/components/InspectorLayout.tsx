@@ -584,7 +584,7 @@ export function InspectorLayout({
             </div>
 
             {composerRequest ? (
-              <RequestComposer initialRequest={composerRequest} />
+              <RequestComposer initialRequest={composerRequest} appId={appId} />
             ) : (
               <RequestDetails
                 request={selectedRequest}

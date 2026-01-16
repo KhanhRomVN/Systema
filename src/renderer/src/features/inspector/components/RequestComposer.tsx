@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
-import { Play, X, Braces, FileText, List, Shield } from 'lucide-react';
-import { CodeBlock } from '../../../components/CodeBlock';
+import { Play, X, Braces, FileText, List, Shield, AlignLeft } from 'lucide-react';
+import { CodeBlock, CodeBlockRef } from '../../../components/CodeBlock';
 import { KeyValueTable, KeyValueItem } from './ComposerEditors/KeyValueTable';
 import { AuthEditor, AuthConfig } from './ComposerEditors/AuthEditor';
 import { DocsEditor } from './ComposerEditors/DocsEditor';
+import { SavedRequest, RequestHistory, updateSavedRequest } from '../utils/collections';
 
 interface RequestComposerProps {
   initialRequest: NetworkRequest;
+  appId?: string;
 }
 
-export function RequestComposer({ initialRequest }: RequestComposerProps) {
+export function RequestComposer({ initialRequest, appId }: RequestComposerProps) {
   const [method, setMethod] = useState(initialRequest.method);
   const [url, setUrl] = useState(
     `${initialRequest.protocol}://${initialRequest.host}${initialRequest.path}`,
@@ -30,10 +32,48 @@ export function RequestComposer({ initialRequest }: RequestComposerProps) {
   const [body, setBody] = useState(initialRequest.requestBody || '');
   const [docs, setDocs] = useState('');
 
-  const [response, setResponse] = useState<any>(null);
+  // Initialize response from saved history if available
+  const [response, setResponse] = useState<any>(() => {
+    const saved = initialRequest as SavedRequest;
+    if (saved.lastResponse) {
+      return {
+        status: saved.lastResponse.status,
+        statusText: saved.lastResponse.statusText,
+        time: saved.lastResponse.time,
+        size: saved.lastResponse.size,
+        headers: saved.lastResponse.headers,
+        body: saved.lastResponse.body,
+        type: 'response', // Marker
+      };
+    }
+    return null;
+  });
+
   const [isLoading, setIsLoading] = useState(false);
+  const bodyBlockRef = useRef<CodeBlockRef>(null);
+  const responseBlockRef = useRef<CodeBlockRef>(null);
 
   useEffect(() => {
+    // Restore response for this specific request
+    const saved = initialRequest as SavedRequest;
+    if (saved.lastResponse) {
+      setResponse({
+        status: saved.lastResponse.status,
+        statusText: saved.lastResponse.statusText,
+        time: saved.lastResponse.time,
+        size: saved.lastResponse.size,
+        headers: saved.lastResponse.headers,
+        body: saved.lastResponse.body,
+        type: 'response',
+      });
+      // Auto-format response after a short delay to let editor mount
+      setTimeout(() => {
+        responseBlockRef.current?.format();
+      }, 100);
+    } else {
+      setResponse(null);
+    }
+
     // Initialize headers
     const initialHeaders = Object.entries(initialRequest.requestHeaders).map(([key, value]) => ({
       key,
@@ -144,6 +184,31 @@ export function RequestComposer({ initialRequest }: RequestComposerProps) {
         body: responseBody,
         size: new Blob([responseBody]).size,
       });
+
+      // Save history and last response if it's a saved request
+      if (appId && (initialRequest as SavedRequest).collectionId) {
+        const historyItem: RequestHistory = {
+          timestamp: Date.now(),
+          status: res.status,
+          statusText: res.statusText,
+          time: endTime - startTime,
+          size: new Blob([responseBody]).size,
+          headers: responseHeaders,
+          body: responseBody,
+        };
+
+        const savedReq = initialRequest as SavedRequest;
+
+        // Update local storage
+        updateSavedRequest(appId, savedReq.collectionId, savedReq.id, {
+          lastResponse: historyItem,
+        });
+      }
+
+      // Auto-format response body
+      setTimeout(() => {
+        responseBlockRef.current?.format();
+      }, 100);
     } catch (error: any) {
       setResponse({
         error: error.message,
@@ -170,155 +235,146 @@ export function RequestComposer({ initialRequest }: RequestComposerProps) {
 
   return (
     <div className="h-full flex flex-col bg-background text-sm">
-      {/* Top Bar */}
-      <div className="h-14 border-b border-border flex items-center px-4 gap-3 bg-muted/20">
-        <div className="flex-1 flex gap-2">
-          {/* Method Badge - Read Only */}
-          <div
-            className={cn(
-              'h-9 pl-3 pr-3 rounded-md font-bold text-xs flex items-center border uppercase',
-              getMethodColor(method),
-            )}
-          >
-            {method}
-          </div>
-
-          {/* URL Display - Read Only */}
-          <div className="flex-1 h-9 bg-muted/30 border border-border rounded-md px-3 text-xs flex items-center font-mono shadow-sm text-foreground">
-            {url}
-          </div>
-          <button
-            onClick={handleSend}
-            disabled={isLoading}
-            className={cn(
-              'h-9 px-6 bg-primary text-primary-foreground rounded-md text-xs font-bold flex items-center gap-2 transition-all shadow-sm hover:opacity-90 active:scale-95',
-              isLoading && 'opacity-70 cursor-not-allowed',
-            )}
-          >
-            {isLoading ? (
-              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Play className="w-3 h-3 fill-current" />
-            )}
-            {isLoading ? 'Sending' : 'Send'}
-          </button>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Request Config (Left) */}
         <div className="flex-1 flex flex-col border-r border-border min-w-0">
-          <div className="flex border-b border-border bg-muted/10">
-            {[
-              {
-                id: 'params',
-                label: 'Params',
-                icon: List,
-                color: 'text-blue-500',
-                showCount: true,
-              },
-              {
-                id: 'headers',
-                label: 'Headers',
-                icon: Braces,
-                color: 'text-purple-500',
-                showCount: true,
-              },
-              {
-                id: 'body',
-                label: 'Body',
-                icon: FileText,
-                color: 'text-orange-500',
-                showDot: true,
-              },
-              {
-                id: 'auth',
-                label: 'Authorization',
-                icon: Shield,
-                color: 'text-green-500',
-                showDot: true,
-              },
-              { id: 'docs', label: 'Docs', icon: FileText, color: 'text-gray-500', showDot: true },
-            ].map((tab) => {
-              // Calculate counts and indicators
-              const count =
-                tab.id === 'params'
-                  ? params.filter((p) => p.enabled && p.key).length
-                  : tab.id === 'headers'
-                    ? headers.filter((h) => h.enabled && h.key).length
-                    : 0;
-              const hasDot =
-                tab.id === 'body'
-                  ? body.trim().length > 0
-                  : tab.id === 'auth'
-                    ? authConfig.type !== 'none'
-                    : tab.id === 'docs'
-                      ? docs.trim().length > 0
-                      : false;
+          <div className="flex border-b border-border bg-muted/10 items-center justify-between pr-2 h-10">
+            <div className="flex">
+              {[
+                {
+                  id: 'params',
+                  label: 'Params',
+                  icon: List,
+                  color: 'text-blue-500',
+                  showCount: true,
+                },
+                {
+                  id: 'headers',
+                  label: 'Headers',
+                  icon: Braces,
+                  color: 'text-purple-500',
+                  showCount: true,
+                },
+                {
+                  id: 'body',
+                  label: 'Body',
+                  icon: FileText,
+                  color: 'text-orange-500',
+                  showDot: true,
+                },
+                {
+                  id: 'auth',
+                  label: 'Authorization',
+                  icon: Shield,
+                  color: 'text-green-500',
+                  showDot: true,
+                },
+                {
+                  id: 'docs',
+                  label: 'Docs',
+                  icon: FileText,
+                  color: 'text-gray-500',
+                  showDot: true,
+                },
+              ].map((tab) => {
+                // Calculate counts and indicators
+                const count =
+                  tab.id === 'params'
+                    ? params.filter((p) => p.enabled && p.key).length
+                    : tab.id === 'headers'
+                      ? headers.filter((h) => h.enabled && h.key).length
+                      : 0;
+                const hasDot =
+                  tab.id === 'body'
+                    ? body.trim().length > 0
+                    : tab.id === 'auth'
+                      ? authConfig.type !== 'none'
+                      : tab.id === 'docs'
+                        ? docs.trim().length > 0
+                        : false;
 
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={cn(
-                    'px-4 py-2.5 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
-                    activeTab === tab.id
-                      ? `${tab.color} bg-background`
-                      : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
-                  )}
-                  style={
-                    activeTab === tab.id
-                      ? {
-                          borderBottomColor:
-                            tab.id === 'params'
-                              ? 'rgb(59 130 246)'
-                              : tab.id === 'headers'
-                                ? 'rgb(168 85 247)'
-                                : tab.id === 'body'
-                                  ? 'rgb(249 115 22)'
-                                  : tab.id === 'auth'
-                                    ? 'rgb(34 197 94)'
-                                    : 'rgb(107 114 128)',
-                        }
-                      : undefined
-                  }
-                >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  {tab.label}
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={cn(
+                      'px-4 py-2.5 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
+                      activeTab === tab.id
+                        ? `${tab.color} bg-background`
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
+                    )}
+                    style={
+                      activeTab === tab.id
+                        ? {
+                            borderBottomColor:
+                              tab.id === 'params'
+                                ? 'rgb(59 130 246)'
+                                : tab.id === 'headers'
+                                  ? 'rgb(168 85 247)'
+                                  : tab.id === 'body'
+                                    ? 'rgb(249 115 22)'
+                                    : tab.id === 'auth'
+                                      ? 'rgb(34 197 94)'
+                                      : 'rgb(107 114 128)',
+                          }
+                        : undefined
+                    }
+                  >
+                    <tab.icon className="w-3.5 h-3.5" />
+                    {tab.label}
 
-                  {/* Count Badge */}
-                  {tab.showCount && count > 0 && (
-                    <span
-                      className={cn(
-                        'ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold',
-                        activeTab === tab.id ? 'bg-current/10' : 'bg-muted text-muted-foreground',
-                      )}
-                    >
-                      {count}
-                    </span>
-                  )}
+                    {/* Count Badge */}
+                    {tab.showCount && count > 0 && (
+                      <span
+                        className={cn(
+                          'ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold',
+                          activeTab === tab.id ? 'bg-current/10' : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {count}
+                      </span>
+                    )}
 
-                  {/* Dot Indicator */}
-                  {tab.showDot && hasDot && (
-                    <span
-                      className={cn(
-                        'w-1.5 h-1.5 rounded-full',
-                        tab.id === 'body'
-                          ? 'bg-orange-500'
-                          : tab.id === 'auth'
-                            ? 'bg-green-500'
-                            : 'bg-gray-500',
-                      )}
-                    />
-                  )}
-                </button>
-              );
-            })}
+                    {/* Dot Indicator */}
+                    {tab.showDot && hasDot && (
+                      <span
+                        className={cn(
+                          'w-1.5 h-1.5 rounded-full',
+                          tab.id === 'body'
+                            ? 'bg-orange-500'
+                            : tab.id === 'auth'
+                              ? 'bg-green-500'
+                              : 'bg-gray-500',
+                        )}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={handleSend}
+              disabled={isLoading}
+              className={cn(
+                'p-2 text-primary hover:bg-primary/10 rounded-md transition-all flex items-center justify-center',
+                isLoading && 'opacity-50 cursor-not-allowed',
+              )}
+              title="Send Request"
+            >
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 fill-current" />
+              )}
+            </button>
           </div>
 
           <div className="flex-1 overflow-hidden p-0 relative">
-            <div className="absolute inset-0 overflow-auto p-4">
+            <div
+              className={cn('absolute inset-0 overflow-auto', activeTab === 'auth' ? 'p-4' : 'p-0')}
+            >
               {activeTab === 'params' && <KeyValueTable items={params} onChange={setParams} />}
 
               {activeTab === 'headers' && <KeyValueTable items={headers} onChange={setHeaders} />}
@@ -328,11 +384,13 @@ export function RequestComposer({ initialRequest }: RequestComposerProps) {
               {activeTab === 'docs' && <DocsEditor value={docs} onChange={setDocs} />}
 
               {activeTab === 'body' && (
-                <div className="h-full flex flex-col border border-border rounded-md overflow-hidden bg-muted/10">
-                  <div className="flex-1 min-h-[200px]">
+                <div className="h-full flex flex-col">
+                  {/* Body Header with Format Button */}
+                  <div className="flex-1 border border-border rounded-md overflow-hidden bg-muted/10">
                     <CodeBlock
+                      ref={bodyBlockRef}
                       code={body}
-                      language="json" // TODO: Auto-detect or allow manual selection
+                      language="json"
                       onChange={setBody}
                       themeConfig={{ background: '#00000000' }}
                       editorOptions={{ readOnly: false, minimap: { enabled: false } }}
@@ -361,65 +419,74 @@ export function RequestComposer({ initialRequest }: RequestComposerProps) {
             </div>
           ) : (
             <div className="flex flex-col h-full">
-              <div className="h-10 border-b border-border flex items-center px-4 gap-4 bg-background">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                    Status
-                  </span>
-                  <span
+              <div className="flex border-b border-border bg-muted/10 items-center justify-between h-10">
+                {/* Left: Tabs */}
+                <div className="flex">
+                  <button
+                    onClick={() => setResponseTab('body')}
                     className={cn(
-                      'text-xs font-bold px-1.5 py-0.5 rounded',
-                      response.status >= 200 && response.status < 300
-                        ? 'bg-green-500/10 text-green-500'
-                        : 'bg-red-500/10 text-red-500',
+                      'px-4 py-2.5 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
+                      responseTab === 'body'
+                        ? 'border-primary bg-background'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
                     )}
                   >
-                    {response.status} {response.statusText}
-                  </span>
+                    <FileText className="w-3.5 h-3.5" />
+                    Body
+                  </button>
+                  <button
+                    onClick={() => setResponseTab('headers')}
+                    className={cn(
+                      'px-4 py-2.5 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
+                      responseTab === 'headers'
+                        ? 'border-primary bg-background'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
+                    )}
+                  >
+                    <Braces className="w-3.5 h-3.5" />
+                    Headers
+                  </button>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                    Time
-                  </span>
-                  <span className="text-xs font-mono">{response.time}ms</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                    Size
-                  </span>
-                  <span className="text-xs font-mono">{response.size} B</span>
-                </div>
-              </div>
 
-              <div className="flex border-b border-border bg-muted/10">
-                <button
-                  onClick={() => setResponseTab('body')}
-                  className={cn(
-                    'px-4 py-2 text-xs font-medium border-b-2 transition-all',
-                    responseTab === 'body'
-                      ? 'border-primary text-foreground'
-                      : 'border-transparent text-muted-foreground',
-                  )}
-                >
-                  Body
-                </button>
-                <button
-                  onClick={() => setResponseTab('headers')}
-                  className={cn(
-                    'px-4 py-2 text-xs font-medium border-b-2 transition-all',
-                    responseTab === 'headers'
-                      ? 'border-primary text-foreground'
-                      : 'border-transparent text-muted-foreground',
-                  )}
-                >
-                  Headers
-                </button>
+                {/* Right: Status Info */}
+                <div className="flex items-center gap-4 px-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                      Status
+                    </span>
+                    <span
+                      className={cn(
+                        'text-xs font-bold px-1.5 py-0.5 rounded',
+                        response.status >= 200 && response.status < 300
+                          ? 'bg-green-500/10 text-green-500'
+                          : response.status >= 400
+                            ? 'bg-red-500/10 text-red-500'
+                            : 'bg-yellow-500/10 text-yellow-500',
+                      )}
+                    >
+                      {response.status} {response.statusText}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                      Time
+                    </span>
+                    <span className="text-xs font-mono">{response.time}ms</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                      Size
+                    </span>
+                    <span className="text-xs font-mono">{response.size} B</span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex-1 overflow-hidden relative">
                 <div className="absolute inset-0 overflow-auto p-0">
                   {responseTab === 'body' && (
                     <CodeBlock
+                      ref={responseBlockRef}
                       code={response.body}
                       language="json" // TODO: Detect from header
                       themeConfig={{ background: '#00000000' }}
@@ -428,7 +495,7 @@ export function RequestComposer({ initialRequest }: RequestComposerProps) {
                     />
                   )}
                   {responseTab === 'headers' && (
-                    <div className="p-4">
+                    <div className="p-0">
                       <KeyValueTable
                         items={Object.entries(response.headers as Record<string, string>).map(
                           ([key, value]) => ({
@@ -438,7 +505,6 @@ export function RequestComposer({ initialRequest }: RequestComposerProps) {
                           }),
                         )}
                         onChange={() => {}} // Read only
-                        title="Response Headers"
                       />
                     </div>
                   )}
