@@ -7,10 +7,12 @@ import {
   getFilteredRowModel,
   SortingState,
 } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { NetworkRequest } from '../types';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { cn } from '../../../shared/lib/utils';
 import { ArrowUpDown, Search, Copy, Trash2, CaseSensitive, Type, Regex } from 'lucide-react';
+import { useDebounce } from 'use-debounce';
 
 interface RequestListProps {
   requests: NetworkRequest[];
@@ -41,16 +43,10 @@ export function RequestList({
   const [matchCase, setMatchCase] = useState(false);
   const [matchWholeWord, setMatchWholeWord] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleSearch = () => {
-    // No-op or additional logic if needed, currently state is managed by parent
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
+  // Debounce search term to reduce re-renders
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
   const columns = useMemo<ColumnDef<NetworkRequest>[]>(
     () => [
@@ -194,20 +190,9 @@ export function RequestList({
     [pendingActionIds, onForward, onDrop, onDelete],
   );
 
-  const table = useReactTable({
-    data: requests,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: setSorting,
-    state: {
-      sorting,
-      globalFilter: searchTerm,
-      columnVisibility: { id: false },
-    },
-    onGlobalFilterChange: onSearchChange,
-    globalFilterFn: (row, _columnId, filterValue) => {
+  // Memoized global filter function with pre-compiled regex
+  const globalFilterFn = useCallback(
+    (row: any, _columnId: string, filterValue: string) => {
       const searchTerm = String(filterValue);
       if (!searchTerm) return true;
 
@@ -269,13 +254,42 @@ export function RequestList({
         return true;
       }
 
-      // Check bodies
-      if (match(request.requestBody) || match(request.responseBody)) {
+      // Check bodies (limit to first 10KB for performance)
+      const limitedRequestBody = request.requestBody?.substring(0, 10240) || '';
+      const limitedResponseBody = request.responseBody?.substring(0, 10240) || '';
+
+      if (match(limitedRequestBody) || match(limitedResponseBody)) {
         return true;
       }
 
       return false;
     },
+    [useRegex, matchCase, matchWholeWord],
+  );
+
+  const table = useReactTable({
+    data: requests,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+      globalFilter: debouncedSearchTerm,
+      columnVisibility: { id: false },
+    },
+    onGlobalFilterChange: onSearchChange,
+    globalFilterFn,
+  });
+
+  // Virtualization setup
+  const rows = table.getRowModel().rows;
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 35,
+    overscan: 10,
   });
 
   return (
@@ -288,7 +302,6 @@ export function RequestList({
           className="bg-transparent border-none outline-none text-xs flex-1"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          onKeyDown={handleKeyDown}
         />
         <div className="flex items-center gap-1 border-l border-border/40 pl-2">
           <button
@@ -330,7 +343,7 @@ export function RequestList({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div ref={tableContainerRef} className="flex-1 overflow-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-muted/50 sticky top-0 z-10 text-xs font-medium text-muted-foreground">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -345,37 +358,41 @@ export function RequestList({
               </tr>
             ))}
           </thead>
-          <tbody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => {
-                const isIntercepted = interceptedIds?.has(row.original.id);
-                const isPending = pendingActionIds?.has(row.original.id);
+          <tbody style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              const isIntercepted = interceptedIds?.has(row.original.id);
+              const isPending = pendingActionIds?.has(row.original.id);
 
-                return (
-                  <tr
-                    key={row.id}
-                    data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
-                    className={cn(
-                      'border-b border-border/20 transition-colors cursor-pointer text-xs',
-                      isPending
-                        ? 'bg-orange-500/10 hover:bg-orange-500/20'
-                        : isIntercepted
-                          ? 'bg-red-500/10 hover:bg-red-500/20'
-                          : 'hover:bg-muted/50',
-                      row.original.id === selectedId &&
-                        'bg-accent text-accent-foreground hover:bg-accent',
-                    )}
-                    onClick={() => onSelect(row.original.id)}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })
-            ) : (
+              return (
+                <tr
+                  key={row.id}
+                  data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
+                  className={cn(
+                    'border-b border-border/20 transition-colors cursor-pointer text-xs absolute w-full',
+                    isPending
+                      ? 'bg-orange-500/10 hover:bg-orange-500/20'
+                      : isIntercepted
+                        ? 'bg-red-500/10 hover:bg-red-500/20'
+                        : 'hover:bg-muted/50',
+                    row.original.id === selectedId &&
+                      'bg-accent text-accent-foreground hover:bg-accent',
+                  )}
+                  style={{
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  onClick={() => onSelect(row.original.id)}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+            {rows.length === 0 && (
               <tr>
                 <td
                   colSpan={columns.length}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Trash2, Copy, Pause, Play, Download, Filter } from 'lucide-react';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { cn } from '../../../shared/lib/utils';
 
 interface LogEntry {
@@ -33,9 +34,11 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [packageFilter, setPackageFilter] = useState('');
   const [hiddenTags, setHiddenTags] = useState<Set<string>>(new Set());
-  const logContainerRef = useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<VirtuosoHandle>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const logBufferRef = useRef<LogEntry[]>([]);
+  const rafRef = useRef<number | null>(null);
+  const lastFlushTime = useRef<number>(Date.now());
 
   useEffect(() => {
     console.log('[LogViewer] Mounted with emulatorSerial:', emulatorSerial);
@@ -63,20 +66,29 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
           }
         });
 
-        // Flush buffer every 100ms to prevent UI freezing
-        flushInterval = setInterval(() => {
-          if (logBufferRef.current.length > 0) {
+        // Optimized buffer flushing with requestAnimationFrame
+        const flushLogs = () => {
+          const now = Date.now();
+          const timeSinceLastFlush = now - lastFlushTime.current;
+          const shouldFlush = logBufferRef.current.length >= 50 || timeSinceLastFlush >= 250;
+
+          if (shouldFlush && logBufferRef.current.length > 0) {
             setLogs((prev) => {
               const newLogs = [...prev, ...logBufferRef.current];
+              logBufferRef.current = [];
+              lastFlushTime.current = now;
               // Limit buffer size
               if (newLogs.length > MAX_LOGS) {
                 return newLogs.slice(newLogs.length - MAX_LOGS);
               }
               return newLogs;
             });
-            logBufferRef.current = [];
           }
-        }, 100);
+
+          rafRef.current = requestAnimationFrame(flushLogs);
+        };
+
+        rafRef.current = requestAnimationFrame(flushLogs);
 
         console.log('[LogViewer] Event listener attached');
       } catch (e) {
@@ -94,17 +106,13 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       if (flushInterval) {
         clearInterval(flushInterval);
       }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
       window.api.invoke('mobile:stop-logcat', emulatorSerial).catch(console.error);
       setIsRunning(false);
     };
   }, [emulatorSerial, isPaused]);
-
-  // Auto-scroll
-  useEffect(() => {
-    if (autoScroll && logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [logs, autoScroll]);
 
   const parseLogLine = (line: string): LogEntry | null => {
     // Android logcat format: MM-DD HH:MM:SS.mmm PID TID LEVEL TAG: message
@@ -193,7 +201,7 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
   }, [logs]);
 
-  const toggleTagVisibility = (tag: string) => {
+  const toggleTagVisibility = useCallback((tag: string) => {
     setHiddenTags((prev) => {
       const next = new Set(prev);
       if (next.has(tag)) {
@@ -203,32 +211,41 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       }
       return next;
     });
-  };
+  }, []);
 
-  const filteredLogs = logs.filter((log) => {
-    if (!levelFilter[log.level]) return false;
-    if (hiddenTags.has(log.tag)) return false;
+  // Memoized filtering with pre-compiled search
+  const filteredLogs = useMemo(() => {
+    // Pre-compile search term
+    const lowerSearch = searchTerm ? searchTerm.toLowerCase() : null;
+    const lowerPackageFilter = packageFilter ? packageFilter.toLowerCase() : null;
 
-    // Package/Tag filter
-    if (packageFilter) {
-      if (
-        !log.tag.toLowerCase().includes(packageFilter.toLowerCase()) &&
-        !log.pid.includes(packageFilter)
-      ) {
-        return false;
+    return logs.filter((log) => {
+      // Fast-path checks first
+      if (!levelFilter[log.level]) return false;
+      if (hiddenTags.has(log.tag)) return false;
+
+      // Package/Tag filter
+      if (lowerPackageFilter) {
+        const lowerTag = log.tag.toLowerCase();
+        if (!lowerTag.includes(lowerPackageFilter) && !log.pid.includes(packageFilter)) {
+          return false;
+        }
       }
-    }
 
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      return (
-        log.tag.toLowerCase().includes(search) ||
-        log.message.toLowerCase().includes(search) ||
-        log.pid.includes(search)
-      );
-    }
-    return true;
-  });
+      // Search filter
+      if (lowerSearch) {
+        const lowerTag = log.tag.toLowerCase();
+        const lowerMessage = log.message.toLowerCase();
+        return (
+          lowerTag.includes(lowerSearch) ||
+          lowerMessage.includes(lowerSearch) ||
+          log.pid.includes(lowerSearch)
+        );
+      }
+
+      return true;
+    });
+  }, [logs, levelFilter, hiddenTags, packageFilter, searchTerm]);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -276,82 +293,104 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
     return `hsl(${hue}, 70%, 60%)`;
   };
 
-  const highlightMessage = (message: string) => {
-    // Simple syntax highlighting for common patterns
-    const parts: JSX.Element[] = [];
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const jsonRegex = /(\{[^}]*\}|\[[^\]]*\])/g;
-    const numberRegex = /\b(\d+)\b/g;
+  // Memoized highlight function with caching
+  const highlightMessage = useMemo(() => {
+    const cache = new Map<string, JSX.Element>();
+    const MAX_CACHE_SIZE = 1000;
 
-    let lastIndex = 0;
-    const matches: Array<{ index: number; length: number; type: string; value: string }> = [];
-
-    // Find all URL matches
-    message.replace(urlRegex, (match, p1, offset) => {
-      matches.push({ index: offset, length: match.length, type: 'url', value: match });
-      return match;
-    });
-
-    // Find all JSON matches
-    message.replace(jsonRegex, (match, p1, offset) => {
-      matches.push({ index: offset, length: match.length, type: 'json', value: match });
-      return match;
-    });
-
-    // Find all number matches
-    message.replace(numberRegex, (match, p1, offset) => {
-      matches.push({ index: offset, length: match.length, type: 'number', value: match });
-      return match;
-    });
-
-    // Sort by index to process in order
-    matches.sort((a, b) => a.index - b.index);
-
-    // Remove overlapping matches
-    const nonOverlapping: typeof matches = [];
-    let prevEnd = 0;
-    for (const match of matches) {
-      if (match.index >= prevEnd) {
-        nonOverlapping.push(match);
-        prevEnd = match.index + match.length;
-      }
-    }
-
-    // Build the highlighted message
-    if (nonOverlapping.length === 0) {
-      return <span>{message}</span>;
-    }
-
-    nonOverlapping.forEach((match, idx) => {
-      // Add text before the match
-      if (match.index > lastIndex) {
-        parts.push(<span key={`text-${idx}`}>{message.substring(lastIndex, match.index)}</span>);
+    return (message: string): JSX.Element => {
+      // Check cache first
+      if (cache.has(message)) {
+        return cache.get(message)!;
       }
 
-      // Add the highlighted match
-      const className =
-        match.type === 'url'
-          ? 'text-blue-400 underline decoration-blue-400/40'
-          : match.type === 'json'
-            ? 'text-purple-400'
-            : 'text-emerald-400';
+      // Disable highlighting for very long messages (performance)
+      if (message.length > 1000 || filteredLogs.length > 2000) {
+        return <span>{message}</span>;
+      }
 
-      parts.push(
-        <span key={`match-${idx}`} className={className}>
-          {match.value}
-        </span>,
-      );
+      // Simple syntax highlighting for common patterns
+      const parts: JSX.Element[] = [];
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const jsonRegex = /(\{[^}]*\}|\[[^\]]*\])/g;
+      const numberRegex = /\b(\d+)\b/g;
 
-      lastIndex = match.index + match.length;
-    });
+      let lastIndex = 0;
+      const matches: Array<{ index: number; length: number; type: string; value: string }> = [];
 
-    // Add remaining text
-    if (lastIndex < message.length) {
-      parts.push(<span key="text-end">{message.substring(lastIndex)}</span>);
-    }
+      // Find all URL matches
+      message.replace(urlRegex, (match, _p1, offset) => {
+        matches.push({ index: offset, length: match.length, type: 'url', value: match });
+        return match;
+      });
 
-    return <>{parts}</>;
-  };
+      // Find all JSON matches
+      message.replace(jsonRegex, (match, _p1, offset) => {
+        matches.push({ index: offset, length: match.length, type: 'json', value: match });
+        return match;
+      });
+
+      // Find all number matches
+      message.replace(numberRegex, (match, _p1, offset) => {
+        matches.push({ index: offset, length: match.length, type: 'number', value: match });
+        return match;
+      });
+
+      // Sort by index to process in order
+      matches.sort((a, b) => a.index - b.index);
+
+      // Remove overlapping matches
+      const nonOverlapping: typeof matches = [];
+      let prevEnd = 0;
+      for (const match of matches) {
+        if (match.index >= prevEnd) {
+          nonOverlapping.push(match);
+          prevEnd = match.index + match.length;
+        }
+      }
+
+      // Build the highlighted message
+      if (nonOverlapping.length === 0) {
+        const result = <span>{message}</span>;
+        if (cache.size < MAX_CACHE_SIZE) cache.set(message, result);
+        return result;
+      }
+
+      nonOverlapping.forEach((match, idx) => {
+        // Add text before the match
+        if (match.index > lastIndex) {
+          parts.push(<span key={`text-${idx}`}>{message.substring(lastIndex, match.index)}</span>);
+        }
+
+        // Add the highlighted match
+        const className =
+          match.type === 'url'
+            ? 'text-blue-400 underline decoration-blue-400/40'
+            : match.type === 'json'
+              ? 'text-purple-400'
+              : 'text-emerald-400';
+
+        parts.push(
+          <span key={`match-${idx}`} className={className}>
+            {match.value}
+          </span>,
+        );
+
+        lastIndex = match.index + match.length;
+      });
+
+      // Add remaining text
+      if (lastIndex < message.length) {
+        parts.push(<span key="text-end">{message.substring(lastIndex)}</span>);
+      }
+
+      const result = <>{parts}</>;
+      if (cache.size < MAX_CACHE_SIZE) {
+        cache.set(message, result);
+      }
+      return result;
+    };
+  }, [filteredLogs.length]);
 
   if (!emulatorSerial) {
     return (
@@ -539,63 +578,61 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
         </div>
       )}
 
-      {/* Logs */}
-      <div
-        ref={logContainerRef}
-        className="flex-1 overflow-y-auto font-mono text-xs p-3 space-y-1 bg-background/50 custom-scrollbar"
-        style={{
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'rgb(148 163 184 / 0.3) transparent',
-        }}
-        onScroll={(e) => {
-          const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-          const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-          setAutoScroll(isAtBottom);
-        }}
-      >
+      {/* Logs - Virtualized */}
+      <div className="flex-1 bg-background/50">
         {filteredLogs.length === 0 ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             {isRunning ? 'Waiting for logs...' : 'No logs available'}
           </div>
         ) : (
-          filteredLogs.map((log, idx) => (
-            <div
-              key={idx}
-              className={cn(
-                'py-2 px-3 rounded-md flex flex-col gap-1 group transition-all',
-                'hover:bg-muted/5',
-                getLevelBgColor(log.level).replace('bg-muted/10', '').replace('bg-', 'hover:bg-'), // Handle bg hover
-              )}
-            >
-              {/* Header: Level Time Tag PID */}
-              <div className="flex items-center gap-2 text-[10px] leading-none opacity-80 select-none">
-                <span
-                  className={cn(
-                    'font-bold px-1.5 py-0.5 rounded text-[9px]',
-                    getLevelColor(log.level),
-                    'bg-current/10',
-                  )}
-                >
-                  {log.level}
-                </span>
-                <span className="font-mono text-muted-foreground">{log.timestamp}</span>
-                <span className="text-muted-foreground/30">•</span>
-                <span
-                  className="font-semibold truncate max-w-[120px]"
-                  style={{ color: getTagColor(log.tag) }}
-                >
-                  {log.tag}
-                </span>
-                <span className="text-muted-foreground/30">•</span>
-                <span className="font-mono text-muted-foreground/50">{log.pid}</span>
-              </div>
+          <Virtuoso
+            ref={logContainerRef}
+            data={filteredLogs}
+            followOutput={autoScroll}
+            defaultItemHeight={60}
+            className="font-mono text-xs custom-scrollbar"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgb(148 163 184 / 0.3) transparent',
+            }}
+            itemContent={(_index, log) => (
+              <div
+                className={cn(
+                  'py-2 px-3 mx-3 my-0.5 rounded-md flex flex-col gap-1 group transition-all',
+                  'hover:bg-muted/5',
+                  getLevelBgColor(log.level).replace('bg-muted/10', '').replace('bg-', 'hover:bg-'),
+                )}
+              >
+                {/* Header: Level Time Tag PID */}
+                <div className="flex items-center gap-2 text-[10px] leading-none opacity-80 select-none">
+                  <span
+                    className={cn(
+                      'font-bold px-1.5 py-0.5 rounded text-[9px]',
+                      getLevelColor(log.level),
+                      'bg-current/10',
+                    )}
+                  >
+                    {log.level}
+                  </span>
+                  <span className="font-mono text-muted-foreground">{log.timestamp}</span>
+                  <span className="text-muted-foreground/30">•</span>
+                  <span
+                    className="font-semibold truncate max-w-[120px]"
+                    style={{ color: getTagColor(log.tag) }}
+                  >
+                    {log.tag}
+                  </span>
+                  <span className="text-muted-foreground/30">•</span>
+                  <span className="font-mono text-muted-foreground/50">{log.pid}</span>
+                </div>
 
-              {/* Message Body */}
-              <div className="text-foreground/90 break-all text-xs leading-5 pl-1">
-                {highlightMessage(log.message)}
+                {/* Message Body */}
+                <div className="text-foreground/90 break-all text-xs leading-5 pl-1">
+                  {highlightMessage(log.message)}
+                </div>
               </div>
-            </div>
-          ))
+            )}
+          />
         )}
       </div>
     </div>

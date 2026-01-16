@@ -1,3 +1,4 @@
+import React from 'react';
 import { ResizableSplit } from '../../../components/ResizableSplit';
 import { RequestList } from './RequestList';
 import { RequestDetails } from './RequestDetails';
@@ -6,7 +7,7 @@ import { ChatContainer } from './ChatContainer';
 import { MemoryMonitor } from './MemoryMonitor';
 import { SaveProfileModal } from './SaveProfileModal';
 import { formatDistanceToNow } from 'date-fns';
-import { Play, Pause, Clock, LayoutList, GanttChartSquare } from 'lucide-react';
+import { Play, Pause, Clock } from 'lucide-react';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
@@ -26,6 +27,30 @@ interface InspectorLayoutProps {
   onInjectBypass?: () => void;
   emulatorSerial?: string;
 }
+
+// Countdown timer component - separated to prevent re-rendering parent
+const CountdownTimer = React.memo(({ nextSaveTime }: { nextSaveTime: number | null }) => {
+  const [, setTick] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!nextSaveTime) return;
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, [nextSaveTime]);
+
+  if (!nextSaveTime) return null;
+
+  const diff = Math.max(0, Math.ceil((nextSaveTime - Date.now()) / 1000));
+  const mins = Math.floor(diff / 60);
+  const secs = diff % 60;
+
+  return (
+    <span className="text-[10px] text-muted-foreground px-1.5 border-l border-border/50 tabular-nums">
+      {mins}:{secs.toString().padStart(2, '0')}
+    </span>
+  );
+});
+CountdownTimer.displayName = 'CountdownTimer';
 
 export function InspectorLayout({
   onBack,
@@ -49,7 +74,6 @@ export function InspectorLayout({
   // New Features State
   const [isPaused, setIsPaused] = useState(false);
   const [displayedRequests, setDisplayedRequests] = useState<NetworkRequest[]>([]);
-  const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table');
 
   // Auto-save State
   const [autoSaveInterval, setAutoSaveInterval] = useState<number>(0); // 0 = off, minutes
@@ -63,25 +87,6 @@ export function InspectorLayout({
       setDisplayedRequests(requests);
     }
   }, [requests, isPaused]);
-
-  // Helper for countdown display
-  const getCountdownString = () => {
-    if (!nextSaveTime) return '';
-    const diff = Math.max(0, Math.ceil((nextSaveTime - Date.now()) / 1000));
-    const mins = Math.floor(diff / 60);
-    const secs = diff % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Force re-render for countdown
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (autoSaveInterval > 0) {
-      const timer = setInterval(() => setTick((t) => t + 1), 1000);
-      return () => clearInterval(timer);
-    }
-    return undefined;
-  }, [autoSaveInterval]);
 
   // Intercept state
   const [isIntercepting, setIsIntercepting] = useState(false);
@@ -405,11 +410,7 @@ export function InspectorLayout({
                 <Clock className="w-3 h-3" />
                 {autoSaveInterval > 0 ? `${autoSaveInterval}m` : 'Off'}
               </button>
-              {autoSaveInterval > 0 && (
-                <span className="text-[10px] text-muted-foreground px-1.5 border-l border-border/50 tabular-nums">
-                  {getCountdownString()}
-                </span>
-              )}
+              {autoSaveInterval > 0 && <CountdownTimer nextSaveTime={nextSaveTime} />}
             </div>
 
             {/* Last Saved Profile Badge */}
