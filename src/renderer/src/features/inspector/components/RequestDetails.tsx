@@ -25,7 +25,7 @@ import { RequestGeneral } from './RequestDetails/RequestGeneral';
 import { ResponseGeneral } from './RequestDetails/ResponseGeneral';
 import { HeadersDetails } from './RequestDetails/HeadersDetails';
 import { CookiesDetails } from './RequestDetails/CookiesDetails';
-import { BodyDetails } from './RequestDetails/BodyDetails';
+import { BodyDetails, BodyDetailsRef } from './RequestDetails/BodyDetails';
 import { SecurityDetails } from './RequestDetails/SecurityDetails';
 import { CertDetails } from './RequestDetails/CertDetails';
 import { NetworkDetails } from './RequestDetails/NetworkDetails';
@@ -78,6 +78,9 @@ export function RequestDetails({
 
   // Ref for the content container to search for highlights
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Ref for BodyDetails to trigger next match
+  const bodyDetailsRef = useRef<BodyDetailsRef>(null);
 
   // Track focused match
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
@@ -187,14 +190,12 @@ export function RequestDetails({
     if (!body || !searchTerm) return 0;
     let regex: RegExp;
     try {
-      regex = new RegExp(searchTerm, 'i');
+      regex = new RegExp(searchTerm, 'gi');
     } catch {
-      regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     }
-    // Just check presence for body, or basic count for small bodies.
-    // Counting occurences in large strings can be slow/complex with global regex.
-    // For now simple presence = 1
-    return regex.test(body) ? 1 : 0;
+    const matches = body.match(regex);
+    return matches ? matches.length : 0;
   };
 
   const matches = {
@@ -205,9 +206,7 @@ export function RequestDetails({
       ? getMatchCount(request.requestHeaders) + getMatchCount(request.responseHeaders)
       : 0,
     cookies: 0,
-    body: request
-      ? getBodyMatchCount(request.requestBody) + getBodyMatchCount(request.responseBody)
-      : 0,
+    body: 0,
     security: 0,
     cert: 0,
     network: 0,
@@ -215,6 +214,23 @@ export function RequestDetails({
     issues: 0,
     initiator: request?.initiator ? 1 : 0,
   };
+
+  // Calculate body matches
+  if (request && request.analysis) {
+    const analysis = request.analysis;
+    const reqBody = analysis?.body?.request?.formatted
+      ? JSON.stringify(analysis.body.request.formatted, null, 2)
+      : analysis?.body?.request?.raw || '';
+
+    const resBody = analysis?.body?.response?.formatted
+      ? JSON.stringify(analysis.body.response.formatted, null, 2)
+      : analysis?.body?.response?.raw || '';
+
+    matches.body = getBodyMatchCount(reqBody) + getBodyMatchCount(resBody);
+  } else if (request) {
+    // Fallback if analysis not ready
+    matches.body = getBodyMatchCount(request.requestBody) + getBodyMatchCount(request.responseBody);
+  }
 
   // Basic overview checks
   if (searchTerm && request) {
@@ -407,6 +423,12 @@ export function RequestDetails({
 
   // Scroll to next match logic
   const scrollToNextMatch = () => {
+    // If we are in Body tab, use the custom handler
+    if (activeTab === 'body') {
+      bodyDetailsRef.current?.nextMatch();
+      return;
+    }
+
     if (!scrollContainerRef.current) return;
 
     // Find all highlighted marks
@@ -449,7 +471,9 @@ export function RequestDetails({
           {activeTab === 'response' && <ResponseGeneral request={request} />}
           {activeTab === 'headers' && <HeadersDetails request={request} searchTerm={searchTerm} />}
           {activeTab === 'cookies' && <CookiesDetails request={request} searchTerm={searchTerm} />}
-          {activeTab === 'body' && <BodyDetails request={request} searchTerm={searchTerm} />}
+          {activeTab === 'body' && (
+            <BodyDetails ref={bodyDetailsRef} request={request} searchTerm={searchTerm} />
+          )}
           {activeTab === 'security' && <SecurityDetails request={request} />}
           {activeTab === 'cert' && <CertDetails request={request} />}
           {activeTab === 'network' && <NetworkDetails request={request} />}

@@ -7,7 +7,8 @@ import { InspectorFilter } from './FilterPanel';
 import { NetworkRequest } from '../types';
 import { ChatSession } from './TabPanel/TabList';
 import { SourcesPanel } from './SourcesPanel';
-import { MessageSquare, FileCode } from 'lucide-react';
+import { LogViewer } from './LogViewer';
+import { MessageSquare, FileCode, TerminalSquare } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 
 export interface InspectorContext {
@@ -18,13 +19,14 @@ export interface InspectorContext {
   onSetFilter: (filter: InspectorFilter) => void;
   onSelectRequest: (id: string) => void;
   targetApp: string;
+  emulatorSerial?: string;
 }
 
 interface ChatContainerProps {
   inspectorContext: InspectorContext;
 }
 
-type TabType = 'chat' | 'sources';
+type TabType = 'chat' | 'sources' | 'logs';
 
 export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
@@ -80,6 +82,10 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   }, []);
 
   const renderContent = () => {
+    if (activeTab === 'logs') {
+      return <LogViewer emulatorSerial={inspectorContext.emulatorSerial} />;
+    }
+
     if (activeTab === 'sources') {
       return <SourcesPanel requests={inspectorContext.requests} />;
     }
@@ -150,24 +156,24 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Header Tab Switcher */}
-      <div className="h-10 border-b border-border flex items-center px-4 shrink-0 bg-background/50 z-10">
-        <div className="flex bg-muted/60 p-1 rounded-lg">
+      <div className="h-10 border-b border-border flex items-center shrink-0 bg-background/50 z-10">
+        <div className="flex bg-muted/60 w-full h-full">
           <button
             onClick={() => setActiveTab('chat')}
             className={cn(
-              'flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium transition-all',
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all',
               activeTab === 'chat'
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
             )}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            Chat & AI
+            Chat &amp; AI
           </button>
           <button
             onClick={() => setActiveTab('sources')}
             className={cn(
-              'flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium transition-all',
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all',
               activeTab === 'sources'
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
@@ -175,6 +181,18 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           >
             <FileCode className="w-3.5 h-3.5" />
             Sources
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={cn(
+              'flex items-center justify-center gap-2 px-6 h-full text-xs font-medium transition-all',
+              activeTab === 'logs'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
+            )}
+          >
+            <TerminalSquare className="w-3.5 h-3.5" />
+            Log
           </button>
         </div>
       </div>
