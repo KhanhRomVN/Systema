@@ -160,29 +160,26 @@ export function RequestComposer({ initialRequest, appId }: RequestComposerProps)
         finalUrl = urlObj.toString();
       }
 
-      const startTime = Date.now();
-      const res = await fetch(finalUrl, {
+      // Use IPC to send request from main process to avoid CORS
+      const res = await (window as any).api.invoke('inspector:send-request', {
+        url: finalUrl,
         method,
         headers: headerObj,
         body: method !== 'GET' && method !== 'HEAD' ? body : undefined,
-        mode: 'no-cors',
       });
 
-      const endTime = Date.now();
-      const responseBody = await res.text();
-
-      const responseHeaders: Record<string, string> = {};
-      res.headers.forEach((val, key) => {
-        responseHeaders[key] = val;
-      });
+      if (res.error) {
+        throw new Error(res.error);
+      }
 
       setResponse({
         status: res.status,
         statusText: res.statusText,
-        time: endTime - startTime,
-        headers: responseHeaders,
-        body: responseBody,
-        size: new Blob([responseBody]).size,
+        time: res.time,
+        headers: res.headers,
+        body: res.body,
+        size: res.size,
+        type: 'response',
       });
 
       // Save history and last response if it's a saved request
@@ -191,10 +188,10 @@ export function RequestComposer({ initialRequest, appId }: RequestComposerProps)
           timestamp: Date.now(),
           status: res.status,
           statusText: res.statusText,
-          time: endTime - startTime,
-          size: new Blob([responseBody]).size,
-          headers: responseHeaders,
-          body: responseBody,
+          time: res.time,
+          size: res.size,
+          headers: res.headers,
+          body: res.body,
         };
 
         const savedReq = initialRequest as SavedRequest;

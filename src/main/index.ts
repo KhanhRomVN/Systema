@@ -15,6 +15,7 @@ import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dns from 'dns';
+import { handleInspectorRequest } from './features/inspector';
 
 // Mobile utilities
 import {
@@ -128,6 +129,11 @@ app.whenReady().then(async () => {
   // Proxy IPC
   ipcMain.handle('proxy:create-session', async (_, appId: string) => {
     return await proxyManager.createSession(appId);
+  });
+
+  // Inspector Request Handler
+  ipcMain.handle('inspector:send-request', async (_, payload) => {
+    return await handleInspectorRequest(payload);
   });
 
   // Deprecated/Modified: 'proxy:start' might not be needed if we use create-session.
