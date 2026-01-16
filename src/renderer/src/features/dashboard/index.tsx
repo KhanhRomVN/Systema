@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserApp, AppPlatform, AppMode } from '../../types/apps'; // Updated import path
 import { AddAppModal } from './components/AddAppModal';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Database } from 'lucide-react';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { SavedProfiles } from './components/SavedProfiles';
-import { InspectorProfile } from '../inspector/utils/profiles';
+import { InspectorProfile, deleteProfilesByAppId } from '../inspector/utils/profiles';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -32,7 +32,7 @@ const getFaviconUrl = (url?: string) => {
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
-  const [activeTab, setActiveTab] = useState<AppPlatform | 'profiles'>('web');
+  const [activeTab, setActiveTab] = useState<AppPlatform>('web');
   const [activeAppId, setActiveAppId] = useState<string>('');
   const [apps, setApps] = useState<UserApp[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -40,13 +40,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Track previous tab to prevent infinite loops
-  const prevTabRef = useRef<AppPlatform | 'profiles'>(activeTab);
+  const prevTabRef = useRef<AppPlatform>(activeTab);
 
   // Form State
   const [newItemName, setNewItemName] = useState('');
   const [newItemUrl, setNewItemUrl] = useState('');
-  const [newItemMode, setNewItemMode] = useState<AppMode>('browser');
-  const [newItemCategory, setNewItemCategory] = useState('');
 
   const fetchApps = async () => {
     try {
@@ -62,11 +60,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
   }, []);
 
   useEffect(() => {
-    // Only auto-select when tab changes or apps load
-    if (activeTab === 'profiles') {
-      setActiveAppId('');
-      return;
-    }
     const appsInTab = apps.filter((app) => app.platform === activeTab);
     const currentAppValid = appsInTab.find((app) => app.id === activeAppId);
 
@@ -83,21 +76,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
     if (!newItemName || !newItemUrl) return;
 
     try {
-      await window.api.invoke('apps:create', {
+      const newApp = await window.api.invoke('apps:create', {
         name: newItemName,
         url: newItemUrl,
-        mode: newItemMode,
+        mode: 'browser',
         platform: 'web',
-        category: newItemCategory,
+        category: '',
         tags: [],
       });
       setShowAddModal(false);
       // Reset form
       setNewItemName('');
       setNewItemUrl('');
-      setNewItemMode('browser');
-      setNewItemCategory('');
-      fetchApps();
+      await fetchApps();
+      if (newApp && newApp.id) {
+        setActiveAppId(newApp.id);
+      }
     } catch (e) {
       console.error('Failed to create app', e);
     }
@@ -129,6 +123,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
     if (confirm('Are you sure you want to delete this custom app?')) {
       try {
         await window.api.invoke('apps:delete', id);
+        // Cascade delete profiles
+        deleteProfilesByAppId(id);
         fetchApps();
       } catch (e) {
         console.error('Failed to delete app', e);
@@ -230,18 +226,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
-            <button
-              onClick={() => setActiveTab('profiles')}
-              className={cn(
-                'flex-1 flex items-center justify-center py-2 rounded-md text-sm font-medium transition-all duration-200',
-                activeTab === 'profiles'
-                  ? 'bg-gray-700 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50',
-              )}
-            >
-              <Database className="w-4 h-4 mr-1.5" />
-              Profiles
-            </button>
           </div>
 
           <div className="relative">
@@ -256,14 +240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
           </div>
         </div>
 
-        {/* App List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-          {activeTab === 'profiles' && (
-            <div className="p-4 text-center text-gray-500 text-sm">
-              Select stored profiles below to restore your work session.
-            </div>
-          )}
-
           {activeTab === 'web' && (
             <button
               onClick={() => setShowAddModal(true)}
@@ -377,7 +354,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
             );
           })}
 
-          {activeTab !== 'profiles' && filteredApps.length === 0 && (
+          {filteredApps.length === 0 && (
             <div className="text-center text-gray-500 py-8 text-sm">No apps found</div>
           )}
         </div>
@@ -385,11 +362,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col relative bg-gradient-to-br from-gray-900 to-gray-950 overflow-y-auto">
-        {activeTab === 'profiles' ? (
-          <SavedProfiles onLoadProfile={(profile) => onLoadProfile && onLoadProfile(profile)} />
-        ) : selectedApp ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 animate-in fade-in duration-500">
-            <div className="max-w-2xl w-full text-center">
+        {selectedApp ? (
+          <div className="flex-1 flex flex-col items-center justify-start p-12 animate-in fade-in duration-500 pt-20">
+            <div className="max-w-4xl w-full text-center">
               <div className="relative inline-block mb-8 group">
                 <div
                   className={cn(
@@ -489,6 +464,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                   </div>
                 )}
               </div>
+
+              {/* Profiles Section */}
+              <div className="mt-16 border-t border-gray-800/50 pt-8 w-full text-left">
+                <SavedProfiles
+                  appName={selectedApp.name}
+                  appId={selectedApp.id}
+                  onLoadProfile={(profile) => onLoadProfile && onLoadProfile(profile)}
+                />
+              </div>
             </div>
           </div>
         ) : (
@@ -539,48 +523,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                       />
                     </div>
                   )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1.5">Mode</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setNewItemMode('browser')}
-                      className={cn(
-                        'flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg border transition-all duration-200',
-                        newItemMode === 'browser'
-                          ? 'bg-blue-600/10 border-blue-500 text-blue-400'
-                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300',
-                      )}
-                    >
-                      <Globe className="w-4 h-4" />
-                      <span className="text-sm font-medium">Real Browser</span>
-                    </button>
-                    <button
-                      onClick={() => setNewItemMode('electron')}
-                      className={cn(
-                        'flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg border transition-all duration-200',
-                        newItemMode === 'electron'
-                          ? 'bg-blue-600/10 border-blue-500 text-blue-400'
-                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300',
-                      )}
-                    >
-                      <Monitor className="w-4 h-4" />
-                      <span className="text-sm font-medium">Electron Window</span>
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1.5">Category</label>
-                  <input
-                    type="text"
-                    value={newItemCategory}
-                    onChange={(e) => setNewItemCategory(e.target.value)}
-                    placeholder="Optional"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none"
-                  />
                 </div>
               </div>
             </div>

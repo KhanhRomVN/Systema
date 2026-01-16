@@ -8,6 +8,7 @@ import { generateRequestAnalysis } from './utils/analysisGenerator';
 export default function InspectorPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedApp, setSelectedApp] = useState<string>('VSCode');
+  const [currentAppName, setCurrentAppName] = useState<string>('VSCode');
   const [requests, setRequests] = useState<NetworkRequest[]>([]);
   const [platform, setPlatform] = useState<'web' | 'pc' | 'android' | undefined>();
   const [fridaStatus, setFridaStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
@@ -17,7 +18,13 @@ export default function InspectorPage() {
   const handleLoadProfile = useCallback((profile: InspectorProfile) => {
     // Restore state from profile
     setRequests(profile.requests);
-    setSelectedApp(profile.appName);
+    // Use appId if available (for exact match), otherwise fallback to appName (legacy/simple)
+    // Note: If profile.appId is missing, selectedApp gets the name.
+    // This assumes that for legacy apps, ID == Name (like 'VSCode').
+    // For custom apps without appId in profile, restoring might be tricky if ID != Name.
+    // But going forward, new profiles will have appId.
+    setSelectedApp(profile.appId || profile.appName);
+    setCurrentAppName(profile.appName);
     setPlatform(profile.metadata.platform);
     setIsScanning(true);
     // Note: We don't launch proxy/app here, just viewing the static data
@@ -33,6 +40,7 @@ export default function InspectorPage() {
         const allApps: any[] = await window.api.invoke('apps:get-all');
         const app = allApps.find((a) => a.id === selectedApp);
         if (app) {
+          setCurrentAppName(app.name);
           setPlatform(app.platform);
           // If Android and using emulator serial as name
           if (app.platform === 'android' && app.emulatorSerial) {
@@ -286,7 +294,9 @@ export default function InspectorPage() {
 
       if (launched) {
         setIsScanning(true);
-        setSelectedApp(appName);
+        setSelectedApp(appName); // appName here is ACTUALLY the ID passed from Dashboard
+        // We'll let the useEffect resolve the name, or we can fetch it here.
+        // But useEffect is safer as it handles initial state too.
         setRequests([]); // Clear previous session
       } else {
         console.error('[Inspector] ❌ Failed to launch app');
@@ -319,7 +329,8 @@ export default function InspectorPage() {
       <InspectorLayout
         onBack={handleBack}
         requests={requests}
-        appName={selectedApp}
+        appName={currentAppName || selectedApp} // Display Name
+        appId={selectedApp} // ID
         onDelete={handleDeleteRequest}
         platform={platform}
         fridaStatus={fridaStatus}

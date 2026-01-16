@@ -5,17 +5,26 @@ import { cn } from '../../../shared/lib/utils';
 
 interface SavedProfilesProps {
   onLoadProfile: (profile: InspectorProfile) => void;
+  appName?: string;
+  appId?: string;
 }
 
-export function SavedProfiles({ onLoadProfile }: SavedProfilesProps) {
+export function SavedProfiles({ onLoadProfile, appName, appId }: SavedProfilesProps) {
   const [profiles, setProfiles] = useState<InspectorProfile[]>([]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [appName, appId]);
 
   const loadData = () => {
-    setProfiles(loadProfiles());
+    let all = loadProfiles();
+    if (appId) {
+      // Prefer filtering by appId
+      all = all.filter((p) => (p.appId ? p.appId === appId : p.appName === appName));
+    } else if (appName) {
+      all = all.filter((p) => p.appName === appName);
+    }
+    setProfiles(all);
   };
 
   const handleDelete = (profileId: string, e: React.MouseEvent) => {
@@ -30,7 +39,7 @@ export function SavedProfiles({ onLoadProfile }: SavedProfilesProps) {
     return (
       <div className="p-8 text-center text-gray-500">
         <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-        <p>No saved profiles yet</p>
+        <p>No saved profiles yet{appName ? ` for ${appName}` : ''}</p>
         <p className="text-sm mt-1">Save inspector sessions from the toolbar</p>
       </div>
     );

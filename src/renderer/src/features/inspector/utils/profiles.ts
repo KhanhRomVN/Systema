@@ -4,6 +4,7 @@ import { NetworkRequest } from '../../inspector/types';
 export interface InspectorProfile {
   id: string;
   name: string;
+  appId?: string;
   appName: string;
   timestamp: number;
   requests: NetworkRequest[];
@@ -40,6 +41,7 @@ export function saveProfiles(profiles: InspectorProfile[]): void {
 export function createProfile(
   name: string,
   appName: string,
+  appId: string | undefined,
   requests: NetworkRequest[],
   filters: InspectorFilter,
   selectedRequestId: string | null,
@@ -49,6 +51,7 @@ export function createProfile(
     id: Date.now().toString(),
     name,
     appName,
+    appId,
     timestamp: Date.now(),
     requests,
     filters,
@@ -85,4 +88,10 @@ export function renameProfile(profileId: string, newName: string): void {
 export function loadProfile(profileId: string): InspectorProfile | null {
   const profiles = loadProfiles();
   return profiles.find((p) => p.id === profileId) || null;
+}
+
+export function deleteProfilesByAppId(appId: string): void {
+  const profiles = loadProfiles();
+  const filtered = profiles.filter((p) => p.appId !== appId);
+  saveProfiles(filtered);
 }

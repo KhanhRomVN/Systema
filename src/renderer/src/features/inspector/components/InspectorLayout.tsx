@@ -4,15 +4,18 @@ import { RequestDetails } from './RequestDetails';
 import { initialFilterState, InspectorFilter } from './FilterPanel';
 import { ChatContainer } from './ChatContainer';
 import { MemoryMonitor } from './MemoryMonitor';
+import { SaveProfileModal } from './SaveProfileModal';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
+import { createProfile } from '../utils/profiles';
 
 interface InspectorLayoutProps {
   onBack: () => void;
   requests: NetworkRequest[];
   appName: string;
+  appId?: string; // Should be passed if available
   onDelete: (id: string) => void;
   platform?: 'web' | 'pc' | 'android';
   fridaStatus?: 'running' | 'stopped' | 'unknown';
@@ -26,6 +29,7 @@ export function InspectorLayout({
   onBack,
   requests,
   appName,
+  appId,
   onDelete,
   platform,
   fridaStatus,
@@ -38,6 +42,7 @@ export function InspectorLayout({
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   const [detailsTab, setDetailsTab] = useState('overview');
+  const [isSaveProfileModalOpen, setIsSaveProfileModalOpen] = useState(false);
 
   // Intercept state
   const [isIntercepting, setIsIntercepting] = useState(false);
@@ -333,14 +338,7 @@ export function InspectorLayout({
           <button
             className="p-1.5 rounded text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
             title="Save Profile"
-            onClick={() => {
-              const profileName = prompt('Enter profile name:');
-              if (profileName) {
-                const { createProfile } = require('../utils/profiles');
-                createProfile(profileName, appName, requests, filter, selectedId, platform);
-                alert(`Profile "${profileName}" saved successfully!`);
-              }
-            }}
+            onClick={() => setIsSaveProfileModalOpen(true)}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -466,6 +464,20 @@ export function InspectorLayout({
           />
         </ResizableSplit>
       </div>
+
+      <SaveProfileModal
+        isOpen={isSaveProfileModalOpen}
+        onClose={() => setIsSaveProfileModalOpen(false)}
+        defaultName={`${appName} - ${new Date().toLocaleString()}`}
+        onSave={(name) => {
+          createProfile(name, appName, appId, requests, filter, selectedId, platform);
+          // Optional: Add a toast notification here instead of alert?
+          // For now, consistent with previous behavior (though alert might also be discouraged, it's safer than prompt)
+          // But since we are in a modal context, maybe just close.
+          // Let's keep it simple.
+          setIsSaveProfileModalOpen(false);
+        }}
+      />
     </div>
   );
 }
