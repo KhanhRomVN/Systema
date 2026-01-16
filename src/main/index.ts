@@ -461,7 +461,6 @@ app.whenReady().then(async () => {
               // Check if VM is running
               const emulators = await detectAllEmulators();
               console.log(`[AppLaunch] Checking Android VM status for stored: "${vmName}"`);
-              console.log(`[AppLaunch] Checking Android VM status for stored: "${vmName}"`);
 
               const isRunning = emulators.some((e) => {
                 const storedName = vmName.toLowerCase();
@@ -475,13 +474,7 @@ app.whenReady().then(async () => {
                   runningSerial === storedName ||
                   runningId === storedName
                 ) {
-                  if (
-                    runningName === storedName ||
-                    runningSerial === storedName ||
-                    runningId === storedName
-                  ) {
-                    return true;
-                  }
+                  return true;
                 }
 
                 // 2. Fuzzy match: check if one contains the other (e.g. "moto x" in "motorola moto x")
@@ -807,6 +800,109 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('mobile:delete-profile', async (_, profileId: string) => {
     return deleteProfile(profileId);
+  });
+
+  // Logcat streaming
+  let activeLogcatProcess: ChildProcess | null = null;
+  let lastLogcatRequestTime = 0;
+
+  ipcMain.handle('mobile:start-logcat', async (_, serial: string) => {
+    const requestTime = Date.now();
+    lastLogcatRequestTime = requestTime;
+
+    try {
+      console.log(`[Logcat] Start request received for serial: ${serial} (ID: ${requestTime})`);
+
+      const resolvedSerial = await resolveEmulatorSerial(serial);
+      console.log('[Logcat] Resolved serial:', resolvedSerial);
+
+      // Check if this request is still the latest one
+      if (lastLogcatRequestTime !== requestTime) {
+        console.log(`[Logcat] Request ID ${requestTime} is obsolete. Aborting start.`);
+        return false;
+      }
+
+      if (!resolvedSerial) {
+        throw new Error('Emulator serial not found');
+      }
+
+      // Stop any existing logcat process immediately before spawning a new one
+      if (activeLogcatProcess) {
+        console.log('[Logcat] Stopping existing logcat process');
+        try {
+          activeLogcatProcess.kill();
+        } catch (e) {
+          // ignore
+        }
+        activeLogcatProcess = null;
+      }
+
+      // Start logcat process
+      console.log('[Logcat] Starting adb logcat for:', resolvedSerial);
+      activeLogcatProcess = spawn('adb', ['-s', resolvedSerial, 'logcat', '-v', 'time'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      console.log('[Logcat] Process spawned, PID:', activeLogcatProcess.pid);
+
+      let logcatBuffer = '';
+
+      // Stream stdout to renderer
+      if (activeLogcatProcess.stdout) {
+        activeLogcatProcess.stdout.on('data', (data) => {
+          logcatBuffer += data.toString();
+
+          let lineEnd = logcatBuffer.indexOf('\n');
+          while (lineEnd !== -1) {
+            const line = logcatBuffer.substring(0, lineEnd).trim();
+            logcatBuffer = logcatBuffer.substring(lineEnd + 1);
+
+            if (line) {
+              const win = windowManager.getMainWindow();
+              if (win && !win.isDestroyed()) {
+                win.webContents.send('mobile:logcat-output', line);
+              }
+            }
+
+            lineEnd = logcatBuffer.indexOf('\n');
+          }
+        });
+        console.log('[Logcat] stdout listener attached');
+      }
+
+      if (activeLogcatProcess.stderr) {
+        activeLogcatProcess.stderr.on('data', (data) => {
+          console.error('[Logcat Error]', data.toString());
+        });
+      }
+
+      activeLogcatProcess.on('exit', (code) => {
+        console.log('[Logcat] Process exited with code:', code);
+        if (activeLogcatProcess?.pid === code) {
+          // Check purely illustrative, actually pid is not code
+          activeLogcatProcess = null;
+        }
+        // Just clear it if it's this process
+        activeLogcatProcess = null;
+      });
+
+      activeLogcatProcess.on('error', (err) => {
+        console.error('[Logcat] Process error:', err);
+      });
+
+      return true;
+    } catch (e) {
+      console.error('[Logcat] Failed to start:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('mobile:stop-logcat', async () => {
+    if (activeLogcatProcess) {
+      activeLogcatProcess.kill();
+      activeLogcatProcess = null;
+    }
+    return true;
   });
 
   // Create main window

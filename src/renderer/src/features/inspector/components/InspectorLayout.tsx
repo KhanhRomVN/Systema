@@ -3,6 +3,7 @@ import { RequestList } from './RequestList';
 import { RequestDetails } from './RequestDetails';
 import { initialFilterState, InspectorFilter } from './FilterPanel';
 import { ChatContainer } from './ChatContainer';
+import { LogViewer } from './LogViewer';
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
@@ -17,6 +18,7 @@ interface InspectorLayoutProps {
   onInstallFrida?: () => void;
   onStartFrida?: () => void;
   onInjectBypass?: () => void;
+  emulatorSerial?: string;
 }
 
 export function InspectorLayout({
@@ -29,7 +31,9 @@ export function InspectorLayout({
   onInstallFrida,
   onStartFrida,
   onInjectBypass,
+  emulatorSerial,
 }: InspectorLayoutProps) {
+  const [activeView, setActiveView] = useState<'network' | 'logs'>('network');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
@@ -260,25 +264,63 @@ export function InspectorLayout({
           &larr; Back
         </button>
         <div className="h-4 w-px bg-border/50" />
-        <span className="font-semibold text-sm">Network Inspector</span>
 
-        {/* Intercept Button */}
-        <button
-          onClick={() => handleSetIntercept(!isIntercepting)}
-          className={cn(
-            'ml-2 px-3 py-1 rounded text-xs font-medium border transition-all flex items-center gap-2',
-            isIntercepting
-              ? 'bg-red-500/10 text-red-500 border-red-500/30 animate-pulse'
-              : 'bg-transparent text-muted-foreground border-border hover:bg-muted/50',
-          )}
-        >
-          <div
-            className={cn('w-2 h-2 rounded-full', isIntercepting ? 'bg-red-500' : 'bg-gray-400')}
-          />
-          {isIntercepting ? 'Intercepting (Blocking)' : 'Intercept'}
-        </button>
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1 bg-background border border-border rounded p-0.5">
+          <button
+            onClick={() => setActiveView('network')}
+            className={cn(
+              'px-3 py-1 rounded text-xs font-medium transition-all',
+              activeView === 'network'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+            )}
+          >
+            Network
+          </button>
+          <button
+            onClick={() => setActiveView('logs')}
+            className={cn(
+              'px-3 py-1 rounded text-xs font-medium transition-all',
+              activeView === 'logs'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+            )}
+            title={platform !== 'android' ? 'Logs (Android only)' : 'View Android Logcat'}
+            disabled={platform !== 'android'}
+          >
+            Logs
+          </button>
+        </div>
 
-        {platform === 'android' && (
+        {activeView === 'network' && (
+          <>
+            {/* Intercept Button */}
+            <button
+              onClick={() => handleSetIntercept(!isIntercepting)}
+              className={cn(
+                'ml-2 px-3 py-1 rounded text-xs font-medium border transition-all flex items-center gap-2',
+                isIntercepting
+                  ? 'bg-red-500/10 text-red-500 border-red-500/30 animate-pulse'
+                  : 'bg-transparent text-muted-foreground border-border hover:bg-muted/50',
+              )}
+            >
+              <div
+                className={cn(
+                  'w-2 h-2 rounded-full',
+                  isIntercepting ? 'bg-red-500' : 'bg-gray-400',
+                )}
+              />
+              {isIntercepting ? 'Intercepting (Blocking)' : 'Intercept'}
+            </button>
+
+            <div className="ml-auto text-xs text-muted-foreground">
+              {filteredRequests.length} / {requests.length} requests
+            </div>
+          </>
+        )}
+
+        {platform === 'android' && activeView === 'network' && (
           <div className="flex items-center gap-2 ml-2 border-l border-border/50 pl-2">
             <span className="text-xs text-muted-foreground mr-1">Frida:</span>
 
@@ -317,66 +359,66 @@ export function InspectorLayout({
             )}
           </div>
         )}
-
-        <div className="ml-auto text-xs text-muted-foreground">
-          {filteredRequests.length} / {requests.length} requests
-        </div>
       </div>
 
       <div className="flex-1 overflow-hidden relative">
-        <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
-          <ResizableSplit direction="vertical" initialSize={50} minSize={20} maxSize={80}>
-            <div className="h-full flex flex-col">
-              {filteredRequests.length === 0 && requests.length > 0 && (
-                <div className="p-4 bg-yellow-500/10 text-yellow-500 text-xs text-center border-b border-yellow-500/20">
-                  All {requests.length} requests are hidden by filters.
-                  <button
-                    onClick={() => setFilter({ ...initialFilterState })}
-                    className="ml-2 underline hover:text-yellow-400"
-                  >
-                    Reset Filters
-                  </button>
-                </div>
-              )}
-              <RequestList
-                requests={filteredRequests}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                interceptedIds={interceptedIds}
-                pendingActionIds={pendingActionIds}
-                onForward={handleForward}
-                onDrop={handleDrop}
-                onDelete={onDelete}
-              />
-            </div>
+        {activeView === 'network' ? (
+          <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
+            <ResizableSplit direction="vertical" initialSize={50} minSize={20} maxSize={80}>
+              <div className="h-full flex flex-col">
+                {filteredRequests.length === 0 && requests.length > 0 && (
+                  <div className="p-4 bg-yellow-500/10 text-yellow-500 text-xs text-center border-b border-yellow-500/20">
+                    All {requests.length} requests are hidden by filters.
+                    <button
+                      onClick={() => setFilter({ ...initialFilterState })}
+                      className="ml-2 underline hover:text-yellow-400"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                )}
+                <RequestList
+                  requests={filteredRequests}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  interceptedIds={interceptedIds}
+                  pendingActionIds={pendingActionIds}
+                  onForward={handleForward}
+                  onDrop={handleDrop}
+                  onDelete={onDelete}
+                />
+              </div>
 
-            <RequestDetails
-              request={selectedRequest}
-              searchTerm={searchTerm}
-              activeTab={detailsTab}
-              onTabChange={setDetailsTab}
-              onToggleFilter={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-              isFilterOpen={isFilterPanelOpen}
-              filter={filter}
-              onFilterChange={setFilter}
-              requests={requests}
+              <RequestDetails
+                request={selectedRequest}
+                searchTerm={searchTerm}
+                activeTab={detailsTab}
+                onTabChange={setDetailsTab}
+                onToggleFilter={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+                isFilterOpen={isFilterPanelOpen}
+                filter={filter}
+                onFilterChange={setFilter}
+                requests={requests}
+              />
+            </ResizableSplit>
+
+            <ChatContainer
+              inspectorContext={{
+                requests,
+                filteredRequests,
+                selectedRequestId: selectedId,
+                filter,
+                onSetFilter: setFilter,
+                onSelectRequest: setSelectedId,
+                targetApp: appName,
+              }}
             />
           </ResizableSplit>
-
-          <ChatContainer
-            inspectorContext={{
-              requests,
-              filteredRequests, // Pass the filtered list
-              selectedRequestId: selectedId,
-              filter,
-              onSetFilter: setFilter,
-              onSelectRequest: setSelectedId,
-              targetApp: appName,
-            }}
-          />
-        </ResizableSplit>
+        ) : (
+          <LogViewer emulatorSerial={emulatorSerial} />
+        )}
       </div>
     </div>
   );

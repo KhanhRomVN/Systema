@@ -11,6 +11,7 @@ export default function InspectorPage() {
   const [platform, setPlatform] = useState<'web' | 'pc' | 'android' | undefined>();
   const [fridaStatus, setFridaStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
   const [targetPackage, setTargetPackage] = useState<string>('');
+  const [emulatorSerial, setEmulatorSerial] = useState<string>('');
 
   // Check platform and Frida status when app changes
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function InspectorPage() {
           // If Android and using emulator serial as name
           if (app.platform === 'android' && app.emulatorSerial) {
             const serial = app.emulatorSerial;
+            setEmulatorSerial(serial);
             const isRunning = await window.api.invoke('mobile:check-frida', serial);
             setFridaStatus(isRunning ? 'running' : 'stopped');
           }
@@ -314,6 +316,7 @@ export default function InspectorPage() {
         onInstallFrida={handleInstallFrida}
         onStartFrida={handleStartFrida}
         onInjectBypass={handleInjectBypass}
+        emulatorSerial={emulatorSerial}
       />
     </div>
   );

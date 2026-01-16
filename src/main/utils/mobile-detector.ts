@@ -81,11 +81,11 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
   try {
     // Strategy 1: VirtualBox (Legacy/Standard)
     let vboxVMs: Map<string, string> = new Map(); // Name -> IP
-    console.log('[MobileDetector] Starting Genymotion detection...');
+    // console.log('[MobileDetector] Starting Genymotion detection...');
     try {
       // Only try if vboxmanage is in path
       execSync('which vboxmanage', { stdio: 'ignore' });
-      console.log('[MobileDetector] vboxmanage found, checking runningvms...');
+      // console.log('[MobileDetector] vboxmanage found, checking runningvms...');
       const { stdout } = await execAsync('vboxmanage list runningvms');
       const lines = stdout.trim().split('\n');
       for (const line of lines) {
@@ -112,7 +112,7 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
     // Find all 'player' processes which indicate a running Genymotion VM
     let runningVMNames: Set<string> = new Set(vboxVMs.keys());
     try {
-      console.log('[MobileDetector] Scanning processes for "player"...');
+      // console.log('[MobileDetector] Scanning processes for "player"...');
       const { stdout: psOut } = await execAsync('ps -ef');
       const lines = psOut.split('\n');
       for (const line of lines) {
@@ -147,7 +147,7 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
       const serial = parts[0].trim();
       const status = parts[1].trim();
 
-      console.log(`[MobileDetector] Checking device: ${serial} (${status})`);
+      // console.log(`[MobileDetector] Checking device: ${serial} (${status})`);
 
       if (status !== 'device') continue;
 
@@ -159,7 +159,7 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
 
         // Allow both Genymotion and Genymobile (newer versions/images)
         if (manufacturer !== 'Genymotion' && manufacturer !== 'Genymobile') {
-          console.log(`[MobileDetector] Skipping non-Genymotion device: ${serial}`);
+          // console.log(`[MobileDetector] Skipping non-Genymotion device: ${serial}`);
           continue;
         }
 

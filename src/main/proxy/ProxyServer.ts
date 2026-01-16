@@ -82,11 +82,14 @@ export class ProxyServer extends EventEmitter {
   }
 
   private setupListeners() {
-    this.proxy.onError((err: any) => {
-      const code = err?.code;
-      if (code === 'ECONNRESET' || err?.message === 'socket hang up') {
+    this.proxy.onError((ctxOrErr: any, err?: any) => {
+      // http-mitm-proxy might pass (ctx, err) or just (err) depending on version/context
+      const error = err || ctxOrErr;
+      const code = error?.code;
+      if (code === 'ECONNRESET' || error?.message === 'socket hang up') {
         return;
       }
+      console.error('[ProxyServer Error]', error);
     });
 
     this.proxy.onRequest((ctx: any, callback: any) => {
@@ -95,6 +98,9 @@ export class ProxyServer extends EventEmitter {
       const url = (ctx.isSSL ? 'https://' : 'http://') + req.headers.host + req.url;
       const requestId = Date.now().toString() + Math.random();
       ctx.requestId = requestId;
+
+      // Debug log to verify requests are being captured
+      console.log(`[ProxyServer] ${ctx.isSSL ? 'HTTPS' : 'HTTP'} ${method} ${url}`);
 
       const initiatorStackBase64 = req.headers['x-systema-initiator'];
       let initiator = null;
