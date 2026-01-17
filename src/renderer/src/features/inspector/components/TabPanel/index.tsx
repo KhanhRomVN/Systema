@@ -5,7 +5,7 @@ import TabFooter from './TabFooter';
 
 interface TabPanelProps {
   sessions: ChatSession[];
-  port: number;
+  port: number | null;
   wsConnected: boolean;
   onSelectSession: (id: string) => void;
   onOpenHistory: () => void;
@@ -25,6 +25,7 @@ export function TabPanel({
   const [copiedPort, setCopiedPort] = useState(false);
 
   const handleCopyPort = () => {
+    if (!port) return;
     navigator.clipboard.writeText(`localhost:${port}`).then(() => {
       setCopiedPort(true);
       setTimeout(() => setCopiedPort(false), 2000);
@@ -63,7 +64,9 @@ export function TabPanel({
             ) : (
               <Copy className="w-2.5 h-2.5" />
             )}
-            <span className={copiedPort ? 'text-green-500 font-medium' : ''}>localhost:{port}</span>
+            <span className={copiedPort ? 'text-green-500 font-medium' : ''}>
+              {port ? `localhost:${port}` : 'Connecting...'}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-1">

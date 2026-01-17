@@ -95,6 +95,10 @@ export function InspectorLayout({
   const [pendingActionIds, setPendingActionIds] = useState<Set<string>>(new Set());
   const [processedIds] = useState(new Set<string>()); // helper to track seen IDs for interception
 
+  // Comparison State
+  const [compareRequest1, setCompareRequest1] = useState<NetworkRequest | null>(null);
+  const [compareRequest2, setCompareRequest2] = useState<NetworkRequest | null>(null);
+
   const handleSetIntercept = (enabled: boolean) => {
     setIsIntercepting(enabled);
     window.api.invoke('proxy:set-intercept', enabled);
@@ -580,6 +584,8 @@ export function InspectorLayout({
                 onDrop={handleDrop}
                 onDelete={onDelete}
                 appId={appId || 'unknown'}
+                onSetCompare1={setCompareRequest1}
+                onSetCompare2={setCompareRequest2}
               />
             </div>
 
@@ -613,6 +619,12 @@ export function InspectorLayout({
               targetApp: appName,
               emulatorSerial,
               appId,
+              compareRequest1,
+              compareRequest2,
+              onClearComparison: () => {
+                setCompareRequest1(null);
+                setCompareRequest2(null);
+              },
             }}
           />
         </ResizableSplit>

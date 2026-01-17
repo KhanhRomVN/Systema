@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 interface TabFooterProps {
   onModelChange?: (modelIds: string[]) => void;
-  port: number;
+  port: number | null;
 }
 
 export default function TabFooter({ onModelChange, port }: TabFooterProps) {
@@ -41,8 +41,10 @@ export default function TabFooter({ onModelChange, port }: TabFooterProps) {
 
   const handleModelToggle = (modelId: string) => {
     if (modelId === 'claude-cookie-web') {
-      // @ts-ignore
-      window.api.invoke('app:launch', 'open-claude', 'http://127.0.0.1:' + port);
+      if (port) {
+        // @ts-ignore
+        window.api.invoke('app:launch', 'open-claude', 'http://127.0.0.1:' + port);
+      }
       return;
     }
 

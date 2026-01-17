@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { NetworkRequest } from '../types';
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { cn } from '../../../shared/lib/utils';
 import {
   ArrowUpDown,
@@ -29,11 +29,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '../../../components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '../../../components/ui/context-menu';
 import { addRequestToDefaultCollection } from '../utils/collections';
 
 interface RequestActionsProps {
@@ -42,6 +46,8 @@ interface RequestActionsProps {
   onToggleHighlight: (id: string) => void;
   onDelete?: (id: string) => void;
   appId: string;
+  onSetCompare1: (req: NetworkRequest) => void;
+  onSetCompare2: (req: NetworkRequest) => void;
 }
 
 function RequestActions({
@@ -76,6 +82,23 @@ function RequestActions({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetCompare1(request);
+            }}
+          >
+            <span>Set as Compare 1</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetCompare2(request);
+            }}
+          >
+            <span>Set as Compare 2</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
@@ -131,6 +154,8 @@ interface RequestListProps {
   onDrop?: (id: string) => void;
   onDelete?: (id: string) => void;
   appId: string;
+  onSetCompare1: (req: NetworkRequest) => void;
+  onSetCompare2: (req: NetworkRequest) => void;
 }
 
 export function RequestList({
@@ -145,6 +170,8 @@ export function RequestList({
   onDrop,
   onDelete,
   appId,
+  onSetCompare1,
+  onSetCompare2,
 }: RequestListProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
@@ -293,11 +320,22 @@ export function RequestList({
             onToggleHighlight={toggleHighlight}
             onDelete={onDelete}
             appId={appId}
+            onSetCompare1={onSetCompare1}
+            onSetCompare2={onSetCompare2}
           />
         ),
       },
     ],
-    [pendingActionIds, onForward, onDrop, onDelete, highlightedIds, toggleHighlight],
+    [
+      pendingActionIds,
+      onForward,
+      onDrop,
+      onDelete,
+      highlightedIds,
+      toggleHighlight,
+      onSetCompare1,
+      onSetCompare2,
+    ],
   );
 
   // Memoized global filter function with pre-compiled regex
@@ -505,49 +543,104 @@ export function RequestList({
             const isHighlighted = highlightedIds.has(row.original.id);
 
             return (
-              <div
-                key={row.id}
-                data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
-                className={cn(
-                  'flex items-center border-b border-border/20 transition-colors cursor-pointer text-xs absolute left-0 top-0',
-                  isPending
-                    ? 'bg-orange-500/10 hover:bg-orange-500/20'
-                    : isIntercepted
-                      ? 'bg-red-500/10 hover:bg-red-500/20'
-                      : isHighlighted
-                        ? 'bg-blue-500/10 hover:bg-blue-500/20 border-l-2 border-l-blue-500' // Highlight style
-                        : 'hover:bg-muted/50',
-                  row.original.id === selectedId &&
-                    'bg-accent text-accent-foreground hover:bg-accent',
-                )}
-                style={{
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start}px)`,
-                  width: '100%',
-                  minWidth: 'max-content',
-                }}
-                onClick={() => onSelect(row.original.id)}
-              >
-                {row.getVisibleCells().map((cell) => {
-                  const isHost = cell.column.id === 'host';
-                  const isPath = cell.column.id === 'path';
-                  const isFixed = !isHost && !isPath;
+              <ContextMenu key={row.id}>
+                <ContextMenuTrigger asChild>
+                  <div
+                    data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
+                    className={cn(
+                      'flex items-center border-b border-border/20 transition-colors cursor-pointer text-xs absolute left-0 top-0',
+                      isPending
+                        ? 'bg-orange-500/10 hover:bg-orange-500/20'
+                        : isIntercepted
+                          ? 'bg-red-500/10 hover:bg-red-500/20'
+                          : isHighlighted
+                            ? 'bg-blue-500/10 hover:bg-blue-500/20 border-l-2 border-l-blue-500' // Highlight style
+                            : 'hover:bg-muted/50',
+                      row.original.id === selectedId &&
+                        'bg-accent text-accent-foreground hover:bg-accent',
+                    )}
+                    style={{
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                      width: '100%',
+                      minWidth: 'max-content',
+                    }}
+                    onClick={() => onSelect(row.original.id)}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const isHost = cell.column.id === 'host';
+                      const isPath = cell.column.id === 'path';
+                      const isFixed = !isHost && !isPath;
 
-                  return (
-                    <div
-                      key={cell.id}
-                      className="px-4 py-1.5 whitespace-nowrap overflow-hidden shrink-0 flex items-center"
-                      style={{
-                        width: isFixed ? cell.column.getSize() : 0,
-                        flex: isHost ? '1 1 0px' : isPath ? '2 1 0px' : undefined,
-                        minWidth: isHost ? '150px' : isPath ? '300px' : undefined,
-                      }}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </div>
-                  );
-                })}
-              </div>
+                      return (
+                        <div
+                          key={cell.id}
+                          className="px-4 py-1.5 whitespace-nowrap overflow-hidden shrink-0 flex items-center"
+                          style={{
+                            width: isFixed ? cell.column.getSize() : 0,
+                            flex: isHost ? '1 1 0px' : isPath ? '2 1 0px' : undefined,
+                            minWidth: isHost ? '150px' : isPath ? '300px' : undefined,
+                          }}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-48">
+                  <ContextMenuItem
+                    onClick={() => {
+                      onSetCompare1(row.original);
+                    }}
+                  >
+                    <span>Set as Compare 1</span>
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => {
+                      onSetCompare2(row.original);
+                    }}
+                  >
+                    <span>Set as Compare 2</span>
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+
+                  <ContextMenuItem
+                    onClick={() => {
+                      addRequestToDefaultCollection(appId, row.original);
+                    }}
+                  >
+                    <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
+                    <span>Add to Collection</span>
+                  </ContextMenuItem>
+
+                  <ContextMenuItem
+                    onClick={() => {
+                      toggleHighlight(row.original.id);
+                    }}
+                  >
+                    <Star
+                      className={cn(
+                        'mr-2 h-3.5 w-3.5',
+                        isHighlighted ? 'fill-yellow-500 text-yellow-500' : '',
+                      )}
+                    />
+                    <span>{isHighlighted ? 'Unhighlight' : 'Highlight'}</span>
+                  </ContextMenuItem>
+
+                  <ContextMenuSeparator />
+
+                  <ContextMenuItem
+                    onClick={() => {
+                      onDelete?.(row.original.id);
+                    }}
+                    className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    <span>Delete</span>
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           })}
 
