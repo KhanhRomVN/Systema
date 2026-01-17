@@ -16,14 +16,12 @@ export class ProxyManager {
 
   setMainWindow(window: BrowserWindow) {
     this.mainWindow = window;
-    // Update existing proxies if any (though usually this is called early)
     for (const session of this.sessions.values()) {
       session.server.setWindow(window);
     }
   }
 
   async createSession(id: string): Promise<number> {
-    // If session exists, return existing port
     if (this.sessions.has(id)) {
       return this.sessions.get(id)!.port;
     }
@@ -78,23 +76,8 @@ export class ProxyManager {
     return false;
   }
 
-  // Forward/Drop requests usually come with a requestId that might need
-  // to imply which session it belongs to.
-  // However, currently the ProxyServer emits events to the main window.
-  // The inspector likely needs to know which proxy emitted the event.
-  // For now, let's assume the request ID is unique enough or the frontend knows.
-  // Actually, we probably need to iterate all proxies to find the request?
-  // OR, the frontend sends the proxyId/appId along with the action.
-
-  // For simplicity MVP, let's just try to apply the action to ALL proxies
-  // or find which one has the request pending.
-  // Since `forwardRequest` returns a promise/boolean, we can try them.
-
   async forwardRequest(requestId: string): Promise<boolean> {
     for (const session of this.sessions.values()) {
-      // We'd ideally check if this session has this request,
-      // but ProxyServer doesn't expose a "hasRequest" method easily without modification.
-      // But calling forwardRequest on a non-existent ID usually just does nothing or returns false.
       const result = await session.server.forwardRequest(requestId);
       if (result) return true;
     }

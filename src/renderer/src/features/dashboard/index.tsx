@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserApp, AppPlatform, AppMode } from '../../types/apps'; // Updated import path
+import { UserApp, AppPlatform, AppMode, MobileEmulator } from '../../types/apps'; // Updated import path
 import { AddAppModal } from './components/AddAppModal';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2 } from 'lucide-react';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Zap } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { SavedProfiles } from './components/SavedProfiles';
@@ -39,6 +39,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
   const [showPcAddModal, setShowPcAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Device State
+  const [connectedDevices, setConnectedDevices] = useState<MobileEmulator[]>([]);
+
   // Track previous tab to prevent infinite loops
   const prevTabRef = useRef<AppPlatform>(activeTab);
 
@@ -55,8 +58,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
     }
   };
 
+  const fetchConnectedDevices = async () => {
+    try {
+      const devices = await window.api.invoke('mobile:detect-emulators');
+      setConnectedDevices(devices);
+    } catch (e) {
+      console.error('Failed to fetch connected devices', e);
+    }
+  };
+
   useEffect(() => {
     fetchApps();
+    fetchConnectedDevices();
+
+    // Poll for devices every 5 seconds
+    const interval = setInterval(fetchConnectedDevices, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -149,49 +166,37 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
     if (!selectedApp || selectedApp.platform !== 'android') return;
 
     try {
-      const emulators = await window.api.invoke('mobile:detect-emulators');
+      // Just check if it's running
+      // If it's a physical device (no "launch" needed), just connect?
+      // Actually standard logic: launch app implies ensure it's inspected.
+
       const vmName = selectedApp.emulatorSerial;
 
-      if (!vmName) {
-        alert('Emulator name is missing.');
-        return;
-      }
-
-      // Check if VM is running (either by name, serial, or id with fuzzy match)
+      // Check if running
+      const emulators = await window.api.invoke('mobile:detect-emulators');
       const isRunning = emulators.some((e: any) => {
-        if (e.status !== 'running') return false;
-
-        const storedName = vmName.toLowerCase();
+        // Logic same as backend fuzzy match
+        const storedName = (vmName || '').toLowerCase();
         const runningName = (e.name || '').toLowerCase();
         const runningSerial = (e.serial || '').toLowerCase();
-        const runningId = (e.id || '').toLowerCase();
 
-        // Exact match
-        if (runningName === storedName || runningSerial === storedName || runningId === storedName)
-          return true;
-
-        // Fuzzy match (except for UUIDs to avoid false positives)
-        const isStoredUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          storedName,
-        );
-        if (
-          !isStoredUUID &&
-          (storedName.includes(runningName) || runningName.includes(storedName))
-        ) {
-          return true;
-        }
-
+        if (runningName === storedName || runningSerial === storedName) return true;
+        if (storedName && runningName.includes(storedName)) return true; // Loose match
         return false;
       });
 
-      if (isRunning) {
+      if (isRunning || !vmName) {
         handleLaunch('electron');
       } else {
-        alert(`Emulator '${vmName}' is not running.\nPlease launch it via Genymotion first.`);
+        // If it has a vmName but not running, maybe it's a Genymotion VM we can launch?
+        // The backend handles launching if we call 'app:launch' (native launch logic)
+        // But here we want to warn user?
+        // Actually `onSelect` update `DashboardContainer` which uses `useAppLauncher` to call `app:launch`.
+        // So just calling `handleLaunch` is enough, backend will try to launch VM if needed.
+        handleLaunch('electron');
       }
     } catch (e) {
       console.error('Failed to check emulator status', e);
-      alert('Failed to check emulator status.');
     }
   };
 
@@ -267,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
               className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-gray-700 text-gray-400 hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 transition-all duration-200 group"
             >
               <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span className="text-sm font-medium">Add Mobile App</span>
+              <span className="text-sm font-medium">Add Mobile App or Device</span>
             </button>
           )}
 
@@ -275,12 +280,27 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
             const faviconUrl = getFaviconUrl(app.url);
             const initials = app.name.slice(0, 2).toUpperCase();
 
+            // Check formatted device mapping
+            const connectedDevice =
+              app.platform === 'android'
+                ? connectedDevices.find((d) => {
+                    const stored = (app.emulatorSerial || '').toLowerCase();
+                    if (!stored) return false;
+
+                    // Check name or serial
+                    if (d.name.toLowerCase() === stored) return true;
+                    if (d.serial.toLowerCase() === stored) return true;
+                    if (d.name.toLowerCase().includes(stored)) return true; // Loose match
+                    return false;
+                  })
+                : null;
+
             return (
               <div
                 key={app.id}
                 onClick={() => setActiveAppId(app.id)}
                 className={cn(
-                  'group flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border border-transparent',
+                  'group flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border border-transparent relative',
                   activeAppId === app.id
                     ? 'bg-gray-800 border-gray-700 shadow-lg'
                     : 'hover:bg-gray-800/50',
@@ -340,14 +360,39 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="text-xs text-gray-500 truncate flex items-center mt-0.5">
-                    {app.mode === 'browser'
-                      ? 'Real Browser'
-                      : app.mode === 'electron'
-                        ? 'Electron Window'
-                        : app.platform === 'android'
-                          ? 'Mobile App'
-                          : 'Native App'}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className="text-xs text-gray-500 truncate">
+                      {app.mode === 'browser'
+                        ? 'Real Browser'
+                        : app.mode === 'electron'
+                          ? 'Electron Window'
+                          : app.platform === 'android'
+                            ? 'Mobile App'
+                            : 'Native App'}
+                    </div>
+
+                    {/* Device Badge */}
+                    {app.platform === 'android' && connectedDevice && (
+                      <div
+                        className={cn(
+                          'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1',
+                          connectedDevice.type === 'physical'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : connectedDevice.type === 'waydroid'
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                              : 'bg-pink-500/20 text-pink-400 border border-pink-500/30', // Genymotion
+                        )}
+                      >
+                        {connectedDevice.type === 'physical' && <Smartphone className="w-2 h-2" />}
+                        {connectedDevice.type === 'waydroid' && <Monitor className="w-2 h-2" />}
+                        {connectedDevice.type === 'genymotion' && <Zap className="w-2 h-2" />}
+                        {connectedDevice.type === 'physical'
+                          ? 'Real Device'
+                          : connectedDevice.type === 'waydroid'
+                            ? 'Waydroid'
+                            : 'Genymotion'}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

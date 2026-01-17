@@ -5,7 +5,7 @@ import * as path from 'path';
 
 const execAsync = promisify(exec);
 
-export type EmulatorType = 'genymotion' | 'waydroid';
+export type EmulatorType = 'genymotion' | 'waydroid' | 'physical';
 
 export interface MobileEmulator {
   type: EmulatorType;
@@ -70,22 +70,18 @@ export async function checkADBAvailability(): Promise<{
 }
 
 /**
- * Detect running Genymotion emulators
+ * Detect running Android devices (Emulators & Physical)
+ * Refactored to be more inclusive of physical devices while maintaining Genymotion specific logic
  */
-/**
- * Detect running Genymotion emulators (VirtualBox & QEMU)
- */
-export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
+export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
   const emulators: MobileEmulator[] = [];
 
   try {
-    // Strategy 1: VirtualBox (Legacy/Standard)
+    // Strategy 1: VirtualBox (Legacy/Standard Genymotion)
     let vboxVMs: Map<string, string> = new Map(); // Name -> IP
-    // console.log('[MobileDetector] Starting Genymotion detection...');
     try {
       // Only try if vboxmanage is in path
       execSync('which vboxmanage', { stdio: 'ignore' });
-      // console.log('[MobileDetector] vboxmanage found, checking runningvms...');
       const { stdout } = await execAsync('vboxmanage list runningvms');
       const lines = stdout.trim().split('\n');
       for (const line of lines) {
@@ -105,18 +101,15 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
         }
       }
     } catch {
-      console.log('[MobileDetector] vboxmanage not found or failed.');
+      // console.log('[MobileDetector] vboxmanage not found or failed.');
     }
 
-    // Strategy 2: Process Scanning (QEMU/KVM)
-    // Find all 'player' processes which indicate a running Genymotion VM
+    // Strategy 2: Process Scanning (QEMU/KVM for Genymotion)
     let runningVMNames: Set<string> = new Set(vboxVMs.keys());
     try {
-      // console.log('[MobileDetector] Scanning processes for "player"...');
       const { stdout: psOut } = await execAsync('ps -ef');
       const lines = psOut.split('\n');
       for (const line of lines) {
-        // Genymotion player command usually looks like: .../player --vm-name "Device Name" ...
         if (
           line.includes('player') &&
           (line.includes('--vm-name') || line.includes('genymotion'))
@@ -125,7 +118,6 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
           if (match) {
             runningVMNames.add(match[1]);
           } else {
-            // Check for non-quoted or other formats if necessary
             const match2 = line.match(/--vm-name\s+([^\s]+)/);
             if (match2) {
               runningVMNames.add(match2[1]);
@@ -147,21 +139,12 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
       const serial = parts[0].trim();
       const status = parts[1].trim();
 
-      // console.log(`[MobileDetector] Checking device: ${serial} (${status})`);
-
       if (status !== 'device') continue;
 
       try {
-        // Check if it is Genymotion
         const manufacturer = (
           await execAsync(`adb -s ${serial} shell getprop ro.product.manufacturer`)
         ).stdout.trim();
-
-        // Allow both Genymotion and Genymobile (newer versions/images)
-        if (manufacturer !== 'Genymotion' && manufacturer !== 'Genymobile') {
-          // console.log(`[MobileDetector] Skipping non-Genymotion device: ${serial}`);
-          continue;
-        }
 
         const model = (
           await execAsync(`adb -s ${serial} shell getprop ro.product.model`)
@@ -176,66 +159,69 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
           await execAsync(`adb -s ${serial} shell getprop sys.boot_completed`)
         ).stdout.trim();
 
-        // Try to find exact VM Name match
-        // If we found it via VBox, we have the IP-to-Name mapping
-        let name = model; // Default to model
+        const isGenymotion = manufacturer === 'Genymotion' || manufacturer === 'Genymobile';
 
-        // VBox matching
-        // serial is typically IP:5555
-        const ip = serial.split(':')[0];
-        for (const [vmName, vmIp] of vboxVMs.entries()) {
-          if (vmIp === ip) {
-            name = vmName;
-            break;
-          }
-        }
-
-        // If not found via VBox, checking if any of the running VM names (from ps) allow us to guess
-        // If only 1 VM is running, we can assume this ADB device is that VM
-        // This is a heuristic for QEMU where explicit mapping is hard without `genymotion-shell`
+        let type: EmulatorType = isGenymotion ? 'genymotion' : 'physical';
+        let name = model;
+        let ip = '';
         let vmId: string | undefined;
 
-        if (runningVMNames.size === 1 && name === model) {
-          // Only overwrite if the running VM name looks human readable, NOT a UUID
-          // Users see human names in the list. QEMU often uses UUID as --vm-name.
-          const candidate = Array.from(runningVMNames)[0];
-          vmId = candidate; // Store the raw ID (UUID)
+        // Try to identify IP for network devices
+        if (serial.includes(':')) {
+          ip = serial.split(':')[0];
+        }
 
-          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            candidate,
-          );
-
-          if (!isUUID) {
-            name = candidate;
-          } else {
-            // Keep model name if process name is UUID
+        // Only try to map to Genymotion VM names if it IS a Genymotion device
+        if (isGenymotion) {
+          // VBox matching
+          for (const [vmName, vmIp] of vboxVMs.entries()) {
+            if (vmIp === ip) {
+              name = vmName;
+              break;
+            }
           }
-        } else if (runningVMNames.has(model)) {
-          // Explicit match
-          name = model;
-          vmId = model;
+
+          // heuristic matching if not found via VBox
+          if (name === model) {
+            if (runningVMNames.size === 1) {
+              const candidate = Array.from(runningVMNames)[0];
+              vmId = candidate;
+              const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                candidate,
+              );
+              if (!isUUID) {
+                name = candidate;
+              }
+            } else if (runningVMNames.has(model)) {
+              name = model;
+              vmId = model;
+            }
+          }
+        } else {
+          // For physical devices, try to get a better name if possible, or just use Model
+          // Maybe "Samsung Galaxy S21" etc.
+          name = `${manufacturer} ${model}`;
         }
 
         emulators.push({
-          type: 'genymotion',
+          type,
           serial,
-          name: name, // This logic tries to sync "Motorola Moto X" with this device
+          name: name,
           id: vmId,
           ip: ip,
-          adbPort: 5555,
+          adbPort: 5555, // Default, might be different for USB but irrelevant
           androidVersion,
           architecture,
           status: bootComplete === '1' ? 'running' : 'booting',
         });
       } catch (e) {
-        console.warn(`Failed to probe Genymotion device ${serial}:`, e);
+        console.warn(`Failed to probe device ${serial}:`, e);
       }
     }
 
-    // If we found running VMs via process check but they are NOT in ADB yet (booting or adb issues)
-    // We should still list them so the UI knows they are "Running" roughly
+    // Add Genymotion VMs that are running but not yet in ADB (booting)
     for (const vmName of runningVMNames) {
-      const alreadyListed = emulators.some((e) => e.name === vmName);
+      const alreadyListed = emulators.some((e) => e.name === vmName || e.id === vmName);
       if (!alreadyListed) {
         emulators.push({
           type: 'genymotion',
@@ -245,12 +231,12 @@ export async function detectGenymotionEmulators(): Promise<MobileEmulator[]> {
           adbPort: 0,
           androidVersion: '?',
           architecture: '?',
-          status: 'booting', // Assume booting if process exists but no ADB
+          status: 'booting',
         });
       }
     }
   } catch (error) {
-    console.error('Failed to detect Genymotion emulators:', error);
+    console.error('Failed to detect Android devices:', error);
   }
 
   return emulators;
@@ -347,12 +333,12 @@ export async function detectAllEmulators(): Promise<MobileEmulator[]> {
   }
 
   // Detect both types of emulators
-  const [genymotionEmulators, waydroidEmulators] = await Promise.all([
-    detectGenymotionEmulators(),
+  const [androidDevices, waydroidEmulators] = await Promise.all([
+    detectAndroidDevices(),
     detectWaydroidEmulators(),
   ]);
 
-  return [...genymotionEmulators, ...waydroidEmulators];
+  return [...androidDevices, ...waydroidEmulators];
 }
 
 /**

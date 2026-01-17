@@ -1,6 +1,6 @@
 export type AppMode = 'browser' | 'electron' | 'native';
 export type AppPlatform = 'web' | 'pc' | 'android';
-export type EmulatorType = 'genymotion' | 'waydroid';
+export type EmulatorType = 'genymotion' | 'waydroid' | 'physical';
 
 export interface MobileEmulator {
   type: EmulatorType;

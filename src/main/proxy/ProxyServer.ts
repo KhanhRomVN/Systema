@@ -102,6 +102,66 @@ export class ProxyServer extends EventEmitter {
       // Debug log to verify requests are being captured
       console.log(`[ProxyServer] ${ctx.isSSL ? 'HTTPS' : 'HTTP'} ${method} ${url}`);
 
+      // Setup Page Logic
+      if (!ctx.isSSL && req.url && (req.url === '/ssl' || req.url.startsWith('/ssl/'))) {
+        const path = require('path');
+        const fs = require('fs');
+
+        // CA Path (Default location for http-mitm-proxy)
+        const caPath = path.join(process.cwd(), '.http-mitm-proxy', 'certs', 'ca.pem');
+
+        if (req.url === '/ssl/download') {
+          // Serve the file
+          if (fs.existsSync(caPath)) {
+            const cert = fs.readFileSync(caPath);
+            ctx.proxyToClientResponse.writeHead(200, {
+              'Content-Type': 'application/x-x509-ca-cert',
+              'Content-Disposition': 'attachment; filename="systema-ca.pem"',
+            });
+            ctx.proxyToClientResponse.end(cert);
+          } else {
+            ctx.proxyToClientResponse.writeHead(404, { 'Content-Type': 'text/plain' });
+            ctx.proxyToClientResponse.end('CA Certificate not found');
+          }
+          return callback();
+        }
+
+        // Serve instructions page
+        const html = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Systema Proxy Setup</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #09090b; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center; }
+                h1 { margin-bottom: 20px; color: #3b82f6; }
+                p { margin-bottom: 30px; line-height: 1.6; color: #a1a1aa; max-width: 400px; }
+                .btn { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: opacity 0.2s; }
+                .btn:active { opacity: 0.8; }
+                .step { margin-bottom: 10px; font-size: 14px; text-align: left; width: 100%; max-width: 350px; background: #18181b; padding: 15px; border-radius: 8px; border: 1px solid #27272a; }
+                .step strong { color: #e4e4e7; display: block; margin-bottom: 4px; }
+              </style>
+            </head>
+            <body>
+              <h1>Systema Proxy</h1>
+              <div class="step">
+                <strong>Step 1: Download Certificate</strong>
+                Click the button below to download the CA Certificate.
+              </div>
+              <a href="/ssl/download" class="btn">Download CA Certificate</a>
+              <div class="step" style="margin-top: 20px;">
+                <strong>Step 2: Install Certificate</strong>
+                Go to <em>Settings > Security > Encryption & credentials > Install a certificate > CA certificate</em> and select the downloaded file.
+              </div>
+            </body>
+          </html>
+        `;
+        ctx.proxyToClientResponse.writeHead(200, { 'Content-Type': 'text/html' });
+        ctx.proxyToClientResponse.end(html);
+        return callback(); // Signal completion to http-mitm-proxy
+      }
+
       const initiatorStackBase64 = req.headers['x-systema-initiator'];
       let initiator = null;
       if (initiatorStackBase64) {

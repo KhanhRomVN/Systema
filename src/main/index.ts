@@ -603,6 +603,61 @@ app.whenReady().then(async () => {
     };
   });
 
+  // Wireless Connection
+  ipcMain.handle('mobile:connect-wireless', async (_, ip: string, port: string) => {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    try {
+      const { stdout } = await execAsync(`adb connect ${ip}:${port}`);
+      return { success: true, message: stdout.trim() };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('mobile:disconnect', async (_, serial: string) => {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    try {
+      await execAsync(`adb disconnect ${serial}`);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // QR Code
+  ipcMain.handle('mobile:get-qr-code', async () => {
+    const QRCode = await import('qrcode'); // Dynamic import
+    const { getLocalIp } = await import('./utils/net');
+
+    // Ensure a proxy session exists for mobile setup
+    // We use a specific ID for this temporary/setup session
+    const port = await proxyManager.createSession('mobile-setup');
+    const ip = getLocalIp().trim();
+
+    // Let's return the Data URL of the Setup Page
+    const setupUrl = `http://${ip}:${port}/ssl`;
+    console.log('[Mobile] Generated QR Setup URL:', setupUrl);
+
+    try {
+      const qrDataUrl = await QRCode.toDataURL(setupUrl, { errorCorrectionLevel: 'H' });
+      return {
+        qrCode: qrDataUrl,
+        ip,
+        port,
+        setupUrl,
+      };
+    } catch (e) {
+      console.error('Failed to generate QR code', e);
+      return null;
+    }
+  });
+
   // Emulator Detection
   ipcMain.handle('mobile:detect-emulators', async () => {
     return await detectAllEmulators();

@@ -1,4 +1,19 @@
 import * as net from 'net';
+import * as os from 'os';
+
+export const getLocalIp = (): string => {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]!) {
+      // Skip internal (non-127.0.0.1) and non-ipv4 addresses
+      if ('IPv4' !== iface.family || iface.internal) {
+        continue;
+      }
+      return iface.address;
+    }
+  }
+  return '127.0.0.1';
+};
 
 export const findAvailablePort = async (startPort: number = 8081): Promise<number> => {
   const isPortAvailable = (port: number): Promise<boolean> => {
