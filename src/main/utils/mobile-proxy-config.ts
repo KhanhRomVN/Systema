@@ -20,14 +20,14 @@ export async function configureEmulatorProxy(
     console.log(`Configuring proxy on ${serial}: ${proxyString}`);
 
     // Set global HTTP proxy
-    await execAsync(`adb -s ${serial} shell settings put global http_proxy ${proxyString}`);
+    await execAsync(`adb -s "${serial}" shell settings put global http_proxy ${proxyString}`);
 
     // Also set for WiFi (some apps check this)
     await execAsync(
-      `adb -s ${serial} shell settings put global global_http_proxy_host ${proxyHost}`,
+      `adb -s "${serial}" shell settings put global global_http_proxy_host ${proxyHost}`,
     );
     await execAsync(
-      `adb -s ${serial} shell settings put global global_http_proxy_port ${proxyPort}`,
+      `adb -s "${serial}" shell settings put global global_http_proxy_port ${proxyPort}`,
     );
 
     console.log('Proxy configured successfully');
@@ -46,11 +46,11 @@ export async function clearEmulatorProxy(serial: string): Promise<boolean> {
     console.log(`Clearing proxy on ${serial}`);
 
     // Clear global HTTP proxy
-    await execAsync(`adb -s ${serial} shell settings put global http_proxy :0`);
+    await execAsync(`adb -s "${serial}" shell settings put global http_proxy :0`);
 
     // Clear WiFi proxy settings
-    await execAsync(`adb -s ${serial} shell settings delete global global_http_proxy_host`);
-    await execAsync(`adb -s ${serial} shell settings delete global global_http_proxy_port`);
+    await execAsync(`adb -s "${serial}" shell settings delete global global_http_proxy_host`);
+    await execAsync(`adb -s "${serial}" shell settings delete global global_http_proxy_port`);
 
     console.log('Proxy cleared successfully');
     return true;
@@ -77,7 +77,7 @@ export async function installCACertificate(
 
     // Check if device is rooted (required for system cert installation)
     try {
-      await execAsync(`adb -s ${serial} shell "su -c 'echo test'"`);
+      await execAsync(`adb -s "${serial}" shell "su -c 'echo test'"`);
     } catch {
       onProgress?.('WARNING: Device not rooted. Certificate installation may fail.');
       // Continue anyway for user cert installation
@@ -99,23 +99,23 @@ export async function installCACertificate(
     onProgress?.('Pushing certificate to device...');
 
     // Push certificate to tmp
-    await execAsync(`adb -s ${serial} push "${certificatePath}" ${tmpPath}`);
+    await execAsync(`adb -s "${serial}" push "${certificatePath}" ${tmpPath}`);
 
     onProgress?.('Installing certificate...');
 
     // Try to remount system as read-write and install
     try {
       // Remount system
-      await execAsync(`adb -s ${serial} shell "su -c 'mount -o rw,remount /system'"`);
+      await execAsync(`adb -s "${serial}" shell "su -c 'mount -o rw,remount /system'"`);
 
       // Copy to system certs
-      await execAsync(`adb -s ${serial} shell "su -c 'cp ${tmpPath} ${systemCertPath}'"`);
+      await execAsync(`adb -s "${serial}" shell "su -c 'cp ${tmpPath} ${systemCertPath}'"`);
 
       // Set proper permissions
-      await execAsync(`adb -s ${serial} shell "su -c 'chmod 644 ${systemCertPath}'"`);
+      await execAsync(`adb -s "${serial}" shell "su -c 'chmod 644 ${systemCertPath}'"`);
 
       // Remount as read-only
-      await execAsync(`adb -s ${serial} shell "su -c 'mount -o ro,remount /system'"`);
+      await execAsync(`adb -s "${serial}" shell "su -c 'mount -o ro,remount /system'"`);
 
       onProgress?.('Certificate installed as system certificate');
     } catch (rootError) {
@@ -124,15 +124,15 @@ export async function installCACertificate(
       // Fallback: Install as user certificate (doesn't require root, but less effective)
       const userCertPath = `/data/misc/user/0/cacerts-added/${certName}`;
 
-      await execAsync(`adb -s ${serial} shell "mkdir -p /data/misc/user/0/cacerts-added"`);
-      await execAsync(`adb -s ${serial} shell "cp ${tmpPath} ${userCertPath}"`);
-      await execAsync(`adb -s ${serial} shell "chmod 644 ${userCertPath}"`);
+      await execAsync(`adb -s "${serial}" shell "mkdir -p /data/misc/user/0/cacerts-added"`);
+      await execAsync(`adb -s "${serial}" shell "cp ${tmpPath} ${userCertPath}"`);
+      await execAsync(`adb -s "${serial}" shell "chmod 644 ${userCertPath}"`);
 
       onProgress?.('Certificate installed as user certificate (limited effectiveness)');
     }
 
     // Cleanup
-    await execAsync(`adb -s ${serial} shell "rm ${tmpPath}"`);
+    await execAsync(`adb -s "${serial}" shell "rm ${tmpPath}"`);
 
     onProgress?.('Certificate installation complete');
     return true;
@@ -233,9 +233,9 @@ export async function setupCompleteProxy(
 export async function restartNetworkServices(serial: string): Promise<boolean> {
   try {
     // Toggle airplane mode to restart network
-    await execAsync(`adb -s ${serial} shell "cmd connectivity airplane-mode enable"`);
+    await execAsync(`adb -s "${serial}" shell "cmd connectivity airplane-mode enable"`);
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await execAsync(`adb -s ${serial} shell "cmd connectivity airplane-mode disable"`);
+    await execAsync(`adb -s "${serial}" shell "cmd connectivity airplane-mode disable"`);
 
     console.log('Network services restarted');
     return true;
@@ -253,7 +253,7 @@ export async function disableBatteryOptimization(
   packageName: string,
 ): Promise<boolean> {
   try {
-    await execAsync(`adb -s ${serial} shell "dumpsys deviceidle whitelist +${packageName}"`);
+    await execAsync(`adb -s "${serial}" shell "dumpsys deviceidle whitelist +${packageName}"`);
     console.log(`Battery optimization disabled for ${packageName}`);
     return true;
   } catch (error) {
@@ -276,7 +276,7 @@ export async function installAPK(
     }
 
     onProgress?.('Installing APK...');
-    const { stdout, stderr } = await execAsync(`adb -s ${serial} install -r "${apkPath}"`);
+    const { stdout, stderr } = await execAsync(`adb -s "${serial}" install -r "${apkPath}"`);
 
     if (stderr && stderr.includes('Failure')) {
       onProgress?.(`Installation failed: ${stderr}`);
@@ -297,7 +297,7 @@ export async function installAPK(
  */
 export async function uninstallApp(serial: string, packageName: string): Promise<boolean> {
   try {
-    await execAsync(`adb -s ${serial} uninstall ${packageName}`);
+    await execAsync(`adb -s "${serial}" uninstall ${packageName}`);
     console.log(`Uninstalled ${packageName}`);
     return true;
   } catch (error) {
@@ -313,16 +313,16 @@ export async function launchApp(serial: string, packageName: string): Promise<bo
   try {
     // Get main activity
     const { stdout } = await execAsync(
-      `adb -s ${serial} shell "cmd package resolve-activity --brief ${packageName} | tail -n 1"`,
+      `adb -s "${serial}" shell "cmd package resolve-activity --brief ${packageName} | tail -n 1"`,
     );
     const activity = stdout.trim();
 
     if (!activity || activity.includes('No activity found')) {
       // Fallback: try to launch with monkey
-      await execAsync(`adb -s ${serial} shell "monkey -p ${packageName} 1"`);
+      await execAsync(`adb -s "${serial}" shell "monkey -p ${packageName} 1"`);
     } else {
       // Launch specific activity
-      await execAsync(`adb -s ${serial} shell "am start -n ${activity}"`);
+      await execAsync(`adb -s "${serial}" shell "am start -n ${activity}"`);
     }
 
     console.log(`Launched ${packageName}`);
@@ -338,7 +338,7 @@ export async function launchApp(serial: string, packageName: string): Promise<bo
  */
 export async function stopApp(serial: string, packageName: string): Promise<boolean> {
   try {
-    await execAsync(`adb -s ${serial} shell "am force-stop ${packageName}"`);
+    await execAsync(`adb -s "${serial}" shell "am force-stop ${packageName}"`);
     console.log(`Stopped ${packageName}`);
     return true;
   } catch (error) {

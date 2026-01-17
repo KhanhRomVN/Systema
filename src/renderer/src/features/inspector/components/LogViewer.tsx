@@ -1,5 +1,18 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Trash2, Copy, Pause, Play, Download, Filter, ChevronDown, X } from 'lucide-react';
+import {
+  Search,
+  Trash2,
+  Copy,
+  Pause,
+  Play,
+  Download,
+  Filter,
+  ChevronDown,
+  X,
+  CaseSensitive,
+  WholeWord,
+  Regex,
+} from 'lucide-react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { cn } from '../../../shared/lib/utils';
 
@@ -32,7 +45,8 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
     F: true,
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [packageFilter, setPackageFilter] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // const [packageFilter, _setPackageFilter] = useState('');
   const [hiddenTags, setHiddenTags] = useState<Set<string>>(new Set());
   const [installedPackages, setInstalledPackages] = useState<string[]>([]);
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set());
@@ -44,6 +58,11 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
   const logBufferRef = useRef<LogEntry[]>([]);
   const rafRef = useRef<number | null>(null);
   const lastFlushTime = useRef<number>(Date.now());
+
+  // Search Options
+  const [matchCase, setMatchCase] = useState(false);
+  const [matchWholeWord, setMatchWholeWord] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
 
   useEffect(() => {
     console.log('[LogViewer] Mounted with emulatorSerial:', emulatorSerial);
@@ -147,6 +166,7 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
+    return undefined;
   }, [showPackageDropdown]);
 
   const parseLogLine = (line: string): LogEntry | null => {
@@ -248,11 +268,33 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
     });
   }, []);
 
+  // Pre-compile search regex
+  const searchRegex = useMemo(() => {
+    if (!searchTerm) return null;
+    try {
+      let pattern = searchTerm;
+      const flags = matchCase ? 'g' : 'gi'; // Always global for highlighting
+
+      if (useRegex) {
+        // Validate regex
+        new RegExp(pattern);
+      } else {
+        // Escape special characters for literal search
+        pattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        if (matchWholeWord) {
+          pattern = `\\b${pattern}\\b`;
+        }
+      }
+
+      return new RegExp(pattern, flags);
+    } catch (e) {
+      return null;
+    }
+  }, [searchTerm, matchCase, matchWholeWord, useRegex]);
+
   // Memoized filtering with pre-compiled search
   const filteredLogs = useMemo(() => {
-    // Pre-compile search term
-    const lowerSearch = searchTerm ? searchTerm.toLowerCase() : null;
-
     return logs.filter((log) => {
       // Fast-path checks first
       if (!levelFilter[log.level]) return false;
@@ -267,19 +309,20 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       }
 
       // Search filter
-      if (lowerSearch) {
-        const lowerTag = log.tag.toLowerCase();
-        const lowerMessage = log.message.toLowerCase();
-        return (
-          lowerTag.includes(lowerSearch) ||
-          lowerMessage.includes(lowerSearch) ||
-          log.pid.includes(lowerSearch)
-        );
+      if (searchRegex) {
+        searchRegex.lastIndex = 0;
+        const tagMatch = searchRegex.test(log.tag);
+        searchRegex.lastIndex = 0;
+        const msgMatch = searchRegex.test(log.message);
+        searchRegex.lastIndex = 0;
+        const pidMatch = searchRegex.test(log.pid);
+
+        return tagMatch || msgMatch || pidMatch;
       }
 
       return true;
     });
-  }, [logs, levelFilter, hiddenTags, selectedPackages, searchTerm]);
+  }, [logs, levelFilter, hiddenTags, selectedPackages, searchRegex]);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -370,10 +413,41 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
         return match;
       });
 
+      // Find all search matches
+      if (searchRegex) {
+        searchRegex.lastIndex = 0;
+        let match;
+        while ((match = searchRegex.exec(message)) !== null) {
+          matches.push({
+            index: match.index,
+            length: match[0].length,
+            type: 'search',
+            value: match[0],
+          });
+          // Prevent infinite loop with zero-width matches (though typically filtered by search logic)
+          if (match.index === searchRegex.lastIndex) {
+            searchRegex.lastIndex++;
+          }
+        }
+      }
+
       // Sort by index to process in order
       matches.sort((a, b) => a.index - b.index);
 
       // Remove overlapping matches
+      // Heuristic: Prefer search matches over others?
+      // Or just keep first one?
+      // Let's just keep first one for simplicity, or maybe implementing priority?
+      // For now, simple standard overlap removal.
+      // If we want search to take precedence, we could sort by type priority too?
+      // Let's sort by index, then by type priority (search first).
+      matches.sort((a, b) => {
+        if (a.index !== b.index) return a.index - b.index;
+        if (a.type === 'search') return -1;
+        if (b.type === 'search') return 1;
+        return 0;
+      });
+
       const nonOverlapping: typeof matches = [];
       let prevEnd = 0;
       for (const match of matches) {
@@ -397,12 +471,21 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
         }
 
         // Add the highlighted match
-        const className =
-          match.type === 'url'
-            ? 'text-blue-400 underline decoration-blue-400/40'
-            : match.type === 'json'
-              ? 'text-purple-400'
-              : 'text-emerald-400';
+        let className = '';
+        switch (match.type) {
+          case 'search':
+            className = 'bg-yellow-500/40 text-yellow-200 rounded px-0.5 -mx-0.5';
+            break;
+          case 'url':
+            className = 'text-blue-400 underline decoration-blue-400/40';
+            break;
+          case 'json':
+            className = 'text-purple-400';
+            break;
+          case 'number':
+            className = 'text-emerald-400';
+            break;
+        }
 
         parts.push(
           <span key={`match-${idx}`} className={className}>
@@ -424,7 +507,7 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       }
       return result;
     };
-  }, [filteredLogs.length]);
+  }, [filteredLogs.length, searchRegex]);
 
   if (!emulatorSerial) {
     return (
@@ -448,8 +531,46 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
             placeholder="Search logs (tag, message, PID)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-7 pr-3 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full pl-7 pr-24 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
           />
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+            <button
+              onClick={() => setMatchCase(!matchCase)}
+              className={cn(
+                'p-0.5 rounded transition-colors',
+                matchCase
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+              title="Match Case"
+            >
+              <CaseSensitive className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setMatchWholeWord(!matchWholeWord)}
+              className={cn(
+                'p-0.5 rounded transition-colors',
+                matchWholeWord
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+              title="Match Whole Word"
+            >
+              <WholeWord className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setUseRegex(!useRegex)}
+              className={cn(
+                'p-0.5 rounded transition-colors',
+                useRegex
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+              )}
+              title="Use Regex"
+            >
+              <Regex className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Filter Toggle */}

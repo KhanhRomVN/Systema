@@ -245,11 +245,49 @@ export async function downloadFridaServer(
 
 /**
  * Check if Frida server is running on emulator
+ * Uses multiple detection methods for compatibility with Android 8.0+
  */
 export async function isFridaRunning(serial: string): Promise<boolean> {
   try {
-    const { stdout } = await execAsync(`adb -s ${serial} shell "ps | grep frida-server"`);
-    return stdout.includes('frida-server');
+    // Method 1: Check for frida-server process using pidof (most reliable on modern Android)
+    try {
+      const { stdout: pidout } = await execAsync(`adb -s "${serial}" shell "pidof frida-server"`);
+      if (pidout.trim()) {
+        return true;
+      }
+    } catch {
+      // Continue to next method
+    }
+
+    // Method 2: Check if port 27042 (default Frida port) is listening
+    try {
+      const { stdout: netstat } = await execAsync(
+        `adb -s "${serial}" shell "netstat -tulpn 2>/dev/null | grep 27042"`,
+      );
+      if (netstat.includes('27042')) {
+        return true;
+      }
+    } catch {
+      // Continue to next method
+    }
+
+    // Method 3: Fallback to ps -A (works on newer Android versions)
+    try {
+      const { stdout } = await execAsync(`adb -s "${serial}" shell "ps -A | grep frida-server"`);
+      return stdout.includes('frida-server');
+    } catch {
+      // Continue to final fallback
+    }
+
+    // Method 4: Final fallback to original ps | grep (for older Android)
+    try {
+      const { stdout } = await execAsync(`adb -s "${serial}" shell "ps | grep frida-server"`);
+      return stdout.includes('frida-server');
+    } catch {
+      // All methods failed
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -274,12 +312,12 @@ export async function installFridaServer(
     onProgress?.('Pushing Frida server to device...');
 
     // Push to device
-    await execAsync(`adb -s ${serial} push "${serverPath}" /data/local/tmp/frida-server`);
+    await execAsync(`adb -s "${serial}" push "${serverPath}" /data/local/tmp/frida-server`);
 
     onProgress?.('Setting permissions...');
 
     // Make executable
-    await execAsync(`adb -s ${serial} shell "chmod 755 /data/local/tmp/frida-server"`);
+    await execAsync(`adb -s "${serial}" shell "chmod 755 /data/local/tmp/frida-server"`);
 
     onProgress?.('Frida server installed successfully');
     return true;
@@ -301,11 +339,21 @@ export async function startFridaServer(serial: string): Promise<boolean> {
       return true;
     }
 
-    // Start in background
-    await execAsync(`adb -s ${serial} shell "/data/local/tmp/frida-server &" > /dev/null 2>&1 &`);
+    // Start in background (Try with root first)
+    try {
+      console.log('Attempting to start Frida server as root...');
+      await execAsync(
+        `adb -s "${serial}" shell "su -c '/data/local/tmp/frida-server > /dev/null 2>&1 &'"`,
+      );
+    } catch (rootError) {
+      console.log(
+        'Root start failed, falling back to non-root execution (may have limited permissions)...',
+      );
+      await execAsync(`adb -s "${serial}" shell "/data/local/tmp/frida-server > /dev/null 2>&1 &"`);
+    }
 
     // Wait a bit for it to start
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Verify it's running
     const isRunning = await isFridaRunning(serial);
@@ -327,7 +375,7 @@ export async function startFridaServer(serial: string): Promise<boolean> {
  */
 export async function stopFridaServer(serial: string): Promise<boolean> {
   try {
-    await execAsync(`adb -s ${serial} shell "pkill frida-server"`);
+    await execAsync(`adb -s "${serial}" shell "pkill frida-server"`);
     console.log('Frida server stopped');
     return true;
   } catch (error) {
@@ -370,11 +418,14 @@ export async function injectSSLBypass(
     fs.writeFileSync(scriptPath, SSL_PINNING_BYPASS_SCRIPT);
 
     // Use frida to inject
-    // -U: USB device, -f: spawn, -l: load script, --no-pause: don't pause on startup
-    const fridaCmd = `frida -U -f ${packageName} -l "${scriptPath}" --no-pause`;
+    // -U: USB device, -f: spawn, -l: load script
+    const fridaCmd = `frida -U -f ${packageName} -l "${scriptPath}"`;
 
     onLog?.('Injecting script...');
     const { stdout, stderr } = await execAsync(fridaCmd);
+
+    if (stdout) onLog?.(stdout);
+    onLog?.('Injecting script...');
 
     if (stdout) onLog?.(stdout);
     if (stderr) onLog?.(`STDERR: ${stderr}`);
@@ -382,9 +433,17 @@ export async function injectSSLBypass(
     onLog?.('SSL Pinning Bypass injected successfully!');
     return true;
   } catch (error: any) {
+    const msg = error.message || '';
+    if (msg.includes("unable to find process with name 'system_server'")) {
+      const rootError =
+        '❌ FAILURE: Device is NOT rooted. Frida requires ROOT access to spawn apps.\nPlease use a rooted device or emulator (Genymotion/LDPlayer).';
+      onLog?.(rootError);
+      throw new Error(rootError);
+    }
+
     onLog?.(`ERROR: ${error.message}`);
     console.error('Failed to inject SSL bypass:', error);
-    return false;
+    throw error; // Re-throw so UI can catch it
   }
 }
 
@@ -415,7 +474,7 @@ export async function injectCustomScript(
     fs.writeFileSync(scriptPath, scriptContent);
 
     // Use frida to inject
-    const fridaCmd = `frida -U -f ${packageName} -l "${scriptPath}" --no-pause`;
+    const fridaCmd = `frida -U -f ${packageName} -l "${scriptPath}"`;
 
     onLog?.('Injecting script...');
     const { stdout, stderr } = await execAsync(fridaCmd);
@@ -442,7 +501,7 @@ export async function listRunningProcesses(serial: string): Promise<
   }>
 > {
   try {
-    const { stdout } = await execAsync(`adb -s ${serial} shell "ps"`);
+    const { stdout } = await execAsync(`adb -s "${serial}" shell "ps"`);
     const lines = stdout.trim().split('\n');
     const processes: Array<{ pid: number; name: string }> = [];
 

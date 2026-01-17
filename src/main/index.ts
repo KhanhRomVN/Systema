@@ -527,6 +527,17 @@ app.whenReady().then(async () => {
             return false;
           }
 
+          // Resolve to actual ADB serial if it's a name
+          const resolvedSerial = await resolveEmulatorSerial(serial);
+          if (resolvedSerial) {
+            serial = resolvedSerial;
+          } else {
+            console.warn(
+              `[AppLaunch] Could not resolve serial for "${serial}". Using original string.`,
+            );
+            // We continue with original string, though it will likely fail if it's not a valid serial
+          }
+
           // Configure absolute proxy (http://127.0.0.1:8081 -> host/port)
           try {
             const url = new URL(proxyUrl);
@@ -626,7 +637,7 @@ app.whenReady().then(async () => {
     try {
       // Enable TCP/IP mode on port 5555
       console.log(`[ADB Wireless] Enabling wireless mode for ${serial}`);
-      const { stdout: tcpipOutput } = await execAsync(`adb -s ${serial} tcpip 5555`);
+      const { stdout: tcpipOutput } = await execAsync(`adb -s "${serial}" tcpip 5555`);
       console.log(`[ADB Wireless] tcpip output:`, tcpipOutput.trim());
 
       // Wait longer for device to restart in tcpip mode and reconnect
@@ -644,7 +655,7 @@ app.whenReady().then(async () => {
           // Try first method
           try {
             const { stdout: ipOutput } = await execAsync(
-              `adb -s ${serial} shell ip -f inet addr show wlan0 | grep -o 'inet [0-9.]*' | cut -d' ' -f2`,
+              `adb -s "${serial}" shell ip -f inet addr show wlan0 | grep -o 'inet [0-9.]*' | cut -d' ' -f2`,
               { timeout: 5000 },
             );
             ip = ipOutput.trim();
@@ -659,7 +670,7 @@ app.whenReady().then(async () => {
           // Try alternative method
           try {
             const { stdout: altIpOutput } = await execAsync(
-              `adb -s ${serial} shell "ip addr show wlan0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1"`,
+              `adb -s "${serial}" shell "ip addr show wlan0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1"`,
               { timeout: 5000 },
             );
             ip = altIpOutput.trim();
@@ -849,18 +860,21 @@ app.whenReady().then(async () => {
   ipcMain.handle(
     'mobile:configure-proxy',
     async (_, serial: string, proxyHost: string, proxyPort: number) => {
-      return await configureEmulatorProxy(serial, proxyHost, proxyPort);
+      const resolvedSerial = await resolveEmulatorSerial(serial);
+      return await configureEmulatorProxy(resolvedSerial || serial, proxyHost, proxyPort);
     },
   );
 
   ipcMain.handle('mobile:clear-proxy', async (_, serial: string) => {
-    return await clearEmulatorProxy(serial);
+    const resolvedSerial = await resolveEmulatorSerial(serial);
+    return await clearEmulatorProxy(resolvedSerial || serial);
   });
 
   ipcMain.handle(
     'mobile:setup-complete-proxy',
     async (_, serial: string, proxyHost: string, proxyPort: number) => {
-      return await setupCompleteProxy(serial, proxyHost, proxyPort, (status) => {
+      const resolvedSerial = await resolveEmulatorSerial(serial);
+      return await setupCompleteProxy(resolvedSerial || serial, proxyHost, proxyPort, (status) => {
         const win = windowManager.getMainWindow();
         if (win) {
           win.webContents.send('mobile:proxy-progress', status);
@@ -871,7 +885,8 @@ app.whenReady().then(async () => {
 
   // App Management
   ipcMain.handle('mobile:install-apk', async (_, serial: string, apkPath: string) => {
-    return await installAPK(serial, apkPath, (status) => {
+    const resolvedSerial = await resolveEmulatorSerial(serial);
+    return await installAPK(resolvedSerial || serial, apkPath, (status) => {
       const win = windowManager.getMainWindow();
       if (win) {
         win.webContents.send('mobile:install-progress', status);
@@ -880,11 +895,13 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('mobile:uninstall-app', async (_, serial: string, packageName: string) => {
-    return await uninstallApp(serial, packageName);
+    const resolvedSerial = await resolveEmulatorSerial(serial);
+    return await uninstallApp(resolvedSerial || serial, packageName);
   });
 
   ipcMain.handle('mobile:launch-app', async (_, serial: string, packageName: string) => {
-    return await launchApp(serial, packageName);
+    const resolvedSerial = await resolveEmulatorSerial(serial);
+    return await launchApp(resolvedSerial || serial, packageName);
   });
 
   ipcMain.handle('mobile:stop-app', async (_, serial: string, packageName: string) => {

@@ -595,6 +595,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
         isOpen={showPcAddModal}
         onClose={() => setShowPcAddModal(false)}
         onAdd={handleAddPcApp}
+        existingApps={apps.filter((app) => app.platform === 'android')}
       />
     </div>
   );

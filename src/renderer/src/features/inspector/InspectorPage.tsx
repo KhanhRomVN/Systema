@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { NetworkRequest } from './types';
 import { InspectorProfile } from './utils/profiles';
 import { generateRequestAnalysis } from './utils/analysisGenerator';
+import { SSLBypassModal } from './components/SSLBypassModal';
 
 export default function InspectorPage() {
   const [isScanning, setIsScanning] = useState(false);
@@ -12,8 +13,9 @@ export default function InspectorPage() {
   const [requests, setRequests] = useState<NetworkRequest[]>([]);
   const [platform, setPlatform] = useState<'web' | 'pc' | 'android' | undefined>();
   const [fridaStatus, setFridaStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
-  const [targetPackage, setTargetPackage] = useState<string>('');
+  const [targetPackage, setTargetPackage] = useState<string>('com.deepseek.chat');
   const [emulatorSerial, setEmulatorSerial] = useState<string>('');
+  const [isSSLBypassModalOpen, setIsSSLBypassModalOpen] = useState(false);
 
   const handleLoadProfile = useCallback((profile: InspectorProfile) => {
     // Restore state from profile
@@ -46,8 +48,11 @@ export default function InspectorPage() {
           if (app.platform === 'android' && app.emulatorSerial) {
             const serial = app.emulatorSerial;
             setEmulatorSerial(serial);
+            console.log('[Inspector] 🔍 Checking Frida status for:', serial);
             const isRunning = await window.api.invoke('mobile:check-frida', serial);
+            console.log('[Inspector] Frida running?', isRunning);
             setFridaStatus(isRunning ? 'running' : 'stopped');
+            console.log('[Inspector] Frida status set to:', isRunning ? 'running' : 'stopped');
           }
         }
       } catch (e) {
@@ -96,25 +101,42 @@ export default function InspectorPage() {
     }
   };
 
-  const handleInjectBypass = async () => {
-    if (platform !== 'android') return;
+  const handleInjectBypass = () => {
+    console.log('[Inspector] 🔍 SSL Bypass button clicked!');
+    console.log('[Inspector] Platform:', platform);
+
+    if (platform !== 'android') {
+      console.log('[Inspector] ❌ Not Android platform, aborting');
+      return;
+    }
+
+    console.log('[Inspector] 💬 Opening SSL Bypass modal...');
+    setIsSSLBypassModalOpen(true);
+  };
+
+  const handleConfirmSSLBypass = async (packageName: string) => {
+    console.log('[Inspector] 🚀 Confirmed package name:', packageName);
+    setTargetPackage(packageName);
+
     const allApps: any[] = await window.api.invoke('apps:get-all');
     const app = allApps.find((a) => a.id === selectedApp);
-    if (!app?.emulatorSerial) return;
 
-    const pkg = prompt(
-      'Enter Android Package Name to inject (e.g. com.example.app):',
-      targetPackage,
-    );
-    if (!pkg) return;
-    setTargetPackage(pkg);
+    if (!app?.emulatorSerial) {
+      console.log('[Inspector] ❌ No emulator serial found');
+      alert('Error: No device serial found');
+      return;
+    }
 
     try {
-      await window.api.invoke('mobile:inject-ssl-bypass', app.emulatorSerial, pkg);
-      alert(`Injection command sent for ${pkg}. Check logs.`);
+      console.log('[Inspector] 🚀 Sending injection command for:', packageName);
+      await window.api.invoke('mobile:inject-ssl-bypass', app.emulatorSerial, packageName);
+      alert(
+        `✅ SSL Bypass injection started for ${packageName}\n\nCheck console/terminal for Frida output.`,
+      );
+      console.log('[Inspector] ✅ Injection command sent successfully');
     } catch (e) {
-      console.error('Failed to inject bypass', e);
-      alert('Failed to inject bypass');
+      console.error('[Inspector] ❌ Failed to inject bypass:', e);
+      alert('❌ Failed to inject bypass. Check console for details.');
     }
   };
 
@@ -284,6 +306,31 @@ export default function InspectorPage() {
 
       console.log(`[Inspector] Starting session for ${appName} on port ${port}`);
 
+      // Check if this is an Android device and configure proxy automatically
+      const allApps: any[] = await window.api.invoke('apps:get-all');
+      const app = allApps.find((a) => a.id === appName);
+
+      if (app?.platform === 'android' && app?.emulatorSerial) {
+        console.log(`[Inspector] 📱 Configuring proxy for Android device ${app.emulatorSerial}`);
+
+        // Configure device to route all traffic through proxy
+        const configured = await window.api.invoke(
+          'mobile:configure-proxy',
+          app.emulatorSerial,
+          '127.0.0.1',
+          port,
+        );
+
+        if (!configured) {
+          console.error('[Inspector] ❌ Failed to configure proxy on device');
+          alert(
+            'Failed to configure proxy on device.\nHTTPS tracking may not work.\n\nPlease ensure the device is connected and ADB is working.',
+          );
+        } else {
+          console.log(`[Inspector] ✅ Proxy configured on device -> 127.0.0.1:${port}`);
+        }
+      }
+
       const launched = await window.api.invoke(
         'app:launch',
         appName,
@@ -308,6 +355,15 @@ export default function InspectorPage() {
 
   const handleBack = async () => {
     try {
+      // Clear proxy from Android device if applicable
+      const allApps: any[] = await window.api.invoke('apps:get-all');
+      const app = allApps.find((a) => a.id === selectedApp);
+
+      if (app?.platform === 'android' && app?.emulatorSerial) {
+        console.log(`[Inspector] 🧹 Clearing proxy from ${app.emulatorSerial}`);
+        await window.api.invoke('mobile:clear-proxy', app.emulatorSerial);
+      }
+
       await window.api.invoke('proxy:stop');
       await window.api.invoke('app:terminate');
     } catch (error) {
@@ -338,6 +394,13 @@ export default function InspectorPage() {
         onStartFrida={handleStartFrida}
         onInjectBypass={handleInjectBypass}
         emulatorSerial={emulatorSerial}
+      />
+
+      <SSLBypassModal
+        isOpen={isSSLBypassModalOpen}
+        onClose={() => setIsSSLBypassModalOpen(false)}
+        onConfirm={handleConfirmSSLBypass}
+        defaultValue={targetPackage}
       />
     </div>
   );

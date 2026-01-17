@@ -34,9 +34,15 @@ interface AddAppModalProps {
     emulatorSerial?: string;
     packageName?: string;
   }) => void;
+  existingApps?: { emulatorSerial?: string }[];
 }
 
-export const AddAppModal: React.FC<AddAppModalProps> = ({ isOpen, onClose, onAdd }) => {
+export const AddAppModal: React.FC<AddAppModalProps> = ({
+  isOpen,
+  onClose,
+  onAdd,
+  existingApps = [],
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'connect'>('list');
@@ -183,10 +189,24 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({ isOpen, onClose, onAdd
   };
 
   const filteredDevices = useMemo(() => {
-    if (!searchQuery) return deviceList;
-    const lower = searchQuery.toLowerCase();
-    return deviceList.filter((d) => d.name.toLowerCase().includes(lower));
-  }, [deviceList, searchQuery]);
+    // Filter out already-added devices
+    const existingSerials = new Set(existingApps.map((app) => app.emulatorSerial).filter(Boolean));
+    let availableDevices = deviceList.filter((d) => {
+      // Hide devices without serial (stopped/offline VMs)
+      if (!d.serial) return false;
+
+      const serial = d.serial || d.name;
+      return !existingSerials.has(serial);
+    });
+
+    // Apply search filter
+    if (searchQuery) {
+      const lower = searchQuery.toLowerCase();
+      availableDevices = availableDevices.filter((d) => d.name.toLowerCase().includes(lower));
+    }
+
+    return availableDevices;
+  }, [deviceList, searchQuery, existingApps]);
 
   if (!isOpen) return null;
 
@@ -245,7 +265,9 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({ isOpen, onClose, onAdd
                 ) : filteredDevices.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full">
                     <Smartphone className="w-8 h-8 opacity-20 text-gray-500 mb-2" />
-                    <p className="text-sm text-gray-500">No devices found.</p>
+                    <p className="text-sm text-gray-500">
+                      {deviceList.length > 0 ? 'All devices already added.' : 'No devices found.'}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
