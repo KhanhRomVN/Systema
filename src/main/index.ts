@@ -952,10 +952,11 @@ app.whenReady().then(async () => {
     lastLogcatRequestTime = requestTime;
 
     try {
-      console.log(`[Logcat] Start request received for serial: ${serial} (ID: ${requestTime})`);
+      console.log(`[Logcat] ========== START REQUEST ==========`);
+      console.log(`[Logcat] Input serial: "${serial}" (ID: ${requestTime})`);
 
       const resolvedSerial = await resolveEmulatorSerial(serial);
-      console.log('[Logcat] Resolved serial:', resolvedSerial);
+      console.log('[Logcat] Resolved serial from input:', resolvedSerial);
 
       // Check if this request is still the latest one
       if (lastLogcatRequestTime !== requestTime) {
@@ -964,6 +965,8 @@ app.whenReady().then(async () => {
       }
 
       if (!resolvedSerial) {
+        console.error('[Logcat] ERROR: Could not resolve emulator serial!');
+        console.error(`[Logcat] Input was: "${serial}"`);
         throw new Error('Emulator serial not found');
       }
 
@@ -980,6 +983,8 @@ app.whenReady().then(async () => {
 
       // Start logcat process
       console.log('[Logcat] Starting adb logcat for:', resolvedSerial);
+      console.log('[Logcat] Command: adb -s', resolvedSerial, 'logcat -v time');
+
       activeLogcatProcess = spawn('adb', ['-s', resolvedSerial, 'logcat', '-v', 'time'], {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -987,6 +992,7 @@ app.whenReady().then(async () => {
       console.log('[Logcat] Process spawned, PID:', activeLogcatProcess.pid);
 
       let logcatBuffer = '';
+      let lineCount = 0;
 
       // Stream stdout to renderer
       if (activeLogcatProcess.stdout) {
@@ -999,9 +1005,19 @@ app.whenReady().then(async () => {
             logcatBuffer = logcatBuffer.substring(lineEnd + 1);
 
             if (line) {
+              lineCount++;
+              if (lineCount <= 5) {
+                console.log(`[Logcat] Line ${lineCount}:`, line.substring(0, 100));
+              }
+
               const win = windowManager.getMainWindow();
               if (win && !win.isDestroyed()) {
                 win.webContents.send('mobile:logcat-output', line);
+                if (lineCount === 1) {
+                  console.log('[Logcat] First line sent to renderer successfully');
+                }
+              } else {
+                console.error('[Logcat] ERROR: Main window not available!');
               }
             }
 
@@ -1009,6 +1025,8 @@ app.whenReady().then(async () => {
           }
         });
         console.log('[Logcat] stdout listener attached');
+      } else {
+        console.error('[Logcat] ERROR: Process stdout is null!');
       }
 
       if (activeLogcatProcess.stderr) {
@@ -1031,6 +1049,7 @@ app.whenReady().then(async () => {
         console.error('[Logcat] Process error:', err);
       });
 
+      console.log('[Logcat] ========== START COMPLETE ==========');
       return true;
     } catch (e) {
       console.error('[Logcat] Failed to start:', e);

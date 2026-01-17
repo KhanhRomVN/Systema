@@ -84,6 +84,14 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
             return;
           }
 
+          // Debug log for first few entries or periodically
+          if (logBufferRef.current.length % 50 === 0) {
+            console.log(
+              '[LogViewer] Received log chunk, buffer size:',
+              logBufferRef.current.length,
+            );
+          }
+
           const entry = parseLogLine(data);
           if (entry) {
             logBufferRef.current.push(entry);
@@ -97,6 +105,9 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
           const shouldFlush = logBufferRef.current.length >= 50 || timeSinceLastFlush >= 250;
 
           if (shouldFlush && logBufferRef.current.length > 0) {
+            console.log(
+              `[LogViewer] Flushing ${logBufferRef.current.length} logs to state. Current logs in state: ${logs.length}`,
+            );
             setLogs((prev) => {
               const newLogs = [...prev, ...logBufferRef.current];
               logBufferRef.current = [];
@@ -227,6 +238,10 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
   };
 
   const handleClear = () => {
+    console.log(
+      '[LogViewer] Clearing logs. Buffer size before clear:',
+      logBufferRef.current.length,
+    );
     setLogs([]);
   };
 
@@ -825,61 +840,61 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       )}
 
       {/* Logs - Virtualized */}
-      <div className="flex-1 bg-background/50">
-        {filteredLogs.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div className="flex-1 bg-background/50 relative">
+        {filteredLogs.length === 0 && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center text-muted-foreground bg-background/50 backdrop-blur-[1px]">
             {isRunning ? 'Waiting for logs...' : 'No logs available'}
           </div>
-        ) : (
-          <Virtuoso
-            ref={logContainerRef}
-            data={filteredLogs}
-            followOutput={autoScroll}
-            defaultItemHeight={60}
-            className="font-mono text-xs custom-scrollbar"
-            style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'rgb(148 163 184 / 0.3) transparent',
-            }}
-            itemContent={(_index, log) => (
-              <div
-                className={cn(
-                  'py-2 px-3 mx-3 my-0.5 rounded-md flex flex-col gap-1 group transition-all',
-                  'hover:bg-muted/5',
-                  getLevelBgColor(log.level).replace('bg-muted/10', '').replace('bg-', 'hover:bg-'),
-                )}
-              >
-                {/* Header: Level Time Tag PID */}
-                <div className="flex items-center gap-2 text-[10px] leading-none opacity-80 select-none">
-                  <span
-                    className={cn(
-                      'font-bold px-1.5 py-0.5 rounded text-[9px]',
-                      getLevelColor(log.level),
-                      'bg-current/10',
-                    )}
-                  >
-                    {log.level}
-                  </span>
-                  <span className="font-mono text-muted-foreground">{log.timestamp}</span>
-                  <span className="text-muted-foreground/30">•</span>
-                  <span
-                    className="font-semibold truncate max-w-[120px]"
-                    style={{ color: getTagColor(log.tag) }}
-                  >
-                    {log.tag}
-                  </span>
-                  <span className="text-muted-foreground/30">•</span>
-                  <span className="font-mono text-muted-foreground/50">{log.pid}</span>
-                </div>
-
-                {/* Message Body */}
-                <div className="text-foreground/90 break-all text-xs leading-5 pl-1">
-                  {highlightMessage(log.message)}
-                </div>
-              </div>
-            )}
-          />
         )}
+
+        <Virtuoso
+          ref={logContainerRef}
+          data={filteredLogs}
+          followOutput={autoScroll}
+          defaultItemHeight={60}
+          className="font-mono text-xs custom-scrollbar h-full"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgb(148 163 184 / 0.3) transparent',
+          }}
+          itemContent={(_index, log) => (
+            <div
+              className={cn(
+                'py-2 px-3 mx-3 my-0.5 rounded-md flex flex-col gap-1 group transition-all',
+                'hover:bg-muted/5',
+                getLevelBgColor(log.level).replace('bg-muted/10', '').replace('bg-', 'hover:bg-'),
+              )}
+            >
+              {/* Header: Level Time Tag PID */}
+              <div className="flex items-center gap-2 text-[10px] leading-none opacity-80 select-none">
+                <span
+                  className={cn(
+                    'font-bold px-1.5 py-0.5 rounded text-[9px]',
+                    getLevelColor(log.level),
+                    'bg-current/10',
+                  )}
+                >
+                  {log.level}
+                </span>
+                <span className="font-mono text-muted-foreground">{log.timestamp}</span>
+                <span className="text-muted-foreground/30">•</span>
+                <span
+                  className="font-semibold truncate max-w-[120px]"
+                  style={{ color: getTagColor(log.tag) }}
+                >
+                  {log.tag}
+                </span>
+                <span className="text-muted-foreground/30">•</span>
+                <span className="font-mono text-muted-foreground/50">{log.pid}</span>
+              </div>
+
+              {/* Message Body */}
+              <div className="text-foreground/90 break-all text-xs leading-5 pl-1">
+                {highlightMessage(log.message)}
+              </div>
+            </div>
+          )}
+        />
       </div>
     </div>
   );

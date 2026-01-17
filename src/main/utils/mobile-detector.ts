@@ -106,10 +106,13 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
 
     // Strategy 2: Process Scanning (QEMU/KVM for Genymotion)
     let runningVMNames: Set<string> = new Set(vboxVMs.keys());
+    const vmUuidToName: Map<string, string> = new Map(); // UUID -> VM Name mapping
+
     try {
       const { stdout: psOut } = await execAsync('ps -ef');
       const lines = psOut.split('\n');
       for (const line of lines) {
+        // Look for genymotion player process
         if (
           line.includes('player') &&
           (line.includes('--vm-name') || line.includes('genymotion'))
@@ -124,10 +127,34 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
             }
           }
         }
+
+        // Look for QEMU process to extract VM name from file path
+        // Example: -drive file=/home/user/.Genymobile/Genymotion/deployed/Motorola Moto X/system.qcow2
+        if (line.includes('qemu-system') && line.includes('.Genymobile/Genymotion/deployed/')) {
+          const pathMatch = line.match(/\.Genymobile\/Genymotion\/deployed\/([^/]+)\//);
+          if (pathMatch) {
+            const vmName = pathMatch[1];
+            runningVMNames.add(vmName);
+            console.log(`[MobileDetector] Found Genymotion VM from QEMU path: "${vmName}"`);
+
+            // Also try to extract UUID from --vm-name in player process
+            // This helps us map UUID to VM name
+            const uuidMatch = line.match(
+              /--vm-name\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+            );
+            if (uuidMatch) {
+              const uuid = uuidMatch[1];
+              vmUuidToName.set(uuid, vmName);
+              console.log(`[MobileDetector] Mapped UUID ${uuid} to VM name "${vmName}"`);
+            }
+          }
+        }
       }
     } catch (e) {
       console.error('Failed to scan processes:', e);
     }
+
+    console.log('[MobileDetector] Detected running VM names:', Array.from(runningVMNames));
 
     // Now scan ADB devices to find matches
     const { stdout: adbOut } = await execAsync('adb devices');
@@ -186,15 +213,41 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
             if (runningVMNames.size === 1) {
               const candidate = Array.from(runningVMNames)[0];
               vmId = candidate;
+
+              // Check if candidate is a UUID and if we have a VM name mapping for it
               const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
                 candidate,
               );
-              if (!isUUID) {
+              if (isUUID && vmUuidToName.has(candidate)) {
+                // Use the mapped VM name instead of UUID
+                name = vmUuidToName.get(candidate)!;
+                console.log(`[MobileDetector] Resolved UUID ${candidate} to VM name "${name}"`);
+              } else if (!isUUID) {
                 name = candidate;
               }
             } else if (runningVMNames.has(model)) {
               name = model;
               vmId = model;
+            }
+
+            // Additional fallback: try to match by partial name
+            // e.g., ADB reports "Moto X" but VM is "Motorola Moto X"
+            if (name === model) {
+              for (const vmName of runningVMNames) {
+                const isUUID =
+                  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vmName);
+                if (isUUID) continue; // Skip UUIDs, we handled them above
+
+                if (
+                  vmName.toLowerCase().includes(model.toLowerCase()) ||
+                  model.toLowerCase().includes(vmName.toLowerCase())
+                ) {
+                  name = vmName;
+                  vmId = vmName;
+                  console.log(`[MobileDetector] Fuzzy matched model "${model}" to VM "${vmName}"`);
+                  break;
+                }
+              }
             }
           }
         } else {
