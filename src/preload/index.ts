@@ -6,12 +6,7 @@ const api = {
   app: appAPI,
   invoke: (channel: string, ...args: any[]) => electronAPI.ipcRenderer.invoke(channel, ...args),
   on: (channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) => {
-    // Debug wrapper
-    const wrappedListener = (event: IpcRendererEvent, ...args: any[]) => {
-      listener(event, ...args);
-    };
-    electronAPI.ipcRenderer.on(channel, wrappedListener);
-    return wrappedListener;
+    electronAPI.ipcRenderer.on(channel, listener);
   },
   off: (channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void) =>
     electronAPI.ipcRenderer.removeListener(channel, listener),

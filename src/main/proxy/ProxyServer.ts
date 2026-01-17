@@ -42,7 +42,7 @@ export class ProxyServer extends EventEmitter {
 
     this.setupListeners();
 
-    this.proxy.listen({ port }, () => {
+    this.proxy.listen({ port, host: '0.0.0.0' }, () => {
       this.isRunning = true;
       this.emit('started', port);
     });
@@ -126,7 +126,12 @@ export class ProxyServer extends EventEmitter {
           return callback();
         }
 
-        // Serve instructions page
+        // Get client IP for diagnostics
+        const clientIP =
+          req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'Unknown';
+        console.log(`[ProxyServer] Setup page accessed from: ${clientIP}`);
+
+        // Serve enhanced instructions page with diagnostics
         const html = `
           <!DOCTYPE html>
           <html>
@@ -134,25 +139,213 @@ export class ProxyServer extends EventEmitter {
               <title>Systema Proxy Setup</title>
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #09090b; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center; }
-                h1 { margin-bottom: 20px; color: #3b82f6; }
-                p { margin-bottom: 30px; line-height: 1.6; color: #a1a1aa; max-width: 400px; }
-                .btn { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: opacity 0.2s; }
-                .btn:active { opacity: 0.8; }
-                .step { margin-bottom: 10px; font-size: 14px; text-align: left; width: 100%; max-width: 350px; background: #18181b; padding: 15px; border-radius: 8px; border: 1px solid #27272a; }
-                .step strong { color: #e4e4e7; display: block; margin-bottom: 4px; }
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { 
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                  background: linear-gradient(135deg, #09090b 0%, #18181b 100%);
+                  color: #fff; 
+                  min-height: 100vh;
+                  padding: 20px;
+                }
+                .container {
+                  max-width: 600px;
+                  margin: 0 auto;
+                  padding-top: 40px;
+                }
+                h1 { 
+                  font-size: 32px;
+                  margin-bottom: 10px; 
+                  color: #3b82f6;
+                  text-align: center;
+                }
+                .subtitle {
+                  text-align: center;
+                  color: #a1a1aa;
+                  margin-bottom: 30px;
+                  font-size: 14px;
+                }
+                .success-badge {
+                  background: #10b981;
+                  color: white;
+                  padding: 8px 16px;
+                  border-radius: 20px;
+                  font-size: 12px;
+                  font-weight: bold;
+                  display: inline-block;
+                  margin-bottom: 30px;
+                }
+                .info-box {
+                  background: #18181b;
+                  border: 1px solid #27272a;
+                  border-radius: 12px;
+                  padding: 20px;
+                  margin-bottom: 20px;
+                }
+                .info-box h3 {
+                  color: #e4e4e7;
+                  font-size: 16px;
+                  margin-bottom: 12px;
+                  display: flex;
+                  align-items: center;
+                }
+                .info-box h3::before {
+                  content: "✓";
+                  background: #10b981;
+                  color: white;
+                  width: 24px;
+                  height: 24px;
+                  border-radius: 50%;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  margin-right: 10px;
+                  font-size: 14px;
+                }
+                .info-item {
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 8px 0;
+                  border-bottom: 1px solid #27272a;
+                  font-size: 14px;
+                }
+                .info-item:last-child {
+                  border-bottom: none;
+                }
+                .info-item .label {
+                  color: #a1a1aa;
+                }
+                .info-item .value {
+                  color: #e4e4e7;
+                  font-family: monospace;
+                  font-weight: bold;
+                }
+                .step { 
+                  background: #18181b;
+                  padding: 20px;
+                  border-radius: 12px;
+                  border: 1px solid #27272a;
+                  margin-bottom: 15px;
+                }
+                .step-number {
+                  background: #3b82f6;
+                  color: white;
+                  width: 28px;
+                  height: 28px;
+                  border-radius: 50%;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-weight: bold;
+                  font-size: 14px;
+                  margin-right: 10px;
+                }
+                .step strong { 
+                  color: #e4e4e7;
+                  font-size: 16px;
+                  display: flex;
+                  align-items: center;
+                  margin-bottom: 10px;
+                }
+                .step p {
+                  color: #a1a1aa;
+                  line-height: 1.6;
+                  margin-left: 38px;
+                  font-size: 14px;
+                }
+                .btn { 
+                  display: block;
+                  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                  color: white;
+                  padding: 16px 24px;
+                  border-radius: 12px;
+                  text-decoration: none;
+                  font-weight: bold;
+                  text-align: center;
+                  transition: transform 0.2s, box-shadow 0.2s;
+                  margin: 20px 0;
+                  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                }
+                .btn:active { 
+                  transform: scale(0.98);
+                  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+                }
+                .troubleshoot {
+                  background: #27272a;
+                  border-left: 4px solid #f59e0b;
+                  padding: 15px;
+                  border-radius: 8px;
+                  margin-top: 20px;
+                  font-size: 13px;
+                  color: #d4d4d8;
+                }
+                .troubleshoot h4 {
+                  color: #f59e0b;
+                  margin-bottom: 8px;
+                  font-size: 14px;
+                }
+                .troubleshoot ul {
+                  margin-left: 20px;
+                  line-height: 1.8;
+                }
+                .troubleshoot li {
+                  color: #a1a1aa;
+                }
               </style>
             </head>
             <body>
-              <h1>Systema Proxy</h1>
-              <div class="step">
-                <strong>Step 1: Download Certificate</strong>
-                Click the button below to download the CA Certificate.
-              </div>
-              <a href="/ssl/download" class="btn">Download CA Certificate</a>
-              <div class="step" style="margin-top: 20px;">
-                <strong>Step 2: Install Certificate</strong>
-                Go to <em>Settings > Security > Encryption & credentials > Install a certificate > CA certificate</em> and select the downloaded file.
+              <div class="container">
+                <h1>🎯 Systema Proxy</h1>
+                <div class="subtitle">Mobile Device Setup</div>
+                
+                <center>
+                  <span class="success-badge">✓ Connected Successfully</span>
+                </center>
+
+                <div class="info-box">
+                  <h3>Connection Information</h3>
+                  <div class="info-item">
+                    <span class="label">Your IP Address:</span>
+                    <span class="value">${clientIP}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">Server:</span>
+                    <span class="value">${req.headers.host}</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="label">Protocol:</span>
+                    <span class="value">HTTP</span>
+                  </div>
+                </div>
+
+                <div class="step">
+                  <strong><span class="step-number">1</span>Download Certificate</strong>
+                  <p>Click the button below to download the CA Certificate to your device.</p>
+                </div>
+                
+                <a href="/ssl/download" class="btn">📥 Download CA Certificate</a>
+
+                <div class="step">
+                  <strong><span class="step-number">2</span>Install Certificate</strong>
+                  <p><strong>Android:</strong> Settings → Security → Encryption & credentials → Install a certificate → CA certificate</p>
+                  <p style="margin-top: 8px;"><strong>iOS:</strong> Settings → General → VPN & Device Management → Downloaded Profile → Install</p>
+                </div>
+
+                <div class="step">
+                  <strong><span class="step-number">3</span>Configure Proxy</strong>
+                  <p>Go to WiFi settings → Modify network → Proxy → Manual</p>
+                  <p style="margin-top: 8px;">Hostname: <strong>${req.headers.host?.split(':')[0] || '192.168.101.189'}</strong></p>
+                  <p>Port: <strong>8081</strong></p>
+                </div>
+
+                <div class="troubleshoot">
+                  <h4>⚠️ Troubleshooting</h4>
+                  <ul>
+                    <li>Ensure both devices are on the same WiFi network</li>
+                    <li>Check if router's AP Isolation is disabled</li>
+                    <li>Try accessing in Incognito/Private browsing mode</li>
+                    <li>Disable VPN on mobile device if enabled</li>
+                  </ul>
+                </div>
               </div>
             </body>
           </html>

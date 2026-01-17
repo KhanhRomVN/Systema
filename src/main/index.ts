@@ -617,6 +617,92 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Enable Wireless ADB for USB Device
+  ipcMain.handle('mobile:enable-wireless-adb', async (_, serial: string) => {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    try {
+      // Enable TCP/IP mode on port 5555
+      console.log(`[ADB Wireless] Enabling wireless mode for ${serial}`);
+      const { stdout: tcpipOutput } = await execAsync(`adb -s ${serial} tcpip 5555`);
+      console.log(`[ADB Wireless] tcpip output:`, tcpipOutput.trim());
+
+      // Wait longer for device to restart in tcpip mode and reconnect
+      console.log('[ADB Wireless] Waiting for device to reconnect...');
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Retry logic for getting IP address (device needs time to reconnect)
+      let ip = '';
+      let retries = 3;
+
+      for (let i = 0; i < retries; i++) {
+        try {
+          console.log(`[ADB Wireless] Attempt ${i + 1}/${retries} to get IP...`);
+
+          // Try first method
+          try {
+            const { stdout: ipOutput } = await execAsync(
+              `adb -s ${serial} shell ip -f inet addr show wlan0 | grep -o 'inet [0-9.]*' | cut -d' ' -f2`,
+              { timeout: 5000 },
+            );
+            ip = ipOutput.trim();
+            if (ip) {
+              console.log(`[ADB Wireless] Device IP (method 1): ${ip}`);
+              break;
+            }
+          } catch (err) {
+            console.log(`[ADB Wireless] Method 1 failed, trying alternative...`);
+          }
+
+          // Try alternative method
+          try {
+            const { stdout: altIpOutput } = await execAsync(
+              `adb -s ${serial} shell "ip addr show wlan0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1"`,
+              { timeout: 5000 },
+            );
+            ip = altIpOutput.trim();
+            if (ip) {
+              console.log(`[ADB Wireless] Device IP (method 2): ${ip}`);
+              break;
+            }
+          } catch (err) {
+            console.log(`[ADB Wireless] Method 2 also failed`);
+          }
+
+          // If no IP yet and not last retry, wait before next attempt
+          if (!ip && i < retries - 1) {
+            console.log('[ADB Wireless] Waiting 2s before retry...');
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        } catch (e) {
+          console.error(`[ADB Wireless] Retry ${i + 1} error:`, e);
+        }
+      }
+
+      if (ip) {
+        console.log(`[ADB Wireless] Successfully retrieved IP: ${ip}`);
+        return {
+          success: true,
+          ip,
+          port: '5555',
+          message: `Wireless ADB enabled successfully at ${ip}:5555`,
+        };
+      } else {
+        // Could not get IP after all retries
+        return {
+          success: true,
+          message:
+            'Wireless ADB enabled on port 5555, but could not retrieve IP address.\nDevice may need more time to reconnect. Check WiFi connection.',
+        };
+      }
+    } catch (e: any) {
+      console.error('[ADB Wireless] Error:', e);
+      return { success: false, error: e.message || 'Failed to enable wireless ADB' };
+    }
+  });
+
   ipcMain.handle('mobile:disconnect', async (_, serial: string) => {
     const { exec } = await import('child_process');
     const { promisify } = await import('util');
@@ -627,34 +713,6 @@ app.whenReady().then(async () => {
       return true;
     } catch (e) {
       return false;
-    }
-  });
-
-  // QR Code
-  ipcMain.handle('mobile:get-qr-code', async () => {
-    const QRCode = await import('qrcode'); // Dynamic import
-    const { getLocalIp } = await import('./utils/net');
-
-    // Ensure a proxy session exists for mobile setup
-    // We use a specific ID for this temporary/setup session
-    const port = await proxyManager.createSession('mobile-setup');
-    const ip = getLocalIp().trim();
-
-    // Let's return the Data URL of the Setup Page
-    const setupUrl = `http://${ip}:${port}/ssl`;
-    console.log('[Mobile] Generated QR Setup URL:', setupUrl);
-
-    try {
-      const qrDataUrl = await QRCode.toDataURL(setupUrl, { errorCorrectionLevel: 'H' });
-      return {
-        qrCode: qrDataUrl,
-        ip,
-        port,
-        setupUrl,
-      };
-    } catch (e) {
-      console.error('Failed to generate QR code', e);
-      return null;
     }
   });
 

@@ -29,6 +29,13 @@ export interface CodeBlockRef {
   format: () => void;
 }
 
+export interface HighlightRange {
+  startLine: number;
+  endLine: number;
+  color?: string; // Optional custom color, defaults to a standard highlight
+  label?: string; // e.g., 'Added', 'Removed'
+}
+
 interface CodeBlockProps {
   code: string;
   language?: string;
@@ -37,6 +44,7 @@ interface CodeBlockProps {
   wordWrap?: 'off' | 'on' | 'wordWrapColumn' | 'bounded';
   showLineNumbers?: boolean;
   searchTerm?: string;
+  highlightRanges?: HighlightRange[];
   onEditorMounted?: (editor: any) => void;
   editorOptions?: any;
   onChange?: (value: string) => void;
@@ -70,6 +78,7 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
       wordWrap = 'on',
       showLineNumbers = false,
       searchTerm,
+      highlightRanges = [],
       onEditorMounted,
       editorOptions,
       onChange,
@@ -80,6 +89,7 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
     const editorInstance = useRef<any>(null);
     const decorationsRef = useRef<string[]>([]);
     const lineDecorationsRef = useRef<string[]>([]);
+    const rangeDecorationsRef = useRef<string[]>([]);
     const [isEditorReady, setIsEditorReady] = React.useState(false);
 
     useImperativeHandle(ref, () => ({
@@ -285,6 +295,12 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
           font-weight: bold;
           color: #eab308 !important;
         }
+        .monaco-range-highlight-green {
+           background-color: rgba(34, 197, 94, 0.2) !important;
+        }
+        .monaco-range-highlight-red {
+           background-color: rgba(239, 68, 68, 0.2) !important;
+        }
       `;
         document.head.appendChild(style);
       }
@@ -337,6 +353,33 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
         );
       }
     }, [searchTerm, code, isEditorReady]); // Re-run when search term or code changes or editor becomes ready
+
+    // Handle Range Highlighting
+    useEffect(() => {
+      if (!isEditorReady || !editorInstance.current || !window.monaco) return;
+
+      if (highlightRanges.length === 0) {
+        rangeDecorationsRef.current = editorInstance.current.deltaDecorations(
+          rangeDecorationsRef.current,
+          [],
+        );
+        return;
+      }
+
+      const newDecorations = highlightRanges.map((range) => ({
+        range: new window.monaco.Range(range.startLine, 1, range.endLine, 1),
+        options: {
+          isWholeLine: true,
+          className: range.color || 'monaco-range-highlight-green', // Fallback
+          linesDecorationsClassName: range.color ? undefined : 'my-line-decoration', // Optional gutter
+        },
+      }));
+
+      rangeDecorationsRef.current = editorInstance.current.deltaDecorations(
+        rangeDecorationsRef.current,
+        newDecorations,
+      );
+    }, [highlightRanges, isEditorReady]);
 
     // Handle line highlighting
     useEffect(() => {
