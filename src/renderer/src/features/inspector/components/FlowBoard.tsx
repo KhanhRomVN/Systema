@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, DragEvent, useEffect } from 'react';
+import { useCallback, useMemo, DragEvent, useEffect, useState, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -9,11 +9,14 @@ import {
   Connection,
   ReactFlowProvider,
   Node,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { X, Network } from 'lucide-react';
+import { X, Network, ArrowRightFromLine, ArrowDownFromLine, GitFork } from 'lucide-react';
 import { HttpsRequestNode } from './HttpsRequestNode';
+import { IfNode } from './IfNode';
 import { NetworkRequest } from '../types';
+import { FlowLayoutContext } from './FlowContext';
 
 interface FlowBoardProps {
   initialData: { nodes: any[]; edges: any[] };
@@ -37,6 +40,7 @@ interface FlowBoardProps {
 // Register custom node types
 const nodeTypes = {
   httpsRequest: HttpsRequestNode,
+  ifNode: IfNode,
 };
 
 export function FlowBoard(props: FlowBoardProps) {
@@ -58,21 +62,39 @@ function FlowBoardInner({
   onNodeSelect,
   onMethodsReady,
 }: FlowBoardProps) {
+  const { screenToFlowPosition } = useReactFlow();
+  const [direction, setDirection] = useState<'vertical' | 'horizontal'>('vertical');
+  const isInitialMount = useRef(true);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Convert initial nodes to include request data
   const initialNodes = useMemo(() => {
     return (initialData.nodes || []).map((node: any) => {
       // If the node already has a request object (saved with flow), use it.
       // Otherwise fallback to looking it up by ID (migration/backward compat).
       if (node.type === 'httpsRequest') {
-        if (node.data?.request) {
+        // Case 1: Already flattened (check for required field like 'method' or 'host' to be safe, or just trust the new state)
+        if (node.data?.method) {
           return node;
         }
-        if (node.data?.requestId) {
-          const request = requests.find((r) => r.id === node.data.requestId);
+        // Case 2: Nested 'request' object (Migration from previous step)
+        if (node.data?.request) {
+          const { request, ...rest } = node.data;
           return {
             ...node,
-            data: { ...node.data, request },
+            data: { ...rest, ...request },
           };
+        }
+        // Case 3: Legacy 'requestId'
+        if (node.data?.requestId) {
+          const request = requests.find((r) => r.id === node.data.requestId);
+          if (request) {
+            const { requestId, ...restData } = node.data;
+            return {
+              ...node,
+              data: { ...restData, ...request },
+            };
+          }
         }
       }
       return node;
@@ -83,8 +105,24 @@ function FlowBoardInner({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData.edges || []);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges],
+    (params: Connection) => {
+      // Determine edge color based on source node type
+      const sourceNode = nodes.find((n) => n.id === params.source);
+      let edgeColor = '#22c55e'; // default green
+
+      if (sourceNode?.type === 'ifNode') {
+        edgeColor = '#eab308'; // yellow for ifNode
+      }
+
+      const edge = {
+        ...params,
+        type: 'step',
+        style: { stroke: edgeColor, strokeWidth: 2 },
+        animated: true,
+      };
+      setEdges((eds) => addEdge(edge, eds));
+    },
+    [setEdges, nodes],
   );
 
   // Expose addNode function to parent
@@ -95,7 +133,7 @@ function FlowBoardInner({
         id: `node-${request.id}-${Date.now()}`,
         type: 'httpsRequest',
         position: { x: 100, y: 100 + nodeCount * 200 },
-        data: { requestId: request.id, request },
+        data: { ...request, sequence: nodeCount + 1 },
       };
       setNodes((nds) => [...nds, newNode]);
     },
@@ -112,9 +150,7 @@ function FlowBoardInner({
               ...node,
               data: {
                 ...node.data,
-                request: newReq,
-                // We also update requestId if the ID changed, though usually it won't here.
-                requestId: newReq.id,
+                ...newReq,
               },
             };
           }
@@ -125,96 +161,102 @@ function FlowBoardInner({
     [setNodes],
   );
 
-  // Handle Dynamic Edge Routing (Smart Handles)
+  // Smart Edge Handling - Simplified for Layout Mode
+  // When in strict vertical/horizontal mode, we might not need dynamic handle switching
+  // as much, or we switch logic based on direction.
   const updateEdgeHandles = useCallback(() => {
+    // If we want to enforce handles based on layout direction:
     setEdges((currentEdges) => {
       let hasChanges = false;
       const newEdges = currentEdges.map((edge) => {
         const sourceNode = nodes.find((n) => n.id === edge.source);
         const targetNode = nodes.find((n) => n.id === edge.target);
 
-        if (
-          !sourceNode ||
-          !targetNode ||
-          sourceNode.type !== 'httpsRequest' ||
-          targetNode.type !== 'httpsRequest'
-        ) {
-          return edge;
-        }
-
-        // Calculate centers
-        const sourceCenter = {
-          x: sourceNode.position.x + (sourceNode.measured?.width || 200) / 2,
-          y: sourceNode.position.y + (sourceNode.measured?.height || 64) / 2,
-        };
-        const targetCenter = {
-          x: targetNode.position.x + (targetNode.measured?.width || 200) / 2,
-          y: targetNode.position.y + (targetNode.measured?.height || 64) / 2,
-        };
-
-        const dx = targetCenter.x - sourceCenter.x;
-        const dy = targetCenter.y - sourceCenter.y;
+        if (!sourceNode || !targetNode || sourceNode.type === 'ifNode') return edge;
 
         let newSourceHandle = edge.sourceHandle;
         let newTargetHandle = edge.targetHandle;
 
-        // Logic:
-        // If horizontal distance is greater than vertical, prefer Right->Left
-        // If vertical distance is greater, prefer Bottom->Top
-
-        // Threshold to switch to Horizontal
-        if (Math.abs(dx) > Math.abs(dy)) {
-          // Horizontal
-          if (dx > 0) {
-            // Target is to the Right
-            newSourceHandle = 'right';
-            newTargetHandle = 'left';
-          } else {
-            // Target is to the Left?? Current nodes don't support Left Source / Right Target.
-            // We keep default or vertical if we can't support it, or force standard flow?
-            // Let's stick to Bottom->Top for backward flow to avoid weird loops from side
-            newSourceHandle = 'bottom';
-            newTargetHandle = 'top';
-          }
+        if (direction === 'vertical') {
+          // Enforce Bottom -> Top
+          newSourceHandle = 'bottom';
+          newTargetHandle = 'top';
         } else {
-          // Vertical
-          if (dy > 0) {
-            // Target is Below
-            newSourceHandle = 'bottom';
-            newTargetHandle = 'top';
-          } else {
-            // Target is Above
-            // We don't have Top Source, so keep Bottom->Top (will loop around) or use Right->Top?
-            newSourceHandle = 'bottom';
-            newTargetHandle = 'top';
-          }
+          // Enforce Right -> Left
+          newSourceHandle = 'right';
+          newTargetHandle = 'left';
         }
 
-        if (newSourceHandle !== edge.sourceHandle || newTargetHandle !== edge.targetHandle) {
-          hasChanges = true;
-          return {
-            ...edge,
-            sourceHandle: newSourceHandle,
-            targetHandle: newTargetHandle,
-          };
+        // Special case for IfNode connections (Yellow)?
+        // If connecting FROM a yellow dot, handle ID might be specific.
+        // We should preserve special handles if they were manually selected/created?
+        // For now, let's just stick to the main flow.
+
+        // Only update if it's a standard HTTPS-HTTPS connection
+        if (sourceNode.type === 'httpsRequest' && targetNode.type === 'httpsRequest') {
+          if (newSourceHandle !== edge.sourceHandle || newTargetHandle !== edge.targetHandle) {
+            hasChanges = true;
+            return {
+              ...edge,
+              sourceHandle: newSourceHandle,
+              targetHandle: newTargetHandle,
+            };
+          }
         }
         return edge;
       });
-
       return hasChanges ? newEdges : currentEdges;
     });
-  }, [nodes, setEdges]);
+  }, [nodes, setEdges, direction]);
+
+  // Update edges when layout changes
+  useEffect(() => {
+    updateEdgeHandles();
+  }, [direction, updateEdgeHandles]);
 
   // Trigger edge update on interaction
   const onNodeDrag = useCallback(() => {
-    updateEdgeHandles();
-  }, [updateEdgeHandles]);
+    // We can disable dynamic smart routing if we are enforcing layout direction
+    // updateEdgeHandles();
+  }, []);
 
   // Register methods with parent
   useEffect(() => {
     onAddNodeRef?.(addNode);
     onMethodsReady?.({ updateNodeRequest });
   }, [addNode, updateNodeRequest, onAddNodeRef, onMethodsReady]);
+
+  // Auto-save flow on changes (debounced)
+  useEffect(() => {
+    // Skip auto-save on initial mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Debounce auto-save by 500ms
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      if (onSaveFlow) {
+        const cleanNodes = nodes.map((node) => ({
+          ...node,
+          data: node.data,
+        }));
+        onSaveFlow({ nodes: cleanNodes, edges });
+      }
+    }, 500);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [nodes, edges, onSaveFlow]);
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -230,6 +272,11 @@ function FlowBoardInner({
 
       if (!requestId) return;
 
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
       let request: NetworkRequest | undefined;
       try {
         request = JSON.parse(requestDataStr);
@@ -239,23 +286,19 @@ function FlowBoardInner({
 
       if (!request) return;
 
-      // Get drop position relative to the ReactFlow container
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      const position = {
-        x: event.clientX - reactFlowBounds.left - 140, // Center the node
-        y: event.clientY - reactFlowBounds.top - 50,
-      };
-
       const newNode: Node = {
-        id: `node-${requestId}-${Date.now()}`,
+        id: `node-${request.id}-${Date.now()}`,
         type: 'httpsRequest',
         position,
-        data: { requestId, request },
+        data: {
+          ...request,
+          sequence: nodes.length + 1,
+        },
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [requests, setNodes],
+    [requests, setNodes, nodes.length, screenToFlowPosition],
   );
 
   const handleSave = useCallback(() => {
@@ -267,69 +310,111 @@ function FlowBoardInner({
     onSaveFlow?.({ nodes: cleanNodes, edges });
   }, [nodes, edges, onSaveFlow]);
 
+  const addIfNode = () => {
+    const newNode: Node = {
+      id: `node-if-${Date.now()}`,
+      type: 'ifNode',
+      position: { x: 250, y: 250 },
+      data: { label: 'Condition' },
+    };
+    setNodes((nds) => [...nds, newNode]);
+  };
+
   return (
-    <div className="flex flex-col h-full w-full">
-      {/* Header */}
-      <div className="h-12 border-b border-border flex items-center px-4 justify-between bg-card text-card-foreground shadow-sm shrink-0">
-        <div className="flex items-center gap-2 font-bold text-green-500">
-          <Network className="w-5 h-5" />
-          Flow Visualization
-        </div>
-        <div className="flex items-center gap-2">
-          {onSaveFlow && (
+    <FlowLayoutContext.Provider value={{ direction }}>
+      <div className="flex flex-col h-full w-full">
+        {/* Header */}
+        <div className="h-12 border-b border-border flex items-center px-4 justify-between bg-card text-card-foreground shadow-sm shrink-0">
+          <div className="flex items-center gap-2 font-bold text-green-500">
+            <Network className="w-5 h-5" />
+            Flow
+          </div>
+
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-lg">
             <button
-              onClick={handleSave}
-              className="px-3 py-1.5 rounded bg-green-500/10 text-green-500 hover:bg-green-500/20 text-xs font-medium transition-colors border border-green-500/30"
+              onClick={() => setDirection('vertical')}
+              className={`p-1.5 rounded transition-all ${direction === 'vertical' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
+              title="Vertical Layout"
             >
-              Save Flow
+              <ArrowDownFromLine className="w-4 h-4" />
             </button>
-          )}
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1 p-1 rounded-md text-xs font-medium transition-colors hover:text-red-500 hover:bg-red-500/10"
+            <button
+              onClick={() => setDirection('horizontal')}
+              className={`p-1.5 rounded transition-all ${direction === 'horizontal' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
+              title="Horizontal Layout"
+            >
+              <ArrowRightFromLine className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-border mx-1" />
+            <button
+              onClick={addIfNode}
+              className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-yellow-500/10 text-yellow-500 text-xs font-medium transition-colors border border-yellow-500/0 hover:border-yellow-500/30"
+              title="Add If/Else Node"
+            >
+              <GitFork className="w-4 h-4" />
+              If/Else
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onSaveFlow && (
+              <button
+                onClick={handleSave}
+                className="px-3 py-1.5 rounded bg-green-500/10 text-green-500 hover:bg-green-500/20 text-xs font-medium transition-colors border border-green-500/30"
+              >
+                Save
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1 p-1 rounded-md text-xs font-medium transition-colors hover:text-red-500 hover:bg-red-500/10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div
+          className="flex-1 w-full h-full bg-neutral-900/50"
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+        >
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            onNodeClick={(_, node) => {
+              if (node.type === 'httpsRequest' && node.data?.request) {
+                onNodeSelect?.(node.id, node.data.request as NetworkRequest);
+              } else {
+                onNodeSelect?.(null, null);
+              }
+            }}
+            onPaneClick={() => onNodeSelect?.(null, null)}
+            onNodeDrag={onNodeDrag}
+            fitView
+            className="bg-background"
+            colorMode="dark"
+            defaultEdgeOptions={{
+              type: 'step', // Square edges
+              style: { stroke: '#22c55e', strokeWidth: 2 },
+              animated: true,
+            }}
           >
-            <X className="w-4 h-4" />
-          </button>
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </div>
+
+        {/* Drop Zone Hint */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground bg-card/80 px-3 py-1.5 rounded-full border border-border/50 pointer-events-none">
+          Drag HTTPS requests to add nodes
         </div>
       </div>
-
-      <div
-        className="flex-1 w-full h-full bg-neutral-900/50"
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-      >
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          onNodeClick={(_, node) => {
-            if (node.type === 'httpsRequest' && node.data?.request) {
-              // Call the new selection handler with ID
-              onNodeSelect?.(node.id, node.data.request as NetworkRequest);
-            }
-          }}
-          onPaneClick={() => onNodeSelect?.(null, null)}
-          onNodeDrag={onNodeDrag}
-          fitView
-          className="bg-background"
-          colorMode="dark"
-          defaultEdgeOptions={{
-            style: { stroke: '#22c55e', strokeWidth: 2 },
-            animated: true,
-          }}
-        >
-          <Background />
-          <Controls />
-        </ReactFlow>
-      </div>
-
-      {/* Drop Zone Hint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground bg-card/80 px-3 py-1.5 rounded-full border border-border/50 pointer-events-none">
-        Drag HTTPS requests from the table above to add nodes
-      </div>
-    </div>
+    </FlowLayoutContext.Provider>
   );
 }

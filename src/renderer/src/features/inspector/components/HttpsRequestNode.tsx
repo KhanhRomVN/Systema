@@ -1,11 +1,11 @@
-import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { memo, useContext } from 'react';
+import { Handle, Position, useEdges } from '@xyflow/react';
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
+import { FlowLayoutContext } from './FlowContext';
 
-interface HttpsRequestNodeData {
-  requestId: string;
-  request: NetworkRequest;
+interface HttpsRequestNodeData extends NetworkRequest {
+  sequence?: number; // Add sequence support
 }
 
 interface HttpsRequestNodeProps {
@@ -13,17 +13,33 @@ interface HttpsRequestNodeProps {
   selected?: boolean;
 }
 
-function HttpsRequestNodeComponent({ data, selected }: HttpsRequestNodeProps) {
-  const { request } = data;
+function HttpsRequestNodeComponent({ data, selected, id }: HttpsRequestNodeProps & { id: string }) {
+  const { sequence, ...request } = data;
+  const { direction } = useContext(FlowLayoutContext);
+  const isVertical = direction === 'vertical';
+  const edges = useEdges();
 
-  if (!request) {
+  // Compute handle colors based on connections
+  const getHandleColor = (handleId: string, handleType: 'source' | 'target') => {
+    const connectedEdges = edges.filter((edge) =>
+      handleType === 'source'
+        ? edge.source === id && edge.sourceHandle === handleId
+        : edge.target === id && edge.targetHandle === handleId,
+    );
+
+    if (connectedEdges.length === 0) return 'gray';
+
+    // If there are connections, use green color
+    return 'green';
+  };
+
+  const inColor = getHandleColor('in', 'target');
+  const outColor = getHandleColor('out', 'source');
+
+  if (!request.id) {
     return (
       <div className="bg-card border border-border rounded-lg p-3 min-w-[280px] text-xs text-muted-foreground">
         Request not found
-        <Handle type="target" position={Position.Top} className="!bg-green-500 !w-2 !h-2" />
-        <Handle type="source" position={Position.Bottom} className="!bg-green-500 !w-2 !h-2" />
-        <Handle type="target" position={Position.Left} className="!bg-green-500 !w-2 !h-2" />
-        <Handle type="source" position={Position.Right} className="!bg-green-500 !w-2 !h-2" />
       </div>
     );
   }
@@ -39,34 +55,41 @@ function HttpsRequestNodeComponent({ data, selected }: HttpsRequestNodeProps) {
   return (
     <div
       className={cn(
-        'bg-card border rounded-lg min-w-[200px] max-w-[250px] shadow-lg transition-all',
+        'bg-card border rounded-lg min-w-[200px] max-w-[250px] shadow-lg transition-all relative group',
         selected ? 'border-green-500 ring-1 ring-green-500/50 z-10' : 'border-border',
       )}
     >
-      {/* Handles for edges */}
+      {/* Sequence Badge */}
+      {sequence !== undefined && (
+        <div className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold shadow-md z-20 border border-background">
+          {sequence}
+        </div>
+      )}
+
+      {/* Handles - Conditional Rendering based on Layout Context */}
+
+      {/* Target (Input) */}
       <Handle
         type="target"
-        position={Position.Top}
-        id="top"
-        className="!bg-green-500 !w-2 !h-2 !border-0"
+        position={isVertical ? Position.Top : Position.Left}
+        id="in"
+        className={cn(
+          '!w-2 !h-2 !border-0 transition-colors',
+          inColor === 'green' && '!bg-green-500',
+          inColor === 'gray' && '!bg-gray-500',
+        )}
       />
+
+      {/* Source (Output - Main Flow) */}
       <Handle
         type="source"
-        position={Position.Bottom}
-        id="bottom"
-        className="!bg-green-500 !w-2 !h-2 !border-0"
-      />
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="left"
-        className="!bg-green-500 !w-2 !h-2 !border-0"
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right"
-        className="!bg-green-500 !w-2 !h-2 !border-0"
+        position={isVertical ? Position.Bottom : Position.Right}
+        id="out"
+        className={cn(
+          '!w-2 !h-2 !border-0 transition-colors',
+          outColor === 'green' && '!bg-green-500',
+          outColor === 'gray' && '!bg-gray-500',
+        )}
       />
 
       {/* Content */}

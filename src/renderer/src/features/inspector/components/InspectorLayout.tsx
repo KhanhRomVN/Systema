@@ -178,7 +178,10 @@ export function InspectorLayout({
           id: `node-${pendingFlowRequest.id}-${Date.now()}`,
           type: 'httpsRequest',
           position: { x: 100, y: 100 },
-          data: { requestId: pendingFlowRequest.id },
+          data: {
+            ...pendingFlowRequest,
+            sequence: 1,
+          },
         },
       ],
       edges: [],
