@@ -10,6 +10,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { Play, Pause, Clock, FileCode, Image, Network } from 'lucide-react';
 import { RequestComposer } from './RequestComposer';
 import { FlowBoard } from './FlowBoard';
+import { CreateFlowModal } from './CreateFlowModal';
+import type { FlowCard } from './ControlFlowPanel';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
@@ -83,6 +85,14 @@ export function InspectorLayout({
   const [isMediaMode, setIsMediaMode] = useState(false);
   const [isControlFlowMode, setIsControlFlowMode] = useState(false);
   const [activeFlowData, setActiveFlowData] = useState<any | null>(null);
+  const [addNodeToFlowRef, setAddNodeToFlowRef] = useState<((req: NetworkRequest) => void) | null>(
+    null,
+  );
+
+  // Flow Management State
+  const [flows, setFlows] = useState<FlowCard[]>([]);
+  const [createFlowModalOpen, setCreateFlowModalOpen] = useState(false);
+  const [pendingFlowRequest, setPendingFlowRequest] = useState<NetworkRequest | null>(null);
 
   // Auto-save State
   const [autoSaveInterval, setAutoSaveInterval] = useState<number>(0); // 0 = off, minutes
@@ -135,6 +145,42 @@ export function InspectorLayout({
       next.delete(id);
       return next;
     });
+  };
+
+  // Flow Management Handlers
+  const handleCreateFlowRequest = (request: NetworkRequest) => {
+    setPendingFlowRequest(request);
+    setCreateFlowModalOpen(true);
+  };
+
+  const handleCreateFlow = (title: string) => {
+    if (!pendingFlowRequest) return;
+
+    const newFlow: FlowCard = {
+      id: Date.now().toString(),
+      title,
+      nodes: [
+        {
+          id: `node-${pendingFlowRequest.id}-${Date.now()}`,
+          type: 'httpsRequest',
+          position: { x: 100, y: 100 },
+          data: { requestId: pendingFlowRequest.id },
+        },
+      ],
+      edges: [],
+      createdAt: Date.now(),
+    };
+    setFlows((prev) => [newFlow, ...prev]);
+    setPendingFlowRequest(null);
+    setIsControlFlowMode(true); // Open control flow panel after creation
+  };
+
+  const handleDeleteFlow = (id: string) => {
+    setFlows((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const handleUpdateFlow = (id: string, data: { nodes: any[]; edges: any[] }) => {
+    setFlows((prev) => prev.map((f) => (f.id === id ? { ...f, ...data } : f)));
   };
 
   // Track new requests for interception
@@ -678,12 +724,24 @@ export function InspectorLayout({
                 appId={appId || 'unknown'}
                 onSetCompare1={setCompareRequest1}
                 onSetCompare2={setCompareRequest2}
+                onAddToFlow={addNodeToFlowRef || undefined}
+                isFlowActive={!!activeFlowData}
+                onCreateFlow={handleCreateFlowRequest}
               />
             </div>
 
             {/* Bottom Panel: FlowBoard OR RequestDetails/RequestComposer */}
             {activeFlowData ? (
-              <FlowBoard initialData={activeFlowData} onClose={() => setActiveFlowData(null)} />
+              <FlowBoard
+                initialData={activeFlowData}
+                onClose={() => {
+                  setActiveFlowData(null);
+                  setAddNodeToFlowRef(null);
+                }}
+                requests={requests}
+                onAddNodeRef={(fn) => setAddNodeToFlowRef(() => fn)}
+                onSelectRequest={(req) => setSelectedId(req?.id || null)}
+              />
             ) : composerRequest ? (
               <RequestComposer initialRequest={composerRequest} appId={appId} />
             ) : (
@@ -727,6 +785,10 @@ export function InspectorLayout({
               isControlFlowMode,
               onCloseControlFlowMode: () => setIsControlFlowMode(false),
               onOpenFlow: (data) => setActiveFlowData(data),
+              flows,
+              onDeleteFlow: handleDeleteFlow,
+              onUpdateFlow: handleUpdateFlow,
+              activeFlowData,
             }}
           />
         </ResizableSplit>
@@ -744,6 +806,25 @@ export function InspectorLayout({
           // Let's keep it simple.
           setIsSaveProfileModalOpen(false);
         }}
+      />
+
+      {/* Create Flow Modal */}
+      <CreateFlowModal
+        isOpen={createFlowModalOpen}
+        onClose={() => {
+          setCreateFlowModalOpen(false);
+          setPendingFlowRequest(null);
+        }}
+        onCreateFlow={handleCreateFlow}
+        requestInfo={
+          pendingFlowRequest
+            ? {
+                method: pendingFlowRequest.method,
+                host: pendingFlowRequest.host,
+                path: pendingFlowRequest.path,
+              }
+            : undefined
+        }
       />
     </div>
   );

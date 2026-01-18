@@ -28,10 +28,12 @@ export interface AuthConfig {
 interface AuthEditorProps {
   config: AuthConfig;
   onChange: (config: AuthConfig) => void;
+  readOnly?: boolean;
 }
 
-export function AuthEditor({ config, onChange }: AuthEditorProps) {
+export function AuthEditor({ config, onChange, readOnly = false }: AuthEditorProps) {
   const updateConfig = (key: keyof AuthConfig, value: any) => {
+    if (readOnly) return;
     onChange({ ...config, [key]: value });
   };
 
@@ -42,7 +44,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
         <select
           value={config.type}
           onChange={(e) => updateConfig('type', e.target.value as AuthType)}
-          className="w-full max-w-xs h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+          className="w-full max-w-xs h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-50"
+          disabled={readOnly}
         >
           <option value="none">No Auth</option>
           <option value="bearer">Bearer Token</option>
@@ -74,7 +77,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                   onChange={(e) => updateConfig('bearerToken', e.target.value)}
                   placeholder="Enter access token"
                   type="password"
-                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono"
+                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono disabled:opacity-70"
+                  readOnly={readOnly}
                 />
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
@@ -95,7 +99,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                 value={config.basicUsername || ''}
                 onChange={(e) => updateConfig('basicUsername', e.target.value)}
                 placeholder="Username"
-                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-70"
+                readOnly={readOnly}
               />
             </div>
             <div>
@@ -107,7 +112,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                 onChange={(e) => updateConfig('basicPassword', e.target.value)}
                 placeholder="Password"
                 type="password"
-                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-70"
+                readOnly={readOnly}
               />
             </div>
           </div>
@@ -122,7 +128,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                   value={config.apiKeyKey || ''}
                   onChange={(e) => updateConfig('apiKeyKey', e.target.value)}
                   placeholder="Key"
-                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-70"
+                  readOnly={readOnly}
                 />
               </div>
               <div>
@@ -133,7 +140,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                   value={config.apiKeyValue || ''}
                   onChange={(e) => updateConfig('apiKeyValue', e.target.value)}
                   placeholder="Value"
-                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-70"
+                  readOnly={readOnly}
                 />
               </div>
             </div>
@@ -142,7 +150,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
               <select
                 value={config.apiKeyLocation || 'header'}
                 onChange={(e) => updateConfig('apiKeyLocation', e.target.value as any)}
-                className="w-full max-w-xs h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+                className="w-full max-w-xs h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-50"
+                disabled={readOnly}
               >
                 <option value="header">Header</option>
                 <option value="query">Query Params</option>
@@ -162,7 +171,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                 onChange={(e) => updateConfig('oauth2AccessToken', e.target.value)}
                 placeholder="Enter OAuth 2.0 access token"
                 type="password"
-                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono"
+                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono disabled:opacity-70"
+                readOnly={readOnly}
               />
               <p className="text-[10px] text-muted-foreground mt-1">
                 The token will be added to the Authorization header as{' '}
@@ -182,7 +192,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                 value={config.awsAccessKey || ''}
                 onChange={(e) => updateConfig('awsAccessKey', e.target.value)}
                 placeholder="AWS Access Key ID"
-                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono"
+                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono disabled:opacity-70"
+                readOnly={readOnly}
               />
             </div>
             <div>
@@ -194,7 +205,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                 onChange={(e) => updateConfig('awsSecretKey', e.target.value)}
                 placeholder="AWS Secret Access Key"
                 type="password"
-                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono"
+                className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary font-mono disabled:opacity-70"
+                readOnly={readOnly}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -206,7 +218,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                   value={config.awsRegion || ''}
                   onChange={(e) => updateConfig('awsRegion', e.target.value)}
                   placeholder="us-east-1"
-                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-70"
+                  readOnly={readOnly}
                 />
               </div>
               <div>
@@ -217,7 +230,8 @@ export function AuthEditor({ config, onChange }: AuthEditorProps) {
                   value={config.awsService || ''}
                   onChange={(e) => updateConfig('awsService', e.target.value)}
                   placeholder="execute-api"
-                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary"
+                  className="w-full h-8 bg-background border border-border rounded px-2 text-xs outline-none focus:border-primary disabled:opacity-70"
+                  readOnly={readOnly}
                 />
               </div>
             </div>

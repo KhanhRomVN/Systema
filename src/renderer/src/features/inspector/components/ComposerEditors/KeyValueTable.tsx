@@ -12,22 +12,27 @@ interface KeyValueTableProps {
   onChange: (items: KeyValueItem[]) => void;
   title?: string;
   descriptionPlaceholder?: boolean;
+  readOnly?: boolean;
 }
 
 export function KeyValueTable({
   items,
   onChange,
   descriptionPlaceholder = false,
+  readOnly = false,
 }: KeyValueTableProps) {
   const handleAdd = () => {
+    if (readOnly) return;
     onChange([...items, { key: '', value: '', enabled: true }]);
   };
 
   const handleRemove = (index: number) => {
+    if (readOnly) return;
     onChange(items.filter((_, i) => i !== index));
   };
 
   const handleUpdate = (index: number, field: keyof KeyValueItem, value: string | boolean) => {
+    if (readOnly) return;
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     onChange(newItems);
@@ -60,6 +65,7 @@ export function KeyValueTable({
                   checked={item.enabled}
                   onChange={(e) => handleUpdate(i, 'enabled', e.target.checked)}
                   className="rounded border-border w-3.5 h-3.5"
+                  disabled={readOnly}
                 />
               </div>
               <div className="flex-1 border-r border-border/50 flex items-center">
@@ -68,6 +74,7 @@ export function KeyValueTable({
                   onChange={(e) => handleUpdate(i, 'key', e.target.value)}
                   placeholder="Key"
                   className="w-full h-8 px-2 bg-transparent text-xs outline-none focus:bg-muted/20 font-mono"
+                  readOnly={readOnly}
                 />
               </div>
               <div className="flex-1 border-r border-border/50 flex items-center py-1">
@@ -101,6 +108,7 @@ export function KeyValueTable({
                     height: '28px',
                     maxHeight: '120px',
                   }}
+                  readOnly={readOnly}
                 />
               </div>
               {descriptionPlaceholder && (
@@ -110,34 +118,39 @@ export function KeyValueTable({
                     onChange={(e) => handleUpdate(i, 'description', e.target.value)}
                     placeholder="Description"
                     className="w-full h-8 px-2 bg-transparent text-xs outline-none focus:bg-muted/20 text-muted-foreground"
+                    readOnly={readOnly}
                   />
                 </div>
               )}
               <div className="w-8 flex items-center justify-center">
-                <button
-                  onClick={() => handleRemove(i)}
-                  className="p-1.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => handleRemove(i)}
+                    className="p-1.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           ))}
 
           {/* Add Row Placeholder */}
-          <div className="flex border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors items-center">
-            <div className="w-8 p-1"></div>
-            <div className="flex-1 border-r border-border/50">
-              <input
-                placeholder="Add new key"
-                className="w-full h-8 px-2 bg-transparent text-xs outline-none font-mono placeholder:text-muted-foreground/50"
-                onFocus={handleAdd}
-              />
+          {!readOnly && (
+            <div className="flex border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors items-center">
+              <div className="w-8 p-1"></div>
+              <div className="flex-1 border-r border-border/50">
+                <input
+                  placeholder="Add new key"
+                  className="w-full h-8 px-2 bg-transparent text-xs outline-none font-mono placeholder:text-muted-foreground/50"
+                  onFocus={handleAdd}
+                />
+              </div>
+              <div className="flex-1 border-r border-border/50"></div>
+              {descriptionPlaceholder && <div className="flex-1 border-r border-border/50"></div>}
+              <div className="w-8"></div>
             </div>
-            <div className="flex-1 border-r border-border/50"></div>
-            {descriptionPlaceholder && <div className="flex-1 border-r border-border/50"></div>}
-            <div className="w-8"></div>
-          </div>
+          )}
         </div>
       </div>
     </div>

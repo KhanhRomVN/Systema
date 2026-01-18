@@ -16,7 +16,7 @@ import { DiffView } from './DiffView';
 
 import { WasmPanel } from './WasmPanel';
 import { MediaPanel } from './MediaPanel';
-import { ControlFlowPanel } from './ControlFlowPanel';
+import { ControlFlowPanel, FlowCard } from './ControlFlowPanel';
 
 interface InspectorContext {
   requests: NetworkRequest[];
@@ -39,6 +39,10 @@ interface InspectorContext {
   isControlFlowMode?: boolean;
   onCloseControlFlowMode?: () => void;
   onOpenFlow?: (data: any) => void;
+  flows?: FlowCard[];
+  onDeleteFlow?: (id: string) => void;
+  onUpdateFlow?: (id: string, data: { nodes: any[]; edges: any[] }) => void;
+  activeFlowData?: { nodes: any[]; edges: any[] } | null;
 }
 
 interface ChatContainerProps {
@@ -248,6 +252,13 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       <ControlFlowPanel
         onClose={inspectorContext.onCloseControlFlowMode || (() => {})}
         onOpenFlow={inspectorContext.onOpenFlow || (() => {})}
+        flows={inspectorContext.flows || []}
+        onDeleteFlow={inspectorContext.onDeleteFlow || (() => {})}
+        onUpdateFlow={inspectorContext.onUpdateFlow || (() => {})}
+        activeFlowData={inspectorContext.activeFlowData}
+        selectedRequest={
+          inspectorContext.requests.find((r) => r.id === inspectorContext.selectedRequestId) || null
+        }
       />
     );
   }

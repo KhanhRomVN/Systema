@@ -22,6 +22,7 @@ import {
   MoreVertical,
   BookmarkPlus,
   Star,
+  Network,
 } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import {
@@ -48,6 +49,9 @@ interface RequestActionsProps {
   appId: string;
   onSetCompare1: (req: NetworkRequest) => void;
   onSetCompare2: (req: NetworkRequest) => void;
+  onAddToFlow?: (req: NetworkRequest) => void;
+  isFlowActive?: boolean;
+  onCreateFlow?: (req: NetworkRequest) => void;
 }
 
 function RequestActions({
@@ -56,6 +60,11 @@ function RequestActions({
   onToggleHighlight,
   onDelete,
   appId,
+  onSetCompare1,
+  onSetCompare2,
+  onAddToFlow,
+  isFlowActive,
+  onCreateFlow,
 }: RequestActionsProps) {
   return (
     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -81,7 +90,7 @@ function RequestActions({
             <MoreVertical className="h-3.5 w-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-64">
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
@@ -108,6 +117,32 @@ function RequestActions({
             <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
             <span>Add to Collection</span>
           </DropdownMenuItem>
+
+          {isFlowActive && onAddToFlow && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToFlow(request);
+              }}
+              className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+            >
+              <Network className="mr-2 h-3.5 w-3.5" />
+              <span>Add to Flow</span>
+            </DropdownMenuItem>
+          )}
+
+          {onCreateFlow && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateFlow(request);
+              }}
+              className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+            >
+              <Network className="mr-2 h-3.5 w-3.5" />
+              <span>Create Flow with Request</span>
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem
             onClick={(e) => {
@@ -156,6 +191,9 @@ interface RequestListProps {
   appId: string;
   onSetCompare1: (req: NetworkRequest) => void;
   onSetCompare2: (req: NetworkRequest) => void;
+  onAddToFlow?: (req: NetworkRequest) => void;
+  isFlowActive?: boolean;
+  onCreateFlow?: (req: NetworkRequest) => void;
 }
 
 export function RequestList({
@@ -172,6 +210,9 @@ export function RequestList({
   appId,
   onSetCompare1,
   onSetCompare2,
+  onAddToFlow,
+  isFlowActive,
+  onCreateFlow,
 }: RequestListProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
@@ -322,6 +363,9 @@ export function RequestList({
             appId={appId}
             onSetCompare1={onSetCompare1}
             onSetCompare2={onSetCompare2}
+            onAddToFlow={onAddToFlow}
+            isFlowActive={isFlowActive}
+            onCreateFlow={onCreateFlow}
           />
         ),
       },
@@ -335,6 +379,9 @@ export function RequestList({
       toggleHighlight,
       onSetCompare1,
       onSetCompare2,
+      onAddToFlow,
+      isFlowActive,
+      onCreateFlow,
     ],
   );
 
@@ -547,6 +594,15 @@ export function RequestList({
                 <ContextMenuTrigger asChild>
                   <div
                     data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
+                    draggable="true"
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/requestId', row.original.id);
+                      e.dataTransfer.setData(
+                        'application/requestData',
+                        JSON.stringify(row.original),
+                      );
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
                     className={cn(
                       'flex items-center border-b border-border/20 transition-colors cursor-pointer text-xs absolute left-0 top-0',
                       isPending
@@ -588,7 +644,7 @@ export function RequestList({
                     })}
                   </div>
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-48">
+                <ContextMenuContent className="w-64">
                   <ContextMenuItem
                     onClick={() => {
                       onSetCompare1(row.original);
@@ -613,6 +669,30 @@ export function RequestList({
                     <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
                     <span>Add to Collection</span>
                   </ContextMenuItem>
+
+                  {isFlowActive && onAddToFlow && (
+                    <ContextMenuItem
+                      onClick={() => {
+                        onAddToFlow(row.original);
+                      }}
+                      className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+                    >
+                      <Network className="mr-2 h-3.5 w-3.5" />
+                      <span>Add to Flow</span>
+                    </ContextMenuItem>
+                  )}
+
+                  {onCreateFlow && (
+                    <ContextMenuItem
+                      onClick={() => {
+                        onCreateFlow(row.original);
+                      }}
+                      className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+                    >
+                      <Network className="mr-2 h-3.5 w-3.5" />
+                      <span>Create Flow with Request</span>
+                    </ContextMenuItem>
+                  )}
 
                   <ContextMenuItem
                     onClick={() => {
