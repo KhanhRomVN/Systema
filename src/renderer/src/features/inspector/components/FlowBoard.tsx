@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, DragEvent } from 'react';
+import React, { useCallback, useMemo, DragEvent, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -21,7 +21,17 @@ interface FlowBoardProps {
   requests: NetworkRequest[];
   onSaveFlow?: (data: { nodes: any[]; edges: any[] }) => void;
   onAddNodeRef?: (addNode: (request: NetworkRequest) => void) => void;
-  onSelectRequest?: (request: NetworkRequest | null) => void;
+  /**
+   * Enhanced selection callback that includes the Node ID.
+   * This is crucial for updating the specific node instance.
+   */
+  onNodeSelect?: (nodeId: string | null, request: NetworkRequest | null) => void;
+  /**
+   * Exposes methods to manipulate the board state from parent.
+   */
+  onMethodsReady?: (methods: {
+    updateNodeRequest: (nodeId: string, req: NetworkRequest) => void;
+  }) => void;
 }
 
 // Register custom node types
@@ -45,17 +55,25 @@ function FlowBoardInner({
   requests,
   onSaveFlow,
   onAddNodeRef,
-  onSelectRequest,
+  onNodeSelect,
+  onMethodsReady,
 }: FlowBoardProps) {
   // Convert initial nodes to include request data
   const initialNodes = useMemo(() => {
     return (initialData.nodes || []).map((node: any) => {
-      if (node.type === 'httpsRequest' && node.data?.requestId) {
-        const request = requests.find((r) => r.id === node.data.requestId);
-        return {
-          ...node,
-          data: { ...node.data, request },
-        };
+      // If the node already has a request object (saved with flow), use it.
+      // Otherwise fallback to looking it up by ID (migration/backward compat).
+      if (node.type === 'httpsRequest') {
+        if (node.data?.request) {
+          return node;
+        }
+        if (node.data?.requestId) {
+          const request = requests.find((r) => r.id === node.data.requestId);
+          return {
+            ...node,
+            data: { ...node.data, request },
+          };
+        }
       }
       return node;
     });
@@ -84,10 +102,119 @@ function FlowBoardInner({
     [nodes.length, setNodes],
   );
 
-  // Register addNode with parent on mount
-  React.useEffect(() => {
+  // Expose updateNodeRequest function
+  const updateNodeRequest = useCallback(
+    (nodeId: string, newReq: NetworkRequest) => {
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id === nodeId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                request: newReq,
+                // We also update requestId if the ID changed, though usually it won't here.
+                requestId: newReq.id,
+              },
+            };
+          }
+          return node;
+        }),
+      );
+    },
+    [setNodes],
+  );
+
+  // Handle Dynamic Edge Routing (Smart Handles)
+  const updateEdgeHandles = useCallback(() => {
+    setEdges((currentEdges) => {
+      let hasChanges = false;
+      const newEdges = currentEdges.map((edge) => {
+        const sourceNode = nodes.find((n) => n.id === edge.source);
+        const targetNode = nodes.find((n) => n.id === edge.target);
+
+        if (
+          !sourceNode ||
+          !targetNode ||
+          sourceNode.type !== 'httpsRequest' ||
+          targetNode.type !== 'httpsRequest'
+        ) {
+          return edge;
+        }
+
+        // Calculate centers
+        const sourceCenter = {
+          x: sourceNode.position.x + (sourceNode.measured?.width || 200) / 2,
+          y: sourceNode.position.y + (sourceNode.measured?.height || 64) / 2,
+        };
+        const targetCenter = {
+          x: targetNode.position.x + (targetNode.measured?.width || 200) / 2,
+          y: targetNode.position.y + (targetNode.measured?.height || 64) / 2,
+        };
+
+        const dx = targetCenter.x - sourceCenter.x;
+        const dy = targetCenter.y - sourceCenter.y;
+
+        let newSourceHandle = edge.sourceHandle;
+        let newTargetHandle = edge.targetHandle;
+
+        // Logic:
+        // If horizontal distance is greater than vertical, prefer Right->Left
+        // If vertical distance is greater, prefer Bottom->Top
+
+        // Threshold to switch to Horizontal
+        if (Math.abs(dx) > Math.abs(dy)) {
+          // Horizontal
+          if (dx > 0) {
+            // Target is to the Right
+            newSourceHandle = 'right';
+            newTargetHandle = 'left';
+          } else {
+            // Target is to the Left?? Current nodes don't support Left Source / Right Target.
+            // We keep default or vertical if we can't support it, or force standard flow?
+            // Let's stick to Bottom->Top for backward flow to avoid weird loops from side
+            newSourceHandle = 'bottom';
+            newTargetHandle = 'top';
+          }
+        } else {
+          // Vertical
+          if (dy > 0) {
+            // Target is Below
+            newSourceHandle = 'bottom';
+            newTargetHandle = 'top';
+          } else {
+            // Target is Above
+            // We don't have Top Source, so keep Bottom->Top (will loop around) or use Right->Top?
+            newSourceHandle = 'bottom';
+            newTargetHandle = 'top';
+          }
+        }
+
+        if (newSourceHandle !== edge.sourceHandle || newTargetHandle !== edge.targetHandle) {
+          hasChanges = true;
+          return {
+            ...edge,
+            sourceHandle: newSourceHandle,
+            targetHandle: newTargetHandle,
+          };
+        }
+        return edge;
+      });
+
+      return hasChanges ? newEdges : currentEdges;
+    });
+  }, [nodes, setEdges]);
+
+  // Trigger edge update on interaction
+  const onNodeDrag = useCallback(() => {
+    updateEdgeHandles();
+  }, [updateEdgeHandles]);
+
+  // Register methods with parent
+  useEffect(() => {
     onAddNodeRef?.(addNode);
-  }, [addNode, onAddNodeRef]);
+    onMethodsReady?.({ updateNodeRequest });
+  }, [addNode, updateNodeRequest, onAddNodeRef, onMethodsReady]);
 
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -132,10 +259,10 @@ function FlowBoardInner({
   );
 
   const handleSave = useCallback(() => {
-    // Clean up request data before saving (only keep requestId)
+    // Save the FULL request object in the node data to ensure independence
     const cleanNodes = nodes.map((node) => ({
       ...node,
-      data: node.type === 'httpsRequest' ? { requestId: node.data.requestId } : node.data,
+      data: node.data, // Save everything including 'request' object
     }));
     onSaveFlow?.({ nodes: cleanNodes, edges });
   }, [nodes, edges, onSaveFlow]);
@@ -180,10 +307,12 @@ function FlowBoardInner({
           nodeTypes={nodeTypes}
           onNodeClick={(_, node) => {
             if (node.type === 'httpsRequest' && node.data?.request) {
-              onSelectRequest?.(node.data.request as NetworkRequest);
+              // Call the new selection handler with ID
+              onNodeSelect?.(node.id, node.data.request as NetworkRequest);
             }
           }}
-          onPaneClick={() => onSelectRequest?.(null)}
+          onPaneClick={() => onNodeSelect?.(null, null)}
+          onNodeDrag={onNodeDrag}
           fitView
           className="bg-background"
           colorMode="dark"

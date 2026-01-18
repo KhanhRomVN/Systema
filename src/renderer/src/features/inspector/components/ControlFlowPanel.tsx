@@ -1,12 +1,11 @@
-import { useState, useMemo } from 'react';
-import { X, Eye, Trash2, Network, Pencil, List, Braces, FileText, Shield } from 'lucide-react';
-import { CodeBlock } from '../../../components/CodeBlock';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { X, Eye, Trash2, Network, Pencil, Braces, FileText } from 'lucide-react';
+import { CodeBlock, CodeBlockRef } from '../../../components/CodeBlock';
 import { NetworkRequest } from '../types';
 import { ResizableSplit } from '../../../components/ResizableSplit';
 import { cn } from '../../../shared/lib/utils';
 import { KeyValueTable } from './ComposerEditors/KeyValueTable';
-import { AuthEditor, AuthConfig } from './ComposerEditors/AuthEditor';
-import { DocsEditor } from './ComposerEditors/DocsEditor';
+import { RequestEditor } from './RequestEditor';
 
 interface FlowCard {
   id: string;
@@ -24,58 +23,27 @@ interface ControlFlowPanelProps {
   onUpdateFlow: (id: string, data: { nodes: any[]; edges: any[] }) => void;
   activeFlowData?: { nodes: any[]; edges: any[] } | null;
   selectedRequest?: NetworkRequest | null;
+  onRequestChange?: (req: NetworkRequest) => void;
 }
 
-function FlowRequestDetails({ request }: { request: NetworkRequest }) {
-  const [activeTab, setActiveTab] = useState<'params' | 'headers' | 'body' | 'auth' | 'docs'>(
-    'params',
-  );
+function FlowRequestDetails({
+  request,
+  onChange,
+}: {
+  request: NetworkRequest;
+  onChange?: (req: NetworkRequest) => void;
+}) {
   const [resTab, setResTab] = useState<'body' | 'headers'>('body');
+  const codeBlockRef = useRef<CodeBlockRef>(null);
 
-  // Parse Params
-  const params = useMemo(() => {
-    try {
-      const urlObj = new URL(`http://${request.host}${request.path}`);
-      const items: any[] = [];
-      urlObj.searchParams.forEach((value, key) => {
-        items.push({ key, value, enabled: true });
-      });
-      return items;
-    } catch (e) {
-      return [];
+  useEffect(() => {
+    if (resTab === 'body' && request.responseBody) {
+      // Small delay to ensure mount
+      setTimeout(() => {
+        codeBlockRef.current?.format();
+      }, 100);
     }
-  }, [request.host, request.path]);
-
-  // Parse Headers
-  const headers = useMemo(() => {
-    return Object.entries(request.requestHeaders || {}).map(([key, value]) => ({
-      key,
-      value: String(value),
-      enabled: true,
-    }));
-  }, [request.requestHeaders]);
-
-  // Parse Auth
-  const authConfig = useMemo<AuthConfig>(() => {
-    const authHeader =
-      request.requestHeaders?.['Authorization'] || request.requestHeaders?.['authorization'];
-    if (typeof authHeader === 'string') {
-      if (authHeader.startsWith('Bearer ')) {
-        return { type: 'bearer', bearerToken: authHeader.slice(7) };
-      }
-      if (authHeader.startsWith('Basic ')) {
-        // Try to decode basic
-        try {
-          const creds = atob(authHeader.slice(6));
-          const [u, p] = creds.split(':');
-          return { type: 'basic', basicUsername: u, basicPassword: p };
-        } catch (e) {
-          return { type: 'basic' };
-        }
-      }
-    }
-    return { type: 'none' };
-  }, [request.requestHeaders]);
+  }, [resTab, request.responseBody]);
 
   // Response Headers
   const resHeaders = useMemo(() => {
@@ -86,103 +54,18 @@ function FlowRequestDetails({ request }: { request: NetworkRequest }) {
     }));
   }, [request.responseHeaders]);
 
-  const tabs = [
-    { id: 'params', label: 'Params', icon: List, color: 'text-blue-500', count: params.length },
-    {
-      id: 'headers',
-      label: 'Headers',
-      icon: Braces,
-      color: 'text-purple-500',
-      count: headers.length,
-    },
-    {
-      id: 'body',
-      label: 'Body',
-      icon: FileText,
-      color: 'text-orange-500',
-      dot: !!request.requestBody,
-    },
-    {
-      id: 'auth',
-      label: 'Auth',
-      icon: Shield,
-      color: 'text-green-500',
-      dot: authConfig.type !== 'none',
-    },
-    { id: 'docs', label: 'Docs', icon: FileText, color: 'text-gray-500', dot: false },
-  ];
-
   return (
     <ResizableSplit direction="vertical" initialSize={50} minSize={20} maxSize={80}>
-      {/* Top: Request Pane */}
-      <div className="flex flex-col h-full bg-background overflow-hidden relative">
-        {/* Method/URL Bar (Optional, already in header? No, header is Flow Details. Maybe add request summary here) */}
-        <div className="flex border-b border-border bg-muted/10 items-center overflow-x-auto no-scrollbar px-2 h-10 shrink-0">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={cn(
-                'px-3 py-2 text-xs font-medium border-b-2 transition-all flex items-center gap-2 shrink-0',
-                activeTab === tab.id
-                  ? `${tab.color} bg-background border-current`
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
-              )}
-              style={activeTab === tab.id ? { borderBottomColor: undefined } : undefined}
-            >
-              <tab.icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span
-                  className={cn(
-                    'px-1.5 py-0.5 rounded-full text-[10px] font-bold',
-                    activeTab === tab.id ? 'bg-current/10' : 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {tab.count}
-                </span>
-              )}
-              {tab.dot && (
-                <span
-                  className={cn(
-                    'w-1.5 h-1.5 rounded-full',
-                    tab.id === 'body' ? 'bg-orange-500' : 'bg-green-500',
-                  )}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-hidden relative">
-          <div
-            className={cn('absolute inset-0 overflow-auto', activeTab === 'auth' ? 'p-4' : 'p-0')}
-          >
-            {activeTab === 'params' && (
-              <KeyValueTable items={params} onChange={() => {}} readOnly={true} />
-            )}
-            {activeTab === 'headers' && (
-              <KeyValueTable items={headers} onChange={() => {}} readOnly={true} />
-            )}
-            {activeTab === 'body' && (
-              <CodeBlock
-                code={request.requestBody || ''}
-                language="json"
-                themeConfig={{ background: '#00000000' }}
-                editorOptions={{ readOnly: true, minimap: { enabled: false } }}
-                className="h-full"
-              />
-            )}
-            {activeTab === 'auth' && (
-              <AuthEditor config={authConfig} onChange={() => {}} readOnly={true} />
-            )}
-            {activeTab === 'docs' && <DocsEditor value="" onChange={() => {}} readOnly={true} />}
-          </div>
-        </div>
+      {/* Top: Request Pane (Editor) */}
+      <div className="flex flex-col h-full bg-background overflow-hidden relative border-b border-border">
+        <RequestEditor request={request} onChange={onChange} />
       </div>
 
-      {/* Bottom: Response Pane */}
+      {/* Bottom: Response Pane (Read-only) */}
       <div className="flex flex-col h-full bg-background overflow-hidden border-t border-border">
+        {/* Helper to show response logic only if there is a response component, 
+            but here we just show what we have in the request object (status etc) */}
+
         <div className="flex border-b border-border bg-muted/10 items-center justify-between h-10 shrink-0">
           <div className="flex px-2">
             <button
@@ -236,6 +119,7 @@ function FlowRequestDetails({ request }: { request: NetworkRequest }) {
           <div className="absolute inset-0 overflow-auto p-0">
             {resTab === 'body' && (
               <CodeBlock
+                ref={codeBlockRef}
                 code={request.responseBody || ''}
                 language="json"
                 themeConfig={{ background: '#00000000' }}
@@ -261,6 +145,7 @@ export function ControlFlowPanel({
   onUpdateFlow,
   activeFlowData,
   selectedRequest,
+  onRequestChange,
 }: ControlFlowPanelProps) {
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
   const [editJson, setEditJson] = useState('');
@@ -318,7 +203,7 @@ export function ControlFlowPanel({
 
         {/* Content */}
         {selectedRequest ? (
-          <FlowRequestDetails request={selectedRequest} />
+          <FlowRequestDetails request={selectedRequest} onChange={onRequestChange} />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-xs p-4 text-center">
             <Network className="w-8 h-8 mb-2 opacity-50" />

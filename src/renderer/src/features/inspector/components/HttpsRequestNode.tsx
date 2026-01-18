@@ -44,20 +44,28 @@ function HttpsRequestNodeComponent({ data, selected }: HttpsRequestNodeProps) {
       )}
     >
       {/* Handles for edges */}
-      <Handle type="target" position={Position.Top} className="!bg-green-500 !w-2 !h-2 !border-0" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top"
+        className="!bg-green-500 !w-2 !h-2 !border-0"
+      />
       <Handle
         type="source"
         position={Position.Bottom}
+        id="bottom"
         className="!bg-green-500 !w-2 !h-2 !border-0"
       />
       <Handle
         type="target"
         position={Position.Left}
+        id="left"
         className="!bg-green-500 !w-2 !h-2 !border-0"
       />
       <Handle
         type="source"
         position={Position.Right}
+        id="right"
         className="!bg-green-500 !w-2 !h-2 !border-0"
       />
 

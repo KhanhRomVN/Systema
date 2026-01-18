@@ -43,6 +43,8 @@ interface InspectorContext {
   onDeleteFlow?: (id: string) => void;
   onUpdateFlow?: (id: string, data: { nodes: any[]; edges: any[] }) => void;
   activeFlowData?: { nodes: any[]; edges: any[] } | null;
+  selectedFlowRequest?: NetworkRequest | null;
+  onUpdateNodeRequest?: (req: NetworkRequest) => void;
 }
 
 interface ChatContainerProps {
@@ -257,8 +259,11 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
         onUpdateFlow={inspectorContext.onUpdateFlow || (() => {})}
         activeFlowData={inspectorContext.activeFlowData}
         selectedRequest={
-          inspectorContext.requests.find((r) => r.id === inspectorContext.selectedRequestId) || null
+          inspectorContext.selectedFlowRequest ||
+          inspectorContext.requests.find((r) => r.id === inspectorContext.selectedRequestId) ||
+          null
         }
+        onRequestChange={inspectorContext.onUpdateNodeRequest}
       />
     );
   }

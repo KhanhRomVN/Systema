@@ -89,6 +89,20 @@ export function InspectorLayout({
     null,
   );
 
+  // Flow Editor State
+  const [selectedFlowNodeId, setSelectedFlowNodeId] = useState<string | null>(null);
+  const [selectedFlowRequest, setSelectedFlowRequest] = useState<NetworkRequest | null>(null);
+  const [flowMethods, setFlowMethods] = useState<{
+    updateNodeRequest: (nodeId: string, req: NetworkRequest) => void;
+  } | null>(null);
+
+  const handleFlowRequestChange = (updatedReq: NetworkRequest) => {
+    if (selectedFlowNodeId && flowMethods) {
+      flowMethods.updateNodeRequest(selectedFlowNodeId, updatedReq);
+      setSelectedFlowRequest(updatedReq);
+    }
+  };
+
   // Flow Management State
   const [flows, setFlows] = useState<FlowCard[]>([]);
   const [createFlowModalOpen, setCreateFlowModalOpen] = useState(false);
@@ -737,10 +751,16 @@ export function InspectorLayout({
                 onClose={() => {
                   setActiveFlowData(null);
                   setAddNodeToFlowRef(null);
+                  setSelectedFlowRequest(null);
+                  setSelectedFlowNodeId(null);
                 }}
                 requests={requests}
                 onAddNodeRef={(fn) => setAddNodeToFlowRef(() => fn)}
-                onSelectRequest={(req) => setSelectedId(req?.id || null)}
+                onNodeSelect={(nodeId, req) => {
+                  setSelectedFlowNodeId(nodeId);
+                  setSelectedFlowRequest(req);
+                }}
+                onMethodsReady={setFlowMethods}
               />
             ) : composerRequest ? (
               <RequestComposer initialRequest={composerRequest} appId={appId} />
@@ -789,6 +809,8 @@ export function InspectorLayout({
               onDeleteFlow: handleDeleteFlow,
               onUpdateFlow: handleUpdateFlow,
               activeFlowData,
+              selectedFlowRequest,
+              onUpdateNodeRequest: handleFlowRequestChange,
             }}
           />
         </ResizableSplit>
