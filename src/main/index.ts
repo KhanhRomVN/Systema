@@ -15,6 +15,7 @@ import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dns from 'dns';
+import * as zlib from 'zlib';
 import { handleInspectorRequest } from './features/inspector';
 
 // Mobile utilities
@@ -137,6 +138,33 @@ app.whenReady().then(async () => {
   // Inspector Request Handler
   ipcMain.handle('inspector:send-request', async (_, payload) => {
     return await handleInspectorRequest(payload);
+  });
+
+  ipcMain.handle('inspector:fetch-wasm', async (_, url: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
+      const arrayBuffer = await response.arrayBuffer();
+      let buffer = Buffer.from(arrayBuffer);
+
+      // Check for GZIP magic bytes (0x1f, 0x8b)
+      if (buffer.length > 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
+        try {
+          console.log('[WASM Fetch] Detected GZIP signature, decompressing...');
+          buffer = zlib.gunzipSync(buffer);
+        } catch (decompressionError) {
+          console.error('[WASM Fetch] Decompression failed:', decompressionError);
+          // Continue with original buffer if decompression fails, might be just coincidence?
+          // But usually gunzipSync throws if invalid.
+        }
+      }
+
+      // Return as Uint8Array (serializable)
+      return new Uint8Array(buffer);
+    } catch (error: any) {
+      console.error('Failed to fetch WASM:', error);
+      throw new Error(error.message);
+    }
   });
 
   // Deprecated/Modified: 'proxy:start' might not be needed if we use create-session.

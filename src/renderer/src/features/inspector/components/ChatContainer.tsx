@@ -14,7 +14,11 @@ import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, KeyRound } from 
 import { cn } from '../../../shared/lib/utils';
 import { DiffView } from './DiffView';
 
-export interface InspectorContext {
+import { WasmPanel } from './WasmPanel';
+import { MediaPanel } from './MediaPanel';
+import { ControlFlowPanel } from './ControlFlowPanel';
+
+interface InspectorContext {
   requests: NetworkRequest[];
   filteredRequests?: NetworkRequest[]; // Optional for backward compact
   selectedRequestId: string | null;
@@ -28,6 +32,13 @@ export interface InspectorContext {
   compareRequest1?: NetworkRequest | null;
   compareRequest2?: NetworkRequest | null;
   onClearComparison?: () => void;
+  isWasmMode?: boolean;
+  onCloseWasmMode?: () => void;
+  isMediaMode?: boolean;
+  onCloseMediaMode?: () => void;
+  isControlFlowMode?: boolean;
+  onCloseControlFlowMode?: () => void;
+  onOpenFlow?: (data: any) => void;
 }
 
 interface ChatContainerProps {
@@ -210,6 +221,36 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       />
     );
   };
+
+  // WASM Mode Overrides
+  if (inspectorContext.isWasmMode) {
+    return (
+      <WasmPanel
+        requests={inspectorContext.requests}
+        onClose={inspectorContext.onCloseWasmMode || (() => {})}
+      />
+    );
+  }
+
+  // Media Mode Overrides
+  if (inspectorContext.isMediaMode) {
+    return (
+      <MediaPanel
+        requests={inspectorContext.requests}
+        onClose={inspectorContext.onCloseMediaMode || (() => {})}
+      />
+    );
+  }
+
+  // Control Flow Mode Overrides
+  if (inspectorContext.isControlFlowMode) {
+    return (
+      <ControlFlowPanel
+        onClose={inspectorContext.onCloseControlFlowMode || (() => {})}
+        onOpenFlow={inspectorContext.onOpenFlow || (() => {})}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">

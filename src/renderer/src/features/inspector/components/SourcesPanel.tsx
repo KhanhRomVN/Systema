@@ -16,8 +16,8 @@ export function SourcesPanel({ requests }: SourcesPanelProps) {
   } | null>(null);
 
   return (
-    <div className="h-full w-full bg-[#1e1e1e] flex flex-col">
-      <ResizableSplit direction="horizontal" initialSize={20} minSize={15} maxSize={40}>
+    <div className="h-full w-full bg-background flex flex-col">
+      <ResizableSplit direction="vertical" initialSize={40} minSize={20} maxSize={60}>
         <div className="h-full bg-background border-r border-border/50 flex flex-col">
           <div className="p-2 border-b border-border/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Sources

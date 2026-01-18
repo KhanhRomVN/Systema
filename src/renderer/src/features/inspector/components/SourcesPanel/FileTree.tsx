@@ -1,7 +1,9 @@
 import { NetworkRequest } from '../../types';
 import { useState, useMemo } from 'react';
 import { cn } from '../../../../shared/lib/utils';
-import { Folder, Globe, FileCode } from 'lucide-react';
+import { Globe } from 'lucide-react';
+import folderIcon from '../../../../assets/other_icons/folder.svg';
+import { getFileIconPath } from '../../../../shared/utils/fileIconMapper';
 
 interface FileTreeProps {
   requests: NetworkRequest[];
@@ -189,9 +191,9 @@ export function FileTree({ requests, onSelectFile }: FileTreeProps) {
                 {node.type === 'domain' ? (
                   <Globe className="w-3.5 h-3.5" />
                 ) : node.type === 'folder' ? (
-                  <Folder className="w-3.5 h-3.5" />
+                  <img src={folderIcon} alt="folder" className="w-3.5 h-3.5" />
                 ) : (
-                  <FileCode className="w-3.5 h-3.5" />
+                  <img src={getFileIconPath(node.name)} alt="file" className="w-3.5 h-3.5" />
                 )}
               </span>
 

@@ -7,13 +7,15 @@ import { ChatContainer } from './ChatContainer';
 import { MemoryMonitor } from './MemoryMonitor';
 import { SaveProfileModal } from './SaveProfileModal';
 import { formatDistanceToNow } from 'date-fns';
-import { Play, Pause, Clock } from 'lucide-react';
+import { Play, Pause, Clock, FileCode, Image, Network } from 'lucide-react';
 import { RequestComposer } from './RequestComposer';
+import { FlowBoard } from './FlowBoard';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
 import { createProfile } from '../utils/profiles';
+import { detectWasmModules, detectMediaFiles } from '../utils/detectors';
 
 interface InspectorLayoutProps {
   onBack: () => void;
@@ -77,6 +79,10 @@ export function InspectorLayout({
   // New Features State
   const [isPaused, setIsPaused] = useState(false);
   const [displayedRequests, setDisplayedRequests] = useState<NetworkRequest[]>([]);
+  const [isWasmMode, setIsWasmMode] = useState(false);
+  const [isMediaMode, setIsMediaMode] = useState(false);
+  const [isControlFlowMode, setIsControlFlowMode] = useState(false);
+  const [activeFlowData, setActiveFlowData] = useState<any | null>(null);
 
   // Auto-save State
   const [autoSaveInterval, setAutoSaveInterval] = useState<number>(0); // 0 = off, minutes
@@ -100,6 +106,10 @@ export function InspectorLayout({
   // Comparison State
   const [compareRequest1, setCompareRequest1] = useState<NetworkRequest | null>(null);
   const [compareRequest2, setCompareRequest2] = useState<NetworkRequest | null>(null);
+
+  // Detection Counts
+  const wasmCount = useMemo(() => detectWasmModules(requests).length, [requests]);
+  const mediaCount = useMemo(() => detectMediaFiles(requests).length, [requests]);
 
   const handleSetIntercept = (enabled: boolean) => {
     setIsIntercepting(enabled);
@@ -466,7 +476,7 @@ export function InspectorLayout({
             />
           </button>
           <button
-            className="p-1.5 rounded text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all border border-transparent hover:border-border"
             title="Clear All Requests"
             onClick={() => {
               if (confirm('Clear all requests?')) {
@@ -474,7 +484,7 @@ export function InspectorLayout({
               }
             }}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -482,13 +492,15 @@ export function InspectorLayout({
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
               />
             </svg>
+            Clear
           </button>
+
           <button
-            className="p-1.5 rounded text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all border border-transparent hover:border-border"
             title="Save Profile"
             onClick={() => setIsSaveProfileModalOpen(true)}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -496,6 +508,78 @@ export function InspectorLayout({
                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
               />
             </svg>
+            Save
+          </button>
+
+          <div className="w-px h-4 bg-border/50 mx-1" />
+
+          <button
+            onClick={() => {
+              setIsWasmMode(!isWasmMode);
+              if (!isWasmMode) {
+                setIsMediaMode(false);
+                setIsControlFlowMode(false);
+              }
+            }}
+            className={cn(
+              'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all border relative',
+              isWasmMode
+                ? 'bg-purple-500/10 text-purple-500 border-purple-500/30 hover:bg-purple-500/20'
+                : 'text-muted-foreground border-transparent hover:bg-muted hover:text-foreground hover:border-border',
+            )}
+            title="Wasm Inspector"
+          >
+            <FileCode className="w-3.5 h-3.5" />
+            WASM
+            {wasmCount > 0 && (
+              <span className="bg-purple-500 text-white text-[9px] px-1 rounded-full h-3.5 min-w-[14px] flex items-center justify-center">
+                {wasmCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMediaMode(!isMediaMode);
+              if (!isMediaMode) {
+                setIsWasmMode(false);
+                setIsControlFlowMode(false);
+              }
+            }}
+            className={cn(
+              'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all border relative',
+              isMediaMode
+                ? 'bg-blue-500/10 text-blue-500 border-blue-500/30 hover:bg-blue-500/20'
+                : 'text-muted-foreground border-transparent hover:bg-muted hover:text-foreground hover:border-border',
+            )}
+            title="Media Inspector"
+          >
+            <Image className="w-3.5 h-3.5" />
+            Media
+            {mediaCount > 0 && (
+              <span className="bg-blue-500 text-white text-[9px] px-1 rounded-full h-3.5 min-w-[14px] flex items-center justify-center">
+                {mediaCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setIsControlFlowMode(!isControlFlowMode);
+              if (!isControlFlowMode) {
+                setIsWasmMode(false);
+                setIsMediaMode(false);
+              }
+            }}
+            className={cn(
+              'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all border relative',
+              isControlFlowMode
+                ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20'
+                : 'text-muted-foreground border-transparent hover:bg-muted hover:text-foreground hover:border-border',
+            )}
+            title="Control Flow Panel"
+          >
+            <Network className="w-3.5 h-3.5" />
+            Flow
           </button>
         </div>
 
@@ -597,7 +681,10 @@ export function InspectorLayout({
               />
             </div>
 
-            {composerRequest ? (
+            {/* Bottom Panel: FlowBoard OR RequestDetails/RequestComposer */}
+            {activeFlowData ? (
+              <FlowBoard initialData={activeFlowData} onClose={() => setActiveFlowData(null)} />
+            ) : composerRequest ? (
               <RequestComposer initialRequest={composerRequest} appId={appId} />
             ) : (
               <RequestDetails
@@ -633,6 +720,13 @@ export function InspectorLayout({
                 setCompareRequest1(null);
                 setCompareRequest2(null);
               },
+              isWasmMode,
+              onCloseWasmMode: () => setIsWasmMode(false),
+              isMediaMode,
+              onCloseMediaMode: () => setIsMediaMode(false),
+              isControlFlowMode,
+              onCloseControlFlowMode: () => setIsControlFlowMode(false),
+              onOpenFlow: (data) => setActiveFlowData(data),
             }}
           />
         </ResizableSplit>

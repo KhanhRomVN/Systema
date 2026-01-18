@@ -1,12 +1,6 @@
-import { CodeBlock } from '../../../../components/CodeBlock';
-import { cn } from '../../../../shared/lib/utils';
-import { FileCode, Braces } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import * as prettier from 'prettier/standalone';
-import * as parserBabel from 'prettier/plugins/babel';
-import * as parserEstree from 'prettier/plugins/estree';
-import * as parserHtml from 'prettier/plugins/html';
-import * as parserPostcss from 'prettier/plugins/postcss';
+import { CodeBlock, CodeBlockRef } from '../../../../components/CodeBlock';
+import { FileCode, AlignLeft } from 'lucide-react';
+import { useRef } from 'react';
 
 interface SourceCodeViewProps {
   content: string;
@@ -19,60 +13,26 @@ export function SourceCodeView({
   fileName,
   language = 'javascript',
 }: SourceCodeViewProps) {
-  const [formattedContent, setFormattedContent] = useState(content);
-  const [isFormatting, setIsFormatting] = useState(false);
-  const [autoFormat, setAutoFormat] = useState(true);
+  const codeBlockRef = useRef<CodeBlockRef>(null);
 
-  useEffect(() => {
-    if (!content || !autoFormat) {
-      setFormattedContent(content);
-      return;
-    }
-
-    const formatCode = async () => {
-      try {
-        setIsFormatting(true);
-        let parser = 'babel';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let plugins: any[] = [parserBabel, parserEstree];
-
-        if (language === 'css') {
-          parser = 'css';
-          plugins = [parserPostcss];
-        } else if (language === 'html') {
-          parser = 'html';
-          plugins = [parserHtml];
-        } else if (language === 'json') {
-          parser = 'json';
-          plugins = [parserBabel, parserEstree];
-        }
-
-        const formatted = await prettier.format(content, {
-          parser,
-          plugins,
-          printWidth: 100,
-          tabWidth: 2,
-          useTabs: false,
-          semi: true,
-          singleQuote: true,
-        });
-
-        setFormattedContent(formatted);
-      } catch (e) {
-        console.error('Prettier formatting failed:', e);
-        // Fallback or just show error in console
-        setFormattedContent(content);
-      } finally {
-        setIsFormatting(false);
-      }
-    };
-
-    formatCode();
-  }, [content, language, autoFormat]);
+  const readonlyOptions = {
+    readOnly: true,
+    domReadOnly: true, // Hides cursor, prevents "Cannot edit" overlay
+    renderLineHighlight: 'none',
+    matchBrackets: 'never',
+    folding: false,
+    guides: { indentation: false },
+    renderIndentGuides: false,
+    selectionHighlight: false,
+    occurrencesHighlight: false,
+    hideCursorInOverviewRuler: true,
+    overviewRulerBorder: false,
+    contextmenu: false,
+  };
 
   if (!content) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 space-y-2">
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50 space-y-2 bg-background">
         <FileCode className="w-12 h-12 stroke-1" />
         <span className="text-sm">Select a file to view its source</span>
       </div>
@@ -80,36 +40,30 @@ export function SourceCodeView({
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e]">
-      <div className="h-9 px-4 flex items-center justify-between border-b border-white/10 bg-[#252526] text-xs text-gray-400">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-300">{fileName}</span>
-          {isFormatting && (
-            <span className="text-muted-foreground italic text-[10px] ml-2">Formatting...</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
+    <div className="h-full flex flex-col overflow-hidden bg-background">
+      <div className="flex justify-between items-center border-b border-border/50 pb-1.5 px-3 pt-2 flex-shrink-0">
+        <h3 className="text-[10px] font-bold text-muted-foreground uppercase">{fileName}</h3>
+        <div className="flex gap-1.5 text-[10px] items-center">
           <button
-            onClick={() => setAutoFormat(!autoFormat)}
-            className={cn(
-              'p-1 hover:bg-white/10 rounded transition-colors',
-              autoFormat ? 'text-blue-400 bg-blue-400/10' : 'text-gray-400',
-            )}
-            title="Auto Pretty Print"
+            onClick={() => codeBlockRef.current?.format()}
+            className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
+            title="Format Document"
           >
-            <Braces className="w-3.5 h-3.5" />
+            <AlignLeft className="w-3 h-3" />
           </button>
+          <div className="w-[1px] h-3 bg-border/50 mx-1" />
+          <span className="bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{language}</span>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden relative">
+
+      <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden relative min-h-0 m-2">
         <CodeBlock
-          code={formattedContent}
+          ref={codeBlockRef}
+          code={content}
           language={language}
-          showLineNumbers={true}
-          wordWrap="on"
-          themeConfig={{
-            background: '#1e1e1e',
-          }}
+          className="absolute inset-0"
+          themeConfig={{ background: '#00000000' }}
+          editorOptions={readonlyOptions}
         />
       </div>
     </div>
