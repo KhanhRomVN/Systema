@@ -1,4 +1,4 @@
-import { exec, execSync } from 'child_process';
+import { exec, execSync, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -294,6 +294,20 @@ export async function isFridaRunning(serial: string): Promise<boolean> {
 }
 
 /**
+ * Check if Frida server is installed on emulator (but potentially not running)
+ */
+export async function isFridaServerInstalled(serial: string): Promise<boolean> {
+  try {
+    // Check if the file exists at /data/local/tmp/frida-server
+    // ls returns exit code 0 if found, non-zero if not
+    await execAsync(`adb -s "${serial}" shell "ls /data/local/tmp/frida-server"`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Install Frida server to emulator
  */
 export async function installFridaServer(
@@ -417,21 +431,61 @@ export async function injectSSLBypass(
     const scriptPath = path.join(app.getPath('temp'), 'ssl-bypass.js');
     fs.writeFileSync(scriptPath, SSL_PINNING_BYPASS_SCRIPT);
 
-    // Use frida to inject
+    // Use spawn instead of exec to stream output and avoid blocking
     // -U: USB device, -f: spawn, -l: load script
-    const fridaCmd = `frida -U -f ${packageName} -l "${scriptPath}"`;
+    // const fridaCmd = `frida -U -f ${packageName} -l "${scriptPath}"`;
 
-    onLog?.('Injecting script...');
-    const { stdout, stderr } = await execAsync(fridaCmd);
+    onLog?.('Injecting script (spawn mode)...');
 
-    if (stdout) onLog?.(stdout);
-    onLog?.('Injecting script...');
+    return new Promise<boolean>((resolve, reject) => {
+      const fridaProcess = spawn('frida', ['-U', '-f', packageName, '-l', scriptPath]);
 
-    if (stdout) onLog?.(stdout);
-    if (stderr) onLog?.(`STDERR: ${stderr}`);
+      const timeout = setTimeout(() => {
+        onLog?.('⚠️ Process spawn timeout (10s), but continuing...');
+        resolve(true);
+      }, 10000);
 
-    onLog?.('SSL Pinning Bypass injected successfully!');
-    return true;
+      fridaProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        onLog?.(output);
+
+        // Check for success markers
+        if (output.includes('Spawned') || output.includes('Resuming main thread')) {
+          clearTimeout(timeout);
+          resolve(true);
+        }
+      });
+
+      fridaProcess.stderr.on('data', (data) => {
+        const output = data.toString();
+        // Ignore header/helper messages if they appear in stderr
+        if (!output.includes('Frida') && !output.includes('Help')) {
+          onLog?.(`STDERR: ${output}`);
+        }
+      });
+
+      fridaProcess.on('error', (err) => {
+        clearTimeout(timeout);
+        const msg = err.message || '';
+        onLog?.(`ERROR: ${msg}`);
+        console.error('Frida process error:', err);
+        // Don't reject outright if we want to be resilient, but for error event it's usually bad.
+        // reject(err);
+        // Better to resolve false or let UI handle?
+        // Existing code threw error.
+        reject(err);
+      });
+
+      fridaProcess.on('close', (code) => {
+        if (code !== 0 && code !== null) {
+          // Only log if it wasn't a manual kill or success?
+          // With -f, it should stay running. If it closes, it might be an error.
+          console.log(`Frida process exited with code ${code}`);
+          // If we haven't resolved yet (e.g. immediate failure)
+          // If already resolved, this does nothing which is fine.
+        }
+      });
+    });
   } catch (error: any) {
     const msg = error.message || '';
     if (msg.includes("unable to find process with name 'system_server'")) {
@@ -469,21 +523,50 @@ export async function injectCustomScript(
 
     onLog?.(`Injecting custom script into ${packageName}...`);
 
-    // Save script to temp file
-    const scriptPath = path.join(app.getPath('temp'), `custom-${Date.now()}.js`);
-    fs.writeFileSync(scriptPath, scriptContent);
+    return new Promise<boolean>((resolve, reject) => {
+      // Save script to temp file
+      const scriptPath = path.join(app.getPath('temp'), `custom-${Date.now()}.js`);
+      fs.writeFileSync(scriptPath, scriptContent);
 
-    // Use frida to inject
-    const fridaCmd = `frida -U -f ${packageName} -l "${scriptPath}"`;
+      const fridaProcess = spawn('frida', ['-U', '-f', packageName, '-l', scriptPath]);
 
-    onLog?.('Injecting script...');
-    const { stdout, stderr } = await execAsync(fridaCmd);
+      const timeout = setTimeout(() => {
+        onLog?.('⚠️ Process spawn timeout (10s), but continuing...');
+        resolve(true);
+      }, 10000);
 
-    if (stdout) onLog?.(stdout);
-    if (stderr) onLog?.(`STDERR: ${stderr}`);
+      fridaProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        onLog?.(output);
+        if (output.includes('Spawned') || output.includes('Resuming main thread')) {
+          clearTimeout(timeout);
+          resolve(true);
+        }
+      });
 
-    onLog?.('Custom script injected successfully!');
-    return true;
+      fridaProcess.stderr.on('data', (data) => {
+        const output = data.toString();
+        if (!output.includes('Frida') && !output.includes('Help')) {
+          onLog?.(`STDERR: ${output}`);
+        }
+      });
+
+      fridaProcess.on('error', (err) => {
+        clearTimeout(timeout);
+        const msg = err.message || '';
+        onLog?.(`ERROR: ${msg}`);
+        console.error('Frida process error:', err);
+        // resolve(false); // Prefer resolve false for custom script? Or reject?
+        // Let's resolve false to avoid crashing the whole flow if script is bad
+        resolve(false);
+      });
+
+      fridaProcess.on('close', (code) => {
+        if (code !== 0 && code !== null) {
+          console.log(`Frida process exited with code ${code}`);
+        }
+      });
+    });
   } catch (error: any) {
     onLog?.(`ERROR: ${error.message}`);
     console.error('Failed to inject custom script:', error);

@@ -2,7 +2,6 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
 
 const execAsync = promisify(exec);
 
@@ -17,12 +16,26 @@ export async function configureEmulatorProxy(
   try {
     const proxyString = `${proxyHost}:${proxyPort}`;
 
-    console.log(`Configuring proxy on ${serial}: ${proxyString}`);
+    console.log(`[ProxyConfig] Configuring proxy for ${serial} -> ${proxyString}`);
+
+    // Enable port forwarding (reverse) so 127.0.0.1 on device maps to host
+    try {
+      console.log(`[ProxyConfig] Running adb reverse tcp:${proxyPort} tcp:${proxyPort}...`);
+      await execAsync(`adb -s "${serial}" reverse tcp:${proxyPort} tcp:${proxyPort}`);
+      console.log(`[ProxyConfig] adb reverse success!`);
+    } catch (e) {
+      console.warn(
+        '[ProxyConfig] adb reverse failed (network might be unreachable if not using special IP aliases):',
+        e,
+      );
+    }
 
     // Set global HTTP proxy
+    console.log(`[ProxyConfig] Setting global http_proxy...`);
     await execAsync(`adb -s "${serial}" shell settings put global http_proxy ${proxyString}`);
 
     // Also set for WiFi (some apps check this)
+    console.log(`[ProxyConfig] Setting global_http_proxy_host/port...`);
     await execAsync(
       `adb -s "${serial}" shell settings put global global_http_proxy_host ${proxyHost}`,
     );
@@ -30,10 +43,11 @@ export async function configureEmulatorProxy(
       `adb -s "${serial}" shell settings put global global_http_proxy_port ${proxyPort}`,
     );
 
-    console.log('Proxy configured successfully');
+    console.log(`[ProxyConfig] Proxy configuration complete.`);
+
     return true;
   } catch (error) {
-    console.error('Failed to configure proxy:', error);
+    console.error('[ProxyConfig] Failed to configure proxy:', error);
     return false;
   }
 }
@@ -43,8 +57,6 @@ export async function configureEmulatorProxy(
  */
 export async function clearEmulatorProxy(serial: string): Promise<boolean> {
   try {
-    console.log(`Clearing proxy on ${serial}`);
-
     // Clear global HTTP proxy
     await execAsync(`adb -s "${serial}" shell settings put global http_proxy :0`);
 
@@ -52,7 +64,6 @@ export async function clearEmulatorProxy(serial: string): Promise<boolean> {
     await execAsync(`adb -s "${serial}" shell settings delete global global_http_proxy_host`);
     await execAsync(`adb -s "${serial}" shell settings delete global global_http_proxy_port`);
 
-    console.log('Proxy cleared successfully');
     return true;
   } catch (error) {
     console.error('Failed to clear proxy:', error);
@@ -237,7 +248,6 @@ export async function restartNetworkServices(serial: string): Promise<boolean> {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     await execAsync(`adb -s "${serial}" shell "cmd connectivity airplane-mode disable"`);
 
-    console.log('Network services restarted');
     return true;
   } catch (error) {
     console.error('Failed to restart network services:', error);
@@ -254,7 +264,6 @@ export async function disableBatteryOptimization(
 ): Promise<boolean> {
   try {
     await execAsync(`adb -s "${serial}" shell "dumpsys deviceidle whitelist +${packageName}"`);
-    console.log(`Battery optimization disabled for ${packageName}`);
     return true;
   } catch (error) {
     console.error('Failed to disable battery optimization:', error);
@@ -276,7 +285,7 @@ export async function installAPK(
     }
 
     onProgress?.('Installing APK...');
-    const { stdout, stderr } = await execAsync(`adb -s "${serial}" install -r "${apkPath}"`);
+    const { stderr } = await execAsync(`adb -s "${serial}" install -r "${apkPath}"`);
 
     if (stderr && stderr.includes('Failure')) {
       onProgress?.(`Installation failed: ${stderr}`);
@@ -298,7 +307,6 @@ export async function installAPK(
 export async function uninstallApp(serial: string, packageName: string): Promise<boolean> {
   try {
     await execAsync(`adb -s "${serial}" uninstall ${packageName}`);
-    console.log(`Uninstalled ${packageName}`);
     return true;
   } catch (error) {
     console.error('Failed to uninstall app:', error);
@@ -325,7 +333,6 @@ export async function launchApp(serial: string, packageName: string): Promise<bo
       await execAsync(`adb -s "${serial}" shell "am start -n ${activity}"`);
     }
 
-    console.log(`Launched ${packageName}`);
     return true;
   } catch (error) {
     console.error('Failed to launch app:', error);
@@ -339,7 +346,6 @@ export async function launchApp(serial: string, packageName: string): Promise<bo
 export async function stopApp(serial: string, packageName: string): Promise<boolean> {
   try {
     await execAsync(`adb -s "${serial}" shell "am force-stop ${packageName}"`);
-    console.log(`Stopped ${packageName}`);
     return true;
   } catch (error) {
     console.error('Failed to stop app:', error);

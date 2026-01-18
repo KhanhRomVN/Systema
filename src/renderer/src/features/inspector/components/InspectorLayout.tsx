@@ -22,10 +22,11 @@ interface InspectorLayoutProps {
   appId?: string; // Should be passed if available
   onDelete: (id: string) => void;
   platform?: 'web' | 'pc' | 'android';
-  fridaStatus?: 'running' | 'stopped' | 'unknown';
+  fridaStatus?: 'running' | 'installed' | 'not_installed' | 'unknown';
   onInstallFrida?: () => void;
   onStartFrida?: () => void;
   onInjectBypass?: () => void;
+  onInstallCert?: () => void;
   emulatorSerial?: string;
 }
 
@@ -64,6 +65,7 @@ export function InspectorLayout({
   onInstallFrida,
   onStartFrida,
   onInjectBypass,
+  onInstallCert,
   emulatorSerial,
 }: InspectorLayoutProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -531,24 +533,30 @@ export function InspectorLayout({
                 >
                   SSL Bypass
                 </button>
+                <button
+                  onClick={onInstallCert}
+                  className="px-2 py-1 rounded text-xs bg-orange-600/10 text-orange-500 hover:bg-orange-600/20 border border-orange-500/30 transition-colors"
+                  title="Install Proxy CA Certificate (Requires Root)"
+                >
+                  Install Cert
+                </button>
               </>
+            ) : fridaStatus === 'installed' ? (
+              <button
+                onClick={onStartFrida}
+                className="px-2 py-1 rounded text-xs bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 border border-blue-500/30 transition-colors"
+                title="Start Frida Server"
+              >
+                Start
+              </button>
             ) : (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={onInstallFrida}
-                  className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80 border border-border transition-colors"
-                  title="Install Frida Server on Device"
-                >
-                  Install
-                </button>
-                <button
-                  onClick={onStartFrida}
-                  className="px-2 py-1 rounded text-xs bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 border border-blue-500/30 transition-colors"
-                  title="Start Frida Server"
-                >
-                  Start
-                </button>
-              </div>
+              <button
+                onClick={onInstallFrida}
+                className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80 border border-border transition-colors"
+                title="Install Frida Server on Device"
+              >
+                Install
+              </button>
             )}
           </div>
         )}

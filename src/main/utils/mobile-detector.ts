@@ -100,9 +100,7 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
           } catch {}
         }
       }
-    } catch {
-      // console.log('[MobileDetector] vboxmanage not found or failed.');
-    }
+    } catch {}
 
     // Strategy 2: Process Scanning (QEMU/KVM for Genymotion)
     let runningVMNames: Set<string> = new Set(vboxVMs.keys());
@@ -135,7 +133,6 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
           if (pathMatch) {
             const vmName = pathMatch[1];
             runningVMNames.add(vmName);
-            console.log(`[MobileDetector] Found Genymotion VM from QEMU path: "${vmName}"`);
 
             // Also try to extract UUID from --vm-name in player process
             // This helps us map UUID to VM name
@@ -145,7 +142,6 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
             if (uuidMatch) {
               const uuid = uuidMatch[1];
               vmUuidToName.set(uuid, vmName);
-              console.log(`[MobileDetector] Mapped UUID ${uuid} to VM name "${vmName}"`);
             }
           }
         }
@@ -153,8 +149,6 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
     } catch (e) {
       console.error('Failed to scan processes:', e);
     }
-
-    console.log('[MobileDetector] Detected running VM names:', Array.from(runningVMNames));
 
     // Now scan ADB devices to find matches
     const { stdout: adbOut } = await execAsync('adb devices');
@@ -221,7 +215,6 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
               if (isUUID && vmUuidToName.has(candidate)) {
                 // Use the mapped VM name instead of UUID
                 name = vmUuidToName.get(candidate)!;
-                console.log(`[MobileDetector] Resolved UUID ${candidate} to VM name "${name}"`);
               } else if (!isUUID) {
                 name = candidate;
               }
@@ -244,7 +237,6 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
                 ) {
                   name = vmName;
                   vmId = vmName;
-                  console.log(`[MobileDetector] Fuzzy matched model "${model}" to VM "${vmName}"`);
                   break;
                 }
               }
@@ -292,12 +284,9 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
     console.error('Failed to detect Android devices:', error);
   }
 
-  // Add ALL Genymotion VMs (including stopped ones)
-  console.log('[MobileDetector] Fetching complete list of Genymotion VMs...');
   try {
     const { listGenymotionVMs } = await import('./emulator-launcher');
     const allVMs = await listGenymotionVMs();
-    console.log('[MobileDetector] All Genymotion VMs:', allVMs);
 
     for (const vmName of allVMs) {
       // Check if this VM is already in our emulators list
@@ -309,7 +298,6 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
       );
 
       if (!alreadyListed) {
-        console.log(`[MobileDetector] Adding stopped VM: ${vmName}`);
         emulators.push({
           type: 'genymotion',
           serial: '', // Empty for stopped VMs
@@ -322,22 +310,7 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
         });
       }
     }
-  } catch (error) {
-    console.error('[MobileDetector] Failed to fetch VM list:', error);
-  }
-
-  // Deduplicate devices:
-  // 1. If same device appears via both USB and wireless, keep only USB
-  // 2. For Genymotion, handle name variations (e.g., "Moto X" vs "Motorola Moto X")
-  console.log('[MobileDetector] Starting deduplication, total emulators:', emulators.length);
-  emulators.forEach((emu, idx) => {
-    console.log(`[MobileDetector] Emulator ${idx}:`, {
-      name: emu.name,
-      serial: emu.serial,
-      status: emu.status,
-      type: emu.type,
-    });
-  });
+  } catch (error) {}
 
   const deduplicatedEmulators: MobileEmulator[] = [];
   const processedSerials = new Set<string>();
@@ -346,14 +319,12 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
   // First pass: handle devices with serials (running devices)
   for (const emu of emulators) {
     if (!emu.serial || emu.status === 'booting') {
-      console.log('[MobileDetector] Booting/no-serial device:', emu.name);
       booting.push(emu);
       continue;
     }
 
     // Check if we already processed this device (via different connection)
     if (processedSerials.has(emu.serial)) {
-      console.log('[MobileDetector] Already processed:', emu.serial);
       continue;
     }
 
@@ -367,26 +338,17 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
       return e.serial === emu.serial || e.serial === wirelessSerial || e.serial === usbSerial;
     });
 
-    console.log(
-      `[MobileDetector] Found ${allVariants.length} variants for ${emu.name}:`,
-      allVariants.map((v) => v.serial),
-    );
-
     // Prefer USB over wireless
     const usbDevice = allVariants.find((d) => !d.serial.includes(':'));
     const chosen = usbDevice || allVariants[0];
 
-    console.log('[MobileDetector] Chosen device:', chosen.name, chosen.serial);
     deduplicatedEmulators.push(chosen);
     allVariants.forEach((v) => processedSerials.add(v.serial));
   }
 
-  console.log('[MobileDetector] After first pass, running devices:', deduplicatedEmulators.length);
-
   // Second pass: handle booting VMs - check if they match any running device by name (fuzzy match)
   for (const bootingVm of booting) {
     const vmName = bootingVm.name.toLowerCase();
-    console.log('[MobileDetector] Checking booting VM:', bootingVm.name);
 
     // Check if any running device matches this VM
     const matchingRunning = deduplicatedEmulators.find((running) => {
@@ -394,14 +356,12 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
 
       // Exact match
       if (runningName === vmName) {
-        console.log(`[MobileDetector] Exact match: "${vmName}" === "${runningName}"`);
         return true;
       }
 
       // Fuzzy match: check if one name contains the other
       // e.g., "Moto X" matches "Motorola Moto X"
       if (vmName.includes(runningName) || runningName.includes(vmName)) {
-        console.log(`[MobileDetector] Fuzzy match: "${vmName}" <=> "${runningName}"`);
         return true;
       }
 
@@ -409,29 +369,16 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
     });
 
     if (matchingRunning) {
-      console.log(
-        `[MobileDetector] Skipping booting VM "${bootingVm.name}" - matches running "${matchingRunning.name}"`,
-      );
-
       // If names differ, update running device details to match the official VM
       if (matchingRunning.name !== bootingVm.name) {
-        console.log(
-          `[MobileDetector] Renaming running device "${matchingRunning.name}" to official VM name "${bootingVm.name}"`,
-        );
         matchingRunning.name = bootingVm.name;
         // Ensure type is genymotion (it might be 'physical' if detected via USB-like connection)
         matchingRunning.type = 'genymotion';
       }
     } else {
-      console.log(`[MobileDetector] Adding booting VM "${bootingVm.name}" - no match found`);
       deduplicatedEmulators.push(bootingVm);
     }
   }
-
-  console.log('[MobileDetector] Final deduplicated count:', deduplicatedEmulators.length);
-  deduplicatedEmulators.forEach((emu, idx) => {
-    console.log(`[MobileDetector] Final ${idx}:`, emu.name, emu.serial, emu.status);
-  });
 
   return deduplicatedEmulators;
 }
@@ -447,7 +394,6 @@ export async function detectWaydroidEmulators(): Promise<MobileEmulator[]> {
     try {
       execSync('which waydroid', { stdio: 'ignore' });
     } catch {
-      console.log('Waydroid not found - skipping Waydroid detection');
       return [];
     }
 
@@ -612,29 +558,52 @@ export async function getInstalledPackages(serial: string): Promise<string[]> {
 /**
  * Resolve an input string (Name, ID, Serial) to the actual running ADB serial
  */
-export async function resolveEmulatorSerial(input: string): Promise<string | null> {
+export async function resolveEmulatorSerial(
+  input: string,
+  fallbackName?: string,
+): Promise<string | null> {
   const emulators = await detectAllEmulators();
   const target = input.toLowerCase();
 
-  for (const emu of emulators) {
-    // skip offline/booting for operations that require ADB
-    if (emu.status !== 'running') continue;
-
+  // Helper to match emulator against a string
+  const matchEmulator = (emu: MobileEmulator, searchStr: string): boolean => {
     const name = emu.name.toLowerCase();
     const id = (emu.id || '').toLowerCase();
     const serial = emu.serial.toLowerCase();
 
     // 1. Exact match
-    if (name === target || id === target || serial === target) {
-      return emu.serial;
+    if (name === searchStr || id === searchStr || serial === searchStr) {
+      return true;
     }
 
     // 2. Fuzzy match (Name) - avoiding UUIDs
     const isTargetUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      target,
+      searchStr,
     );
-    if (!isTargetUUID && (target.includes(name) || name.includes(target))) {
+    if (!isTargetUUID && (searchStr.includes(name) || name.includes(searchStr))) {
+      return true;
+    }
+    return false;
+  };
+
+  for (const emu of emulators) {
+    // skip offline/booting for operations that require ADB
+    if (emu.status !== 'running') continue;
+
+    // Try matching input
+    if (matchEmulator(emu, target)) {
       return emu.serial;
+    }
+  }
+
+  // If input resolution failed, try fallback name
+  if (fallbackName) {
+    const fallbackTarget = fallbackName.toLowerCase();
+    for (const emu of emulators) {
+      if (emu.status !== 'running') continue;
+      if (matchEmulator(emu, fallbackTarget)) {
+        return emu.serial;
+      }
     }
   }
 

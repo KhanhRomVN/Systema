@@ -111,11 +111,8 @@ export async function startGenymotionVM(
   try {
     // Check if already running
     if (await isVMRunning(vmName)) {
-      console.log(`VM ${vmName} is already running`);
       return true;
     }
-
-    console.log(`Starting Genymotion VM: ${vmName}`);
 
     let playerPath = '';
 
@@ -144,7 +141,6 @@ export async function startGenymotionVM(
     }
 
     if (playerPath) {
-      console.log(`Found Genymotion player at: ${playerPath}`);
       try {
         const args = ['--vm-name', vmName];
         if (headless) {
@@ -158,24 +154,16 @@ export async function startGenymotionVM(
 
         child.unref();
 
-        console.log('Started with Genymotion player (spawned)');
-
-        // Wait a bit to ensure it started, though with detached we assume success
-        // Real verification would be polling isVMRunning
         return true;
       } catch (spawnError) {
         console.error('Failed to spawn player:', spawnError);
         // Fallthrough to VBox fallback
       }
-    } else {
-      console.warn('Genymotion player executable not found in PATH or common locations.');
     }
 
     // 2. Fallback to VirtualBox (only works if utilizing VBox backend)
-    console.log('Attempting fallback to VirtualBox...');
     const vboxType = headless ? 'headless' : 'gui';
     await execAsync(`vboxmanage startvm "${vmName}" --type ${vboxType}`);
-    console.log('Started with VirtualBox');
     return true;
   } catch (error) {
     console.error(`Failed to start Genymotion VM '${vmName}':`, error);
@@ -188,9 +176,7 @@ export async function startGenymotionVM(
  */
 export async function stopGenymotionVM(vmName: string): Promise<boolean> {
   try {
-    console.log(`Stopping Genymotion VM: ${vmName}`);
     await execAsync(`vboxmanage controlvm "${vmName}" poweroff`);
-    console.log('VM stopped');
     return true;
   } catch (error) {
     console.error('Failed to stop VM:', error);
@@ -203,8 +189,6 @@ export async function stopGenymotionVM(vmName: string): Promise<boolean> {
  */
 export async function startWaydroid(): Promise<boolean> {
   try {
-    console.log('Starting Waydroid...');
-
     // Start session
     await execAsync('waydroid session start &');
 
@@ -214,7 +198,6 @@ export async function startWaydroid(): Promise<boolean> {
     // Show UI
     await execAsync('waydroid show-full-ui &');
 
-    console.log('Waydroid started');
     return true;
   } catch (error) {
     console.error('Failed to start Waydroid:', error);
@@ -227,9 +210,7 @@ export async function startWaydroid(): Promise<boolean> {
  */
 export async function stopWaydroid(): Promise<boolean> {
   try {
-    console.log('Stopping Waydroid...');
     await execAsync('waydroid session stop');
-    console.log('Waydroid stopped');
     return true;
   } catch (error) {
     console.error('Failed to stop Waydroid:', error);

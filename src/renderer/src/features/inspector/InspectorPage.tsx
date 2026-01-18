@@ -5,6 +5,7 @@ import { NetworkRequest } from './types';
 import { InspectorProfile } from './utils/profiles';
 import { generateRequestAnalysis } from './utils/analysisGenerator';
 import { SSLBypassModal } from './components/SSLBypassModal';
+import React from 'react';
 
 export default function InspectorPage() {
   const [isScanning, setIsScanning] = useState(false);
@@ -12,24 +13,24 @@ export default function InspectorPage() {
   const [currentAppName, setCurrentAppName] = useState<string>('VSCode');
   const [requests, setRequests] = useState<NetworkRequest[]>([]);
   const [platform, setPlatform] = useState<'web' | 'pc' | 'android' | undefined>();
-  const [fridaStatus, setFridaStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
-  const [targetPackage, setTargetPackage] = useState<string>('com.deepseek.chat');
+  const [fridaStatus, setFridaStatus] = useState<
+    'running' | 'installed' | 'not_installed' | 'unknown'
+  >('unknown');
+  const [targetPackage, setTargetPackage] = useState<string>('');
   const [emulatorSerial, setEmulatorSerial] = useState<string>('');
   const [isSSLBypassModalOpen, setIsSSLBypassModalOpen] = useState(false);
+
+  // Track auto-start attempts to prevent infinite loops
+  const autoStartAttempted = React.useRef<Set<string>>(new Set());
 
   const handleLoadProfile = useCallback((profile: InspectorProfile) => {
     // Restore state from profile
     setRequests(profile.requests);
-    // Use appId if available (for exact match), otherwise fallback to appName (legacy/simple)
-    // Note: If profile.appId is missing, selectedApp gets the name.
-    // This assumes that for legacy apps, ID == Name (like 'VSCode').
-    // For custom apps without appId in profile, restoring might be tricky if ID != Name.
-    // But going forward, new profiles will have appId.
     setSelectedApp(profile.appId || profile.appName);
     setCurrentAppName(profile.appName);
     setPlatform(profile.metadata.platform);
     setIsScanning(true);
-    // Note: We don't launch proxy/app here, just viewing the static data
+    // Check platform and Frida status when app changes
   }, []);
 
   // Check platform and Frida status when app changes
@@ -48,11 +49,23 @@ export default function InspectorPage() {
           if (app.platform === 'android' && app.emulatorSerial) {
             const serial = app.emulatorSerial;
             setEmulatorSerial(serial);
-            console.log('[Inspector] 🔍 Checking Frida status for:', serial);
-            const isRunning = await window.api.invoke('mobile:check-frida', serial);
-            console.log('[Inspector] Frida running?', isRunning);
-            setFridaStatus(isRunning ? 'running' : 'stopped');
-            console.log('[Inspector] Frida status set to:', isRunning ? 'running' : 'stopped');
+            // console.log('[Inspector] 🔍 Checking Frida status for:', serial);
+            const status = await window.api.invoke('mobile:check-frida', serial);
+            // console.log('[Inspector] Frida status?', status);
+            setFridaStatus(status);
+
+            // Auto-Start Logic (Silent)
+            if (status === 'installed' && !autoStartAttempted.current.has(serial)) {
+              console.log('[Inspector] 🚀 Auto-starting Frida server...');
+              autoStartAttempted.current.add(serial);
+
+              // Call API directly for silent auto-start
+              window.api.invoke('mobile:start-frida', serial).then(async () => {
+                // Re-check status after start attempt
+                const newStatus = await window.api.invoke('mobile:check-frida', serial);
+                setFridaStatus(newStatus);
+              });
+            }
           }
         }
       } catch (e) {
@@ -74,10 +87,10 @@ export default function InspectorPage() {
     try {
       alert('Installing Frida Server... process logs will appear in console/terminal.');
       await window.api.invoke('mobile:install-frida', app.emulatorSerial);
-      alert('Frida Server installed (check console for details).');
+      alert('Frida Server installed successfully.');
       // Re-check status
-      const isRunning = await window.api.invoke('mobile:check-frida', app.emulatorSerial);
-      setFridaStatus(isRunning ? 'running' : 'stopped');
+      const status = await window.api.invoke('mobile:check-frida', app.emulatorSerial);
+      setFridaStatus(status);
     } catch (e) {
       console.error('Failed to install Frida', e);
       alert('Failed to install Frida');
@@ -93,21 +106,39 @@ export default function InspectorPage() {
     try {
       await window.api.invoke('mobile:start-frida', app.emulatorSerial);
       // Re-check status
-      const isRunning = await window.api.invoke('mobile:check-frida', app.emulatorSerial);
-      setFridaStatus(isRunning ? 'running' : 'stopped');
+      const status = await window.api.invoke('mobile:check-frida', app.emulatorSerial);
+      setFridaStatus(status);
     } catch (e) {
       console.error('Failed to start Frida', e);
       alert('Failed to start Frida');
     }
   };
 
-  const handleInjectBypass = () => {
+  const [installedPackages, setInstalledPackages] = useState<string[]>([]);
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false);
+
+  const handleInjectBypass = async () => {
     console.log('[Inspector] 🔍 SSL Bypass button clicked!');
-    console.log('[Inspector] Platform:', platform);
 
     if (platform !== 'android') {
       console.log('[Inspector] ❌ Not Android platform, aborting');
       return;
+    }
+
+    // Fetch packages if not already fetched
+    if (emulatorSerial) {
+      setIsLoadingPackages(true);
+      try {
+        console.log('[Inspector] 📦 Fetching installed packages...');
+        const packages = await window.api.invoke('mobile:list-packages', emulatorSerial);
+        if (Array.isArray(packages)) {
+          setInstalledPackages(packages.sort());
+        }
+      } catch (e) {
+        console.error('Failed to list packages', e);
+      } finally {
+        setIsLoadingPackages(false);
+      }
     }
 
     console.log('[Inspector] 💬 Opening SSL Bypass modal...');
@@ -118,10 +149,7 @@ export default function InspectorPage() {
     console.log('[Inspector] 🚀 Confirmed package name:', packageName);
     setTargetPackage(packageName);
 
-    const allApps: any[] = await window.api.invoke('apps:get-all');
-    const app = allApps.find((a) => a.id === selectedApp);
-
-    if (!app?.emulatorSerial) {
+    if (!emulatorSerial) {
       console.log('[Inspector] ❌ No emulator serial found');
       alert('Error: No device serial found');
       return;
@@ -129,7 +157,7 @@ export default function InspectorPage() {
 
     try {
       console.log('[Inspector] 🚀 Sending injection command for:', packageName);
-      await window.api.invoke('mobile:inject-ssl-bypass', app.emulatorSerial, packageName);
+      await window.api.invoke('mobile:inject-ssl-bypass', emulatorSerial, packageName);
       alert(
         `✅ SSL Bypass injection started for ${packageName}\n\nCheck console/terminal for Frida output.`,
       );
@@ -319,6 +347,7 @@ export default function InspectorPage() {
           app.emulatorSerial,
           '127.0.0.1',
           port,
+          app.name, // Pass app name as fallback for stale serials
         );
 
         if (!configured) {
@@ -361,7 +390,7 @@ export default function InspectorPage() {
 
       if (app?.platform === 'android' && app?.emulatorSerial) {
         console.log(`[Inspector] 🧹 Clearing proxy from ${app.emulatorSerial}`);
-        await window.api.invoke('mobile:clear-proxy', app.emulatorSerial);
+        await window.api.invoke('mobile:clear-proxy', app.emulatorSerial, app.name);
       }
 
       await window.api.invoke('proxy:stop');
@@ -374,6 +403,35 @@ export default function InspectorPage() {
 
   const handleDeleteRequest = (id: string) => {
     setRequests((prev) => prev.filter((req) => req.id !== id));
+  };
+
+  const handleInstallCert = async () => {
+    if (platform !== 'android') return;
+    const allApps: any[] = await window.api.invoke('apps:get-all');
+    const app = allApps.find((a) => a.id === selectedApp);
+    if (!app?.emulatorSerial) return;
+
+    if (
+      !confirm(
+        'This will try to install the Proxy CA Certificate to the device system store.\n\nRequirements:\n- Device must be rooted (adb root)\n- System partition must be writable\n\nContinue?',
+      )
+    ) {
+      return;
+    }
+
+    try {
+      alert('Installing Certificate... check console for progress.');
+      const success = await window.api.invoke('mobile:install-ca-cert', app.emulatorSerial);
+
+      if (success) {
+        alert('Certificate installed successfully! You may need to restart the app or device.');
+      } else {
+        alert('Certificate installation fail or partial. Check console logs.');
+      }
+    } catch (e) {
+      console.error('Failed to install cert', e);
+      alert('Failed to install cert');
+    }
   };
 
   if (!isScanning) {
@@ -393,6 +451,7 @@ export default function InspectorPage() {
         onInstallFrida={handleInstallFrida}
         onStartFrida={handleStartFrida}
         onInjectBypass={handleInjectBypass}
+        onInstallCert={handleInstallCert}
         emulatorSerial={emulatorSerial}
       />
 
@@ -401,6 +460,7 @@ export default function InspectorPage() {
         onClose={() => setIsSSLBypassModalOpen(false)}
         onConfirm={handleConfirmSSLBypass}
         defaultValue={targetPackage}
+        packages={installedPackages}
       />
     </div>
   );

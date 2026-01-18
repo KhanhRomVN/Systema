@@ -41,7 +41,6 @@ export class ProxyManager {
       server,
     });
 
-    console.log(`[ProxyManager] Created session ${id} on port ${port}`);
     return port;
   }
 
@@ -54,14 +53,12 @@ export class ProxyManager {
     if (session) {
       session.server.stop();
       this.sessions.delete(id);
-      console.log(`[ProxyManager] Stopped session ${id}`);
     }
   }
 
   stopAll() {
     for (const [id, session] of this.sessions) {
       session.server.stop();
-      console.log(`[ProxyManager] Stopped session ${id}`);
     }
     this.sessions.clear();
   }

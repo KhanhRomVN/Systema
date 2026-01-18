@@ -34,6 +34,7 @@ import {
   injectSSLBypass,
   injectCustomScript,
   listRunningProcesses,
+  isFridaServerInstalled,
 } from './utils/frida-manager';
 import {
   configureEmulatorProxy,
@@ -43,6 +44,8 @@ import {
   uninstallApp,
   launchApp,
   stopApp,
+  setupProxyCertificate,
+  getProxyCACertPath,
 } from './utils/mobile-proxy-config';
 import {
   getAllProfiles,
@@ -466,7 +469,6 @@ app.whenReady().then(async () => {
               const vmName = serial;
               // Check if VM is running
               const emulators = await detectAllEmulators();
-              console.log(`[AppLaunch] Checking Android VM status for stored: "${vmName}"`);
 
               const isRunning = emulators.some((e) => {
                 const storedName = vmName.toLowerCase();
@@ -501,10 +503,6 @@ app.whenReady().then(async () => {
               });
 
               if (isRunning) {
-                console.log(`[AppLaunch] VM "${vmName}" is confirmed running.`);
-                // If running, we might want to ensure proxy is configured, but usually
-                // that happens when we "Connect" or "Intercept".
-                // For now, just return true to indicate it's ready for inspection.
                 return true;
               } else {
                 return false;
@@ -527,15 +525,10 @@ app.whenReady().then(async () => {
             return false;
           }
 
-          // Resolve to actual ADB serial if it's a name
-          const resolvedSerial = await resolveEmulatorSerial(serial);
+          // Resolve to actual ADB serial if it's a name or stale IP
+          const resolvedSerial = await resolveEmulatorSerial(serial, userApp.name);
           if (resolvedSerial) {
             serial = resolvedSerial;
-          } else {
-            console.warn(
-              `[AppLaunch] Could not resolve serial for "${serial}". Using original string.`,
-            );
-            // We continue with original string, though it will likely fail if it's not a valid serial
           }
 
           // Configure absolute proxy (http://127.0.0.1:8081 -> host/port)
@@ -772,8 +765,17 @@ app.whenReady().then(async () => {
   // Frida IPC
   ipcMain.handle('mobile:check-frida', async (_, serial: string) => {
     const resolvedSerial = await resolveEmulatorSerial(serial);
-    if (!resolvedSerial) return false;
-    return await isFridaRunning(resolvedSerial);
+    if (!resolvedSerial) return 'not_installed';
+
+    // Check if running first
+    const running = await isFridaRunning(resolvedSerial);
+    if (running) return 'running';
+
+    // Check if installed
+    const installed = await isFridaServerInstalled(resolvedSerial);
+    if (installed) return 'installed';
+
+    return 'not_installed';
   });
 
   ipcMain.handle('mobile:install-frida', async (_, serial: string) => {
@@ -859,21 +861,27 @@ app.whenReady().then(async () => {
   // Proxy Configuration
   ipcMain.handle(
     'mobile:configure-proxy',
-    async (_, serial: string, proxyHost: string, proxyPort: number) => {
-      const resolvedSerial = await resolveEmulatorSerial(serial);
+    async (_, serial: string, proxyHost: string, proxyPort: number, fallbackName?: string) => {
+      console.log(`[Proxy] Configure request for serial: "${serial}", fallback: "${fallbackName}"`);
+      const resolvedSerial = await resolveEmulatorSerial(serial, fallbackName);
+      console.log(`[Proxy] Resolved serial: "${resolvedSerial}"`);
       return await configureEmulatorProxy(resolvedSerial || serial, proxyHost, proxyPort);
     },
   );
 
-  ipcMain.handle('mobile:clear-proxy', async (_, serial: string) => {
-    const resolvedSerial = await resolveEmulatorSerial(serial);
+  ipcMain.handle('mobile:clear-proxy', async (_, serial: string, fallbackName?: string) => {
+    const resolvedSerial = await resolveEmulatorSerial(serial, fallbackName);
     return await clearEmulatorProxy(resolvedSerial || serial);
   });
 
   ipcMain.handle(
     'mobile:setup-complete-proxy',
-    async (_, serial: string, proxyHost: string, proxyPort: number) => {
-      const resolvedSerial = await resolveEmulatorSerial(serial);
+    async (_, serial: string, proxyHost: string, proxyPort: number, fallbackName?: string) => {
+      console.log(
+        `[Proxy] Setup complete request for serial: "${serial}", fallback: "${fallbackName}"`,
+      );
+      const resolvedSerial = await resolveEmulatorSerial(serial, fallbackName);
+      console.log(`[Proxy] Resolved serial: "${resolvedSerial}"`);
       return await setupCompleteProxy(resolvedSerial || serial, proxyHost, proxyPort, (status) => {
         const win = windowManager.getMainWindow();
         if (win) {
@@ -882,6 +890,23 @@ app.whenReady().then(async () => {
       });
     },
   );
+
+  ipcMain.handle('mobile:install-ca-cert', async (_, serial: string) => {
+    const resolvedSerial = await resolveEmulatorSerial(serial);
+    if (!resolvedSerial) return false;
+
+    try {
+      const caPath = getProxyCACertPath();
+      const win = windowManager.getMainWindow();
+
+      return await setupProxyCertificate(resolvedSerial, caPath, (status) => {
+        if (win) win.webContents.send('mobile:install-cert-progress', status);
+      });
+    } catch (e) {
+      console.error('Failed to install CA cert:', e);
+      return false;
+    }
+  });
 
   // App Management
   ipcMain.handle('mobile:install-apk', async (_, serial: string, apkPath: string) => {

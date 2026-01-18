@@ -99,9 +99,6 @@ export class ProxyServer extends EventEmitter {
       const requestId = Date.now().toString() + Math.random();
       ctx.requestId = requestId;
 
-      // Debug log to verify requests are being captured
-      console.log(`[ProxyServer] ${ctx.isSSL ? 'HTTPS' : 'HTTP'} ${method} ${url}`);
-
       // Setup Page Logic
       if (!ctx.isSSL && req.url && (req.url === '/ssl' || req.url.startsWith('/ssl/'))) {
         const path = require('path');
@@ -129,7 +126,6 @@ export class ProxyServer extends EventEmitter {
         // Get client IP for diagnostics
         const clientIP =
           req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'Unknown';
-        console.log(`[ProxyServer] Setup page accessed from: ${clientIP}`);
 
         // Serve enhanced instructions page with diagnostics
         const html = `
