@@ -1,1 +1,0 @@
-/home/khanhromvn/Documents/Coding/Systema/Link to eslint.config.mjs
