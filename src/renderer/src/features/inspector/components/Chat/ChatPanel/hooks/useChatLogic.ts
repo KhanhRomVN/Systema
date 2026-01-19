@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Message } from '../components/ChatBody';
-import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../types/provider-types';
+import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../../types/provider-types';
 
 export function useChatLogic(providerConfig: ProviderConfig | null, _sessionId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);

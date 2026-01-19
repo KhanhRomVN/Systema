@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { Bot, User, Terminal, CheckCircle2, PlayCircle, Eye, EyeOff } from 'lucide-react';
-import { ParsedResponse, ContentBlock } from '../../../../../services/ResponseParser';
+import { Bot, Terminal, CheckCircle2, PlayCircle, Eye, EyeOff } from 'lucide-react';
+import { ParsedResponse, ContentBlock } from '../../../../../../services/ResponseParser';
 
 export interface Message {
   id: string;

@@ -1,6 +1,6 @@
 {
   "name": "Systema",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "publishConfig": {
     "access": "public"
   },
@@ -38,7 +38,8 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
+    "build": "npm run typecheck && electron-vite build && electron-builder --win --linux",
+    "build:all": "npm run build",
     "preview": "electron-vite preview",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
@@ -50,9 +51,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "postinstall": "electron-builder install-app-deps",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux",
+    "build:win": "npm run typecheck && electron-vite build && electron-builder --win",
+    "build:mac": "npm run typecheck && electron-vite build && electron-builder --mac",
+    "build:linux": "npm run typecheck && electron-vite build && electron-builder --linux",
     "prepare": "husky"
   },
   "dependencies": {

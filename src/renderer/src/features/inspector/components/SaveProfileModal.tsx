@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface SaveProfileModalProps {
   isOpen: boolean;

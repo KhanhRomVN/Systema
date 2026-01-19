@@ -108,7 +108,7 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
         const model = editorInstance.current.getModel();
         if (!model) return;
 
-        let matches = [];
+        let matches: any[] = [];
         try {
           matches = model.findMatches(searchTerm, false, true, false, null, true);
         } catch {
@@ -316,7 +316,7 @@ const CodeBlock = forwardRef<CodeBlockRef, CodeBlockProps>(
       const model = editorInstance.current.getModel();
       if (!model) return;
 
-      let matches = [];
+      let matches: any[] = [];
       try {
         // Try regex first
         matches = model.findMatches(searchTerm, false, true, false, null, true);

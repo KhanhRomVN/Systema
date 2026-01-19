@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, forwardRef } from 'react';
+import { useEffect, useRef, forwardRef } from 'react';
 import { CodeBlockThemeConfig } from './CodeBlock';
 
 declare global {
@@ -37,7 +37,7 @@ const SYSTEMA_THEME = {
 };
 
 export const DiffCodeBlock = forwardRef<HTMLDivElement, DiffCodeBlockProps>(
-  ({ original, modified, language = 'json', className, themeConfig, onEditorMounted }, ref) => {
+  ({ original, modified, language = 'json', className, themeConfig, onEditorMounted }, _ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorInstance = useRef<any>(null);
 

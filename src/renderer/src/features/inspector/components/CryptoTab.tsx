@@ -293,6 +293,6 @@ export function CryptoTab() {
     </div>
   );
 }
-function useEffect(arg0: () => () => void, arg1: never[]) {
+function useEffect(_arg0: () => () => void, _arg1: never[]) {
   throw new Error('Function not implemented.');
 }

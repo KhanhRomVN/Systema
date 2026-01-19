@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { NetworkRequest } from '../types';
 import {
   X,
@@ -9,7 +9,6 @@ import {
   Film,
   ExternalLink,
 } from 'lucide-react';
-import { cn } from '../../../shared/lib/utils';
 
 interface MediaPanelProps {
   requests: NetworkRequest[];

@@ -1,5 +1,4 @@
 import {
-  History,
   Plus,
   ChevronRight,
   Send,
@@ -13,21 +12,31 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
-import { TabList, ChatSession } from './TabList';
+// TabList removed
+// ChatSession defined locally now since TabList is gone
+export interface ChatSession {
+  id: string;
+  title: string;
+  timestamp: number;
+  messageCount: number;
+  preview: string;
+  status?: 'free' | 'busy' | 'sleep';
+  provider?: string;
+  requestCount?: number;
+  containerName?: string;
+  conversationId?: string;
+}
 import {
   ProviderConfig,
   ProviderType,
   ModelInfo,
   ElaraFreeConfig,
-} from '../../types/provider-types';
-import { cn } from '../../../../shared/lib/utils';
+} from '../../../types/provider-types';
+import { cn } from '../../../../../shared/lib/utils';
 
 interface TabPanelProps {
-  sessions: ChatSession[];
-  onSelectSession: (id: string) => void;
-  onOpenHistory: () => void;
+  onSelectSession: (session: ChatSession) => void;
   onOpenSettings: () => void;
-  onSessionsChange: (sessions: ChatSession[]) => void;
   onOpenProviderSelection: () => void;
   currentProviderConfig: ProviderConfig | null;
   onUpdateProviderConfig: (config: ProviderConfig) => void;
@@ -151,11 +160,8 @@ function CustomSelect({
 }
 
 export function TabPanel({
-  sessions,
   onSelectSession,
-  onOpenHistory,
   onOpenSettings,
-  onSessionsChange,
   onOpenProviderSelection,
   currentProviderConfig,
   onUpdateProviderConfig,
@@ -301,8 +307,8 @@ export function TabPanel({
       provider: currentProviderConfig?.type || 'deepseek',
       containerName: 'Container #01',
     };
-    onSessionsChange([newSession, ...sessions]);
-    onSelectSession(newId);
+    // onSessionsChange([newSession, ...sessions]); // Removed
+    onSelectSession(newSession); // Pass object instead of ID
     setInputText('');
     setAttachments([]);
   };
@@ -362,13 +368,6 @@ export function TabPanel({
           <span className="text-xs font-semibold text-muted-foreground">New Chat</span>
           <div className="flex items-center gap-1">
             <button
-              onClick={onOpenHistory}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
-              title="History"
-            >
-              <History className="w-4 h-4" />
-            </button>
-            <button
               onClick={handleNewChat}
               className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
               title="New Chat"
@@ -395,8 +394,20 @@ export function TabPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <TabList sessions={sessions} onSelect={onSelectSession} onNewChat={handleNewChat} />
+      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col items-center justify-center text-muted-foreground p-8">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-16 h-16 bg-muted/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Brain className="w-8 h-8 opacity-50" />
+          </div>
+          <h3 className="font-semibold text-lg text-foreground">Start a New Chat</h3>
+          <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            Configure your AI provider below and start a new session to analyze your network
+            traffic.
+          </p>
+          <button onClick={handleNewChat} className="text-xs text-primary hover:underline">
+            Click here or type below to start
+          </button>
+        </div>
       </div>
 
       <div className="p-3 border-t border-border bg-muted/10 shrink-0 flex flex-col gap-2">

@@ -28,7 +28,7 @@ export function HighlightText({
         regex = new RegExp(`(${escaped})`, 'i');
       }
 
-      return text.split(regex).map((part, i) => {
+      return text.split(regex).map((part, _i) => {
         // Even indices are non-matches, odd are matches (because of capturing group)
         // However, if the regex doesn't have capturing groups or behaves differently, we need to be careful.
         // With `(${searchTerm})`, split includes the separators.

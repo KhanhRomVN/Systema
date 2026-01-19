@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Filter } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 import { Slider } from '../../../components/ui/slider';
 
@@ -496,16 +496,6 @@ function ListFilterSection({
     handleAdd(suggestion);
     setInput('');
     setShowSuggestions(false);
-  };
-
-  const handleToggleItem = (item: string) => {
-    const currentList = lists.whitelist || [];
-    if (currentList.includes(item)) {
-      handleRemove(item);
-    } else {
-      handleAdd(item);
-    }
-    setShowDropdown(false);
   };
 
   return (

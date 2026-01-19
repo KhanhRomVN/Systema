@@ -68,7 +68,7 @@ interface RequestDetailsProps {
 function TextSelectionMenu({
   x,
   y,
-  selectedText,
+
   onAddToCrypto,
   onUseInSearch,
   onClose,

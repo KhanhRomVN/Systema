@@ -104,7 +104,7 @@ export function RequestEditor({
     } catch (e) {}
 
     // Construct headers
-    const headerObj: Record<string, string | number> = {};
+    const headerObj: Record<string, string> = {};
     newHeaders
       .filter((h) => h.enabled && h.key)
       .forEach((h) => {

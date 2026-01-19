@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Send, Paperclip, X, Search, Brain } from 'lucide-react';
-import { cn } from '../../../../../shared/lib/utils';
+import { cn } from '../../../../../../shared/lib/utils';
 
 interface ChatInputAreaProps {
   input: string;

@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { ChatHeader } from './components/ChatHeader';
 import { ChatBody } from './components/ChatBody';
 import { ChatInputArea } from './components/ChatInputArea';
-import { InspectorContext } from '../ChatContainer';
-import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../types/provider-types';
+import { InspectorContext } from '../../ChatContainer';
+import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../types/provider-types';
 import { useChatLogic } from './hooks/useChatLogic';
 import { Settings2, Zap, User } from 'lucide-react';
 
@@ -21,9 +21,9 @@ export function ChatPanel({
   sessionId,
   title,
   provider,
-  initialConversationId,
+
   onBack,
-  inspectorContext,
+
   providerConfig: initialProviderConfig,
 }: ChatPanelProps) {
   // Local state for configuration within this panel (can override global)
@@ -56,7 +56,6 @@ export function ChatPanel({
 
   // Elara Sub-Provider Logic
   const [subProviders, setSubProviders] = useState<any[]>([]);
-  const [elaraModels, setElaraModels] = useState<any[]>([]);
 
   // Fetch Elara Sub-Providers
   useEffect(() => {
@@ -91,7 +90,6 @@ export function ChatPanel({
         onBack={onBack}
         onNewChat={() => {}}
         onSettings={() => {}}
-        onHistory={onBack}
       />
 
       <ChatBody

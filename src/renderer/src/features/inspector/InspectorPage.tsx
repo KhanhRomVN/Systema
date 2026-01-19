@@ -115,7 +115,6 @@ export default function InspectorPage() {
   };
 
   const [installedPackages, setInstalledPackages] = useState<string[]>([]);
-  const [isLoadingPackages, setIsLoadingPackages] = useState(false);
 
   const handleInjectBypass = async () => {
     console.log('[Inspector] 🔍 SSL Bypass button clicked!');
@@ -127,7 +126,6 @@ export default function InspectorPage() {
 
     // Fetch packages if not already fetched
     if (emulatorSerial) {
-      setIsLoadingPackages(true);
       try {
         console.log('[Inspector] 📦 Fetching installed packages...');
         const packages = await window.api.invoke('mobile:list-packages', emulatorSerial);
@@ -137,7 +135,6 @@ export default function InspectorPage() {
       } catch (e) {
         console.error('Failed to list packages', e);
       } finally {
-        setIsLoadingPackages(false);
       }
     }
 

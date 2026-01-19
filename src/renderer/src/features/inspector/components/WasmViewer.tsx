@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Copy, Download, Code } from 'lucide-react';
-import { cn } from '../../../shared/lib/utils';
+
 import wabt from 'wabt';
 
 interface WasmViewerProps {

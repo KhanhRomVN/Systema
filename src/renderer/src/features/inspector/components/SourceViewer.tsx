@@ -1,7 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { CodeBlock } from '../../../components/CodeBlock';
-import { cn } from '../../../shared/lib/utils'; // Assuming this exists
 
 interface SourceViewerProps {
   isOpen: boolean;
@@ -20,8 +19,6 @@ export function SourceViewer({
   highlightLine,
   language = 'javascript',
 }: SourceViewerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (isOpen && highlightLine) {
       // Wait for content render

@@ -1,6 +1,6 @@
-import { InspectorContext } from '../../ChatContainer';
-import { initialFilterState, InspectorFilter } from '../../FilterPanel';
-import { ToolAction } from '../../../../../services/ResponseParser';
+import { InspectorContext } from '../../../ChatContainer';
+import { initialFilterState, InspectorFilter } from '../../../FilterPanel';
+import { ToolAction } from '../../../../../../services/ResponseParser';
 
 export async function executeTool(action: ToolAction, context: InspectorContext): Promise<string> {
   switch (action.type) {

@@ -172,7 +172,7 @@ function generateHeadersAnalysis(request: NetworkRequest): HeadersAnalysis {
   const enrichHeader = (name: string, value: string): HeaderItem => {
     let description = 'Custom header';
     let parsed: any = undefined;
-    let status = undefined;
+    let status: string | undefined = undefined;
 
     const lowerName = name.toLowerCase();
     if (lowerName === 'host') description = 'Target host for the request';

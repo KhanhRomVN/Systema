@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BookmarkPlus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 import {
   getOrCreateDefaultCollection,
-  addRequestToDefaultCollection,
   deleteRequestFromCollection,
-  replayRequest,
   RequestCollection,
-  SavedRequest,
   COLLECTIONS_UPDATED_EVENT,
 } from '../utils/collections';
 import { NetworkRequest } from '../types';
@@ -18,7 +15,7 @@ interface CollectionsTabProps {
   appId: string;
 }
 
-export function CollectionsTab({ onSelectRequest, currentRequest, appId }: CollectionsTabProps) {
+export function CollectionsTab({ onSelectRequest, appId }: CollectionsTabProps) {
   const [collection, setCollection] = useState<RequestCollection | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -32,22 +29,6 @@ export function CollectionsTab({ onSelectRequest, currentRequest, appId }: Colle
 
   const loadData = () => {
     setCollection(getOrCreateDefaultCollection(appId));
-  };
-
-  const handleAddCurrentRequest = () => {
-    if (!currentRequest) return;
-    addRequestToDefaultCollection(appId, currentRequest);
-    loadData();
-  };
-
-  const handleReplay = async (request: SavedRequest) => {
-    try {
-      const response = await replayRequest(request);
-      console.log('Replay response:', response);
-      // You could add more UI feedback here
-    } catch (error) {
-      console.error('Failed to replay request:', error);
-    }
   };
 
   const handleDeleteRequest = (requestId: string) => {

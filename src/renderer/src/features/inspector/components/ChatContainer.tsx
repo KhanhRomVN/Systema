@@ -1,11 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { TabPanel } from './TabPanel';
-import { ChatPanel } from './ChatPanel';
-import { HistoryPanel } from './HistoryPanel';
-import SettingsPanel from './SettingsPanel';
+import { useState, useEffect } from 'react';
+import { TabPanel } from './Chat/TabPanel';
+import { ChatPanel } from './Chat/ChatPanel';
+import SettingsPanel from './Chat/SettingsPanel';
 import { InspectorFilter } from './FilterPanel';
 import { NetworkRequest } from '../types';
-import { ChatSession } from './TabPanel/TabList';
 import { SourcesPanel } from './SourcesPanel';
 import { LogViewer } from './LogViewer';
 import { CollectionsTab } from './CollectionsTab';
@@ -56,17 +54,18 @@ interface ChatContainerProps {
 
 export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   const [activeTab, setActiveTab] = useState<string>('chat');
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
+  // Lifted state from TabPanel
+  // History removed, using single active session or similar if needed.
+  // For now just tracking selected ID is enough if we generate it on demand?
+  // Actually we need to store the session info if we want to display title etc.
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+
+  // Missing state variables
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showProviderSelection, setShowProviderSelection] = useState(false);
-  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
-
-  // Lifted state from TabPanel
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
 
   const [collectionCount, setCollectionCount] = useState(0);
-  const lastActiveSessionRef = useRef<ChatSession | null>(null);
 
   // Load saved provider config on mount
   useEffect(() => {
@@ -135,15 +134,6 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       return <SourcesPanel requests={inspectorContext.requests} />;
     }
 
-    if (showHistory) {
-      return (
-        <HistoryPanel
-          onClose={() => setShowHistory(false)}
-          onSelectSession={setSelectedSessionId}
-        />
-      );
-    }
-
     if (showSettings) {
       return <SettingsPanel onClose={() => setShowSettings(false)} />;
     }
@@ -161,38 +151,15 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       );
     }
 
-    if (selectedSessionId) {
-      let activeSession = sessions.find((s) => s.id === selectedSessionId);
-
-      // If we rely on the list having NO conversationId, we shouldn't patch it back from cache.
-      if (activeSession) {
-        lastActiveSessionRef.current = activeSession;
-      }
-
-      // Fallback if not found at all
-      if (!activeSession) {
-        activeSession = (lastActiveSessionRef.current?.id === selectedSessionId
-          ? lastActiveSessionRef.current
-          : null) || {
-          id: selectedSessionId,
-          title: 'History Chat',
-          provider: 'Systema',
-          timestamp: Date.now(),
-          messageCount: 0,
-          preview: '',
-          status: 'free',
-          conversationId: undefined,
-        };
-      }
-
+    if (activeSession) {
       return (
         <ChatPanel
-          key={selectedSessionId} // Force remount on session change
-          sessionId={selectedSessionId}
+          key={activeSession.id}
+          sessionId={activeSession.id}
           title={activeSession.title}
           provider={activeSession.provider}
           initialConversationId={activeSession.conversationId}
-          onBack={() => setSelectedSessionId(null)}
+          onBack={() => setActiveSession(null)}
           inspectorContext={inspectorContext}
           providerConfig={providerConfig}
         />
@@ -201,11 +168,10 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
 
     return (
       <TabPanel
-        sessions={sessions}
-        onSelectSession={setSelectedSessionId}
-        onOpenHistory={() => setShowHistory(true)}
+        onSelectSession={(session) => {
+          setActiveSession(session);
+        }}
         onOpenSettings={() => setShowSettings(true)}
-        onSessionsChange={setSessions}
         onOpenProviderSelection={() => setShowProviderSelection(true)}
         currentProviderConfig={providerConfig}
         onUpdateProviderConfig={(newConfig) => {
