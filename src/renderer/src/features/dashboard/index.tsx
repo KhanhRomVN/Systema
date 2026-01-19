@@ -457,20 +457,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
               <h1 className="text-4xl font-bold mb-4 text-white tracking-tight">
                 {selectedApp.name}
               </h1>
-              <p className="text-lg text-gray-400 mb-10 leading-relaxed max-w-lg mx-auto">
-                {selectedApp.description || `Launch ${selectedApp.name}`}
-              </p>
 
               <div className="flex flex-col items-center space-y-6">
-                {/* Proxy Status Indicator */}
-                <div className="flex items-center space-x-3 px-4 py-2 bg-gray-800/50 rounded-full border border-gray-700/50 backdrop-blur-sm">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-sm font-medium text-gray-300">Proxy Ready: :8081</span>
-                </div>
-
                 <div className="flex items-center space-x-4">
                   {selectedApp.platform === 'android' ? (
                     <button

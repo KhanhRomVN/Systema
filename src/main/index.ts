@@ -1,5 +1,18 @@
 import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'media',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
 import { ProxyManager } from './proxy/ProxyManager';
@@ -119,12 +132,51 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Register 'media' protocol for serving local files
-  protocol.handle('media', (request) => {
-    const filePath = request.url.slice('media://'.length);
-    // Decode URI component to handle spaces and special chars
-    const decodedPath = decodeURIComponent(filePath);
-    return net.fetch(`file://${decodedPath}`);
+  // Register 'media' protocol for serving local and remote files (bypassing CORS/CORP)
+  protocol.handle('media', async (request) => {
+    try {
+      // 1. Extract and normalize the URL
+      let targetUrl = request.url.replace(/^media:\/\/+/i, '');
+
+      // Fix potential transformation media://https:// becomes media://https/
+      if (targetUrl.startsWith('https/') && !targetUrl.startsWith('https://')) {
+        targetUrl = 'https://' + targetUrl.slice(6);
+      } else if (targetUrl.startsWith('http/') && !targetUrl.startsWith('http://')) {
+        targetUrl = 'http://' + targetUrl.slice(5);
+      }
+
+      const decodedUrl = decodeURIComponent(targetUrl);
+      console.log(`[Protocol Media] Handling: ${request.url} -> ${decodedUrl}`);
+
+      const actualUrl =
+        decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://')
+          ? decodedUrl
+          : `file://${decodedUrl.startsWith('/') ? '' : '/'}${decodedUrl}`;
+
+      const response = await net.fetch(actualUrl, { bypassCustomProtocolHandlers: true });
+
+      // 3. Create a response with stripped restrictive headers to fix CORS/CORP/COEP/COOP
+      const cleanHeaders = new Headers(response.headers);
+      const headersToRemove = [
+        'cross-origin-resource-policy',
+        'content-security-policy',
+        'cross-origin-embedder-policy',
+        'cross-origin-opener-policy',
+      ];
+      headersToRemove.forEach((h) => cleanHeaders.delete(h));
+
+      // Ensure cross-origin access
+      cleanHeaders.set('access-control-allow-origin', '*');
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: cleanHeaders,
+      });
+    } catch (error: any) {
+      console.error(`[Protocol Media] Load Error for ${request.url}:`, error);
+      return new Response(`Media Load Error: ${error.message}`, { status: 500 });
+    }
   });
 
   // Setup IPC event handlers

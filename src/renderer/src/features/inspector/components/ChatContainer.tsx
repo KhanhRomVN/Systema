@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TabPanel } from './Chat/TabPanel';
+import { HomePanel } from './Chat/HomePanel';
 import { ChatPanel } from './Chat/ChatPanel';
 import SettingsPanel from './Chat/SettingsPanel';
 import { InspectorFilter } from './FilterPanel';
@@ -16,7 +16,7 @@ import { ProviderConfig } from '../types/provider-types';
 import { ProviderStorage } from '../../../services/provider-storage';
 
 import { WasmPanel } from './WasmPanel';
-import { MediaPanel } from './MediaPanel';
+import { MediaPanel } from './Media';
 import { ControlFlowPanel, FlowCard } from './ControlFlowPanel';
 
 export interface InspectorContext {
@@ -167,7 +167,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     }
 
     return (
-      <TabPanel
+      <HomePanel
         onSelectSession={(session) => {
           setActiveSession(session);
         }}

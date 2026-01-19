@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NetworkRequest } from '../types';
+import { NetworkRequest } from '../../types';
 import {
   X,
   Image as ImageIcon,
@@ -9,6 +9,7 @@ import {
   Film,
   ExternalLink,
 } from 'lucide-react';
+import { MediaModal } from './MediaModal';
 
 interface MediaPanelProps {
   requests: NetworkRequest[];
@@ -28,6 +29,7 @@ interface MediaItem {
 export function MediaPanel({ requests, onClose }: MediaPanelProps) {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
 
   useEffect(() => {
     setIsScanning(true);
@@ -58,7 +60,7 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
         items.push({
           id: req.id,
           filename: req.path.split('/').pop()?.split('?')[0] || `unknown.${type}`,
-          url: `${req.protocol}://${req.host}${req.path}`,
+          url: `media://${req.protocol}://${req.host}${req.path}`,
           type,
           contentType,
           size: req.size,
@@ -70,10 +72,6 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
     setMediaItems(items.sort((a, b) => b.timestamp - a.timestamp));
     setIsScanning(false);
   }, [requests]);
-
-  const handleOpenMedia = (url: string) => {
-    window.open(url, '_blank');
-  };
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
@@ -99,7 +97,7 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
           {mediaItems.map((item) => (
             <div
               key={item.id}
-              onClick={() => handleOpenMedia(item.url)}
+              onClick={() => setSelectedMedia(item)}
               className="border border-border rounded-lg bg-card overflow-hidden hover:border-blue-500/50 transition-all shadow-sm group cursor-pointer hover:shadow-md flex flex-col h-48"
             >
               {/* Preview Area */}
@@ -137,7 +135,7 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <span className="text-white text-xs font-medium flex items-center gap-1">
                     <ExternalLink className="w-3 h-3" />
-                    Open
+                    Preview
                   </span>
                 </div>
               </div>
@@ -181,6 +179,16 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
           )}
         </div>
       </div>
+
+      {/* Media Preview Modal */}
+      {selectedMedia && (
+        <MediaModal
+          url={selectedMedia.url}
+          filename={selectedMedia.filename}
+          type={selectedMedia.type}
+          onClose={() => setSelectedMedia(null)}
+        />
+      )}
     </div>
   );
 }

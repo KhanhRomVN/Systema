@@ -1,15 +1,4 @@
-import {
-  Plus,
-  ChevronRight,
-  Send,
-  Brain,
-  Paperclip,
-  Search,
-  X,
-  ChevronDown,
-  Globe,
-  Sparkles,
-} from 'lucide-react';
+import { Plus, ChevronRight, Brain, ChevronDown, Globe, Sparkles } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 // TabList removed
@@ -33,8 +22,9 @@ import {
   ElaraFreeConfig,
 } from '../../../types/provider-types';
 import { cn } from '../../../../../shared/lib/utils';
+import { ChatInputArea } from '../ChatPanel/components/ChatInputArea';
 
-interface TabPanelProps {
+interface HomePanelProps {
   onSelectSession: (session: ChatSession) => void;
   onOpenSettings: () => void;
   onOpenProviderSelection: () => void;
@@ -56,6 +46,8 @@ interface SubProvider {
   models: string[];
   website?: string;
   is_enabled?: boolean;
+  is_upload?: boolean;
+  is_search?: boolean;
 }
 
 // Custom Select Component for displaying Icons
@@ -90,13 +82,13 @@ function CustomSelect({
   const selectedOption = options.find((opt) => opt.value === value);
 
   return (
-    <div ref={containerRef} className={cn('relative inline-block text-[10px]', className)}>
+    <div ref={containerRef} className={cn('relative inline-block text-[11px]', className)}>
       <button
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={cn(
-          'h-7 w-full flex items-center justify-between gap-2 bg-background border border-border rounded px-2 outline-none focus:border-primary cursor-pointer transition-colors hover:bg-muted/50 truncate',
+          'h-8 w-full flex items-center justify-between gap-2 bg-background border border-border rounded px-2.5 outline-none focus:border-primary cursor-pointer transition-colors hover:bg-muted/50 truncate',
           disabled && 'opacity-50 cursor-not-allowed',
         )}
       >
@@ -105,19 +97,19 @@ function CustomSelect({
             <img
               src={selectedOption.iconUrl}
               alt=""
-              className="w-3.5 h-3.5 object-contain rounded-sm"
+              className="w-4 h-4 object-contain rounded-sm"
               onError={(e) => (e.currentTarget.style.display = 'none')}
             />
           ) : selectedOption && selectedOption.iconUrl !== undefined ? (
-            <Globe className="w-3 h-3 text-muted-foreground" />
+            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
           ) : null}
           <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
         </span>
-        <ChevronDown className="w-3 h-3 text-muted-foreground opacity-50 shrink-0" />
+        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-50 shrink-0" />
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-full left-0 mb-1 w-full min-w-[140px] max-h-60 overflow-y-auto bg-popover border border-border rounded-md shadow-md z-50 animate-in fade-in zoom-in-95 duration-100 slide-in-from-bottom-2">
+        <div className="absolute bottom-full left-0 mb-1 w-full min-w-[160px] max-h-60 overflow-y-auto bg-popover border border-border rounded-md shadow-md z-50 animate-in fade-in zoom-in-95 duration-100 slide-in-from-bottom-2">
           <div className="p-1">
             {options.map((option) => (
               <button
@@ -130,7 +122,7 @@ function CustomSelect({
                 }}
                 disabled={option.disabled}
                 className={cn(
-                  'w-full flex items-center gap-2 px-2 py-1.5 rounded-sm text-left transition-colors',
+                  'w-full flex items-center gap-2 px-2 py-2 rounded-sm text-left transition-colors',
                   option.disabled
                     ? 'opacity-50 cursor-not-allowed bg-muted/20'
                     : 'hover:bg-muted/50 cursor-pointer',
@@ -138,17 +130,13 @@ function CustomSelect({
                 )}
               >
                 {option.iconUrl ? (
-                  <img
-                    src={option.iconUrl}
-                    alt=""
-                    className="w-3.5 h-3.5 object-contain rounded-sm"
-                  />
+                  <img src={option.iconUrl} alt="" className="w-4 h-4 object-contain rounded-sm" />
                 ) : option.iconUrl !== undefined ? (
-                  <Globe className="w-3 h-3 text-muted-foreground" />
+                  <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                 ) : null}
                 <span className="truncate flex-1">{option.label}</span>
                 {option.disabled && (
-                  <span className="text-[9px] border border-border px-1 rounded">Disabled</span>
+                  <span className="text-[10px] border border-border px-1 rounded">Disabled</span>
                 )}
               </button>
             ))}
@@ -159,13 +147,13 @@ function CustomSelect({
   );
 }
 
-export function TabPanel({
+export function HomePanel({
   onSelectSession,
   onOpenSettings,
   onOpenProviderSelection,
   currentProviderConfig,
   onUpdateProviderConfig,
-}: TabPanelProps) {
+}: HomePanelProps) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [subProviders, setSubProviders] = useState<SubProvider[]>([]);
@@ -174,20 +162,19 @@ export function TabPanel({
 
   // Input State
   const [inputText, setInputText] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const [isSearch, setIsSearch] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [thinkingEnabled, setThinkingEnabled] = useState(false);
+  const [searchEnabled, setSearchEnabled] = useState(false);
 
   // Trace Config Changes
   useEffect(() => {
-    console.log('[TabPanel] Current Provider Config:', currentProviderConfig);
+    console.log('[HomePanel] Current Provider Config:', currentProviderConfig);
   }, [currentProviderConfig]);
 
   // Default to Elara if not set
   useEffect(() => {
     if (!currentProviderConfig || currentProviderConfig.type !== ProviderType.ELARA_FREE) {
-      console.log('[TabPanel] No valid config, setting default Elara...');
+      console.log('[HomePanel] No valid config, setting default Elara...');
       const defaultConfig: ProviderConfig = {
         type: ProviderType.ELARA_FREE,
         name: 'Elara (Free)',
@@ -205,13 +192,13 @@ export function TabPanel({
       // Robust Fallback: Use config.baseURL OR default to local backend
       const baseURL = config.baseURL || 'http://localhost:11434';
 
-      console.log('[TabPanel] Config:', config);
-      console.log('[TabPanel] Fetching providers from:', baseURL);
+      console.log('[HomePanel] Config:', config);
+      console.log('[HomePanel] Fetching providers from:', baseURL);
 
       fetch(`${baseURL}/v1/providers`)
         .then((res) => res.json())
         .then((data) => {
-          console.log('[TabPanel] Providers API Response:', data);
+          console.log('[HomePanel] Providers API Response:', data);
           if (data.success && Array.isArray(data.data)) {
             const subs = data.data.map((p: any) => ({
               id: p.id,
@@ -219,14 +206,16 @@ export function TabPanel({
               models: [],
               website: p.website,
               is_enabled: p.is_enabled,
+              is_upload: p.is_upload,
+              is_search: p.is_search,
             }));
             setSubProviders(subs);
           } else {
-            console.warn('[TabPanel] Invalid providers data structure:', data);
+            console.warn('[HomePanel] Invalid providers data structure:', data);
           }
         })
         .catch((err) => {
-          console.warn('[TabPanel] Failed to fetch providers (likely offline or wrong URL):', err);
+          console.warn('[HomePanel] Failed to fetch providers (likely offline or wrong URL):', err);
         });
     }
   }, [currentProviderConfig?.type, (currentProviderConfig as any)?.baseURL]);
@@ -338,6 +327,15 @@ export function TabPanel({
     }
   };
 
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSend = () => {
+    if (!inputText.trim() && attachments.length === 0) return;
+    handleNewChat();
+  };
+
   // Dropdown Options
   const subProviderOptions = subProviders.map((sp) => ({
     value: sp.id,
@@ -404,19 +402,16 @@ export function TabPanel({
             Configure your AI provider below and start a new session to analyze your network
             traffic.
           </p>
-          <button onClick={handleNewChat} className="text-xs text-primary hover:underline">
-            Click here or type below to start
-          </button>
         </div>
       </div>
 
-      <div className="p-3 border-t border-border bg-muted/10 shrink-0 flex flex-col gap-2">
-        {/* Unified Config Row */}
-        <div className="flex flex-wrap gap-2">
+      <div className="border-t border-border bg-background shrink-0">
+        {/* Configuration Toolbar */}
+        <div className="p-3 border-b border-border bg-muted/10 flex flex-wrap gap-2">
           {/* Elara SubProvider Select (Replaces Main Provider) */}
           {currentProviderConfig?.type === ProviderType.ELARA_FREE ? (
             <CustomSelect
-              className="w-fit min-w-[120px] max-w-[150px]"
+              className="w-fit min-w-[130px] max-w-[160px]"
               options={subProviderOptions}
               value={selectedSubProvider}
               onChange={(val) => setSelectedSubProvider(val)}
@@ -431,7 +426,7 @@ export function TabPanel({
 
           {/* Model Select */}
           <CustomSelect
-            className="w-fit max-w-[150px]"
+            className="w-fit max-w-[170px]"
             options={modelOptions}
             value={currentProviderConfig?.model || ''}
             onChange={(val) => handleModelChange(val)}
@@ -442,7 +437,7 @@ export function TabPanel({
           {/* Account Select */}
           {currentProviderConfig?.type === ProviderType.ELARA_FREE && (
             <CustomSelect
-              className="w-fit max-w-[150px]"
+              className="w-fit max-w-[170px]"
               options={accountOptions}
               value={(currentProviderConfig as ElaraFreeConfig).accountId || ''}
               onChange={(val) => handleAccountChange(val)}
@@ -451,79 +446,32 @@ export function TabPanel({
           )}
         </div>
 
-        {attachments.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto py-1">
-            {attachments.map((file, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1 bg-background border border-border rounded px-2 py-1 text-[10px]"
-              >
-                <span className="truncate max-w-[80px]">{file.name}</span>
-                <button
-                  onClick={() => setAttachments((p) => p.filter((_, idx) => idx !== i))}
-                  className="text-muted-foreground hover:text-red-500"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="relative bg-background border border-input rounded-lg shadow-sm focus-within:ring-1 focus-within:ring-primary">
-          <textarea
-            className="w-full bg-transparent border-none px-3 py-2 text-xs resize-none outline-none min-h-[48px] max-h-[200px]"
-            placeholder="Type a message..."
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            rows={2}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleNewChat();
-              }
-            }}
-          />
-          <div className="flex items-center justify-between px-2 pb-2">
-            <div className="flex items-center gap-1">
-              <input
-                type="file"
-                multiple
-                ref={fileInputRef}
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                title="Attach File"
-              >
-                <Paperclip className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setIsSearch(!isSearch)}
-                className={`p-1.5 rounded transition-all ${isSearch ? 'text-blue-400 bg-blue-400/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                title="Web Search"
-              >
-                <Search className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setIsThinking(!isThinking)}
-                className={`p-1.5 rounded transition-all ${isThinking ? 'text-purple-400 bg-purple-400/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                title="Thinking Mode"
-              >
-                <Brain className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <button
-              onClick={handleNewChat}
-              disabled={!inputText.trim() && attachments.length === 0}
-              className="p-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+        {/* Chat Input Area */}
+        <ChatInputArea
+          input={inputText}
+          setInput={setInputText}
+          onSend={handleSend}
+          isLoading={false}
+          onStop={() => {}}
+          attachments={attachments}
+          onFileSelect={handleFileSelect}
+          onRemoveAttachment={handleRemoveAttachment}
+          thinkingEnabled={thinkingEnabled}
+          setThinkingEnabled={setThinkingEnabled}
+          searchEnabled={searchEnabled}
+          setSearchEnabled={setSearchEnabled}
+          supportsUpload={
+            selectedSubProvider
+              ? (subProviders.find((p) => p.id === selectedSubProvider)?.is_upload ?? false)
+              : false
+          }
+          supportsSearch={
+            selectedSubProvider
+              ? (subProviders.find((p) => p.id === selectedSubProvider)?.is_search ?? false)
+              : false
+          }
+          supportsThinking={false}
+        />
       </div>
     </div>
   );

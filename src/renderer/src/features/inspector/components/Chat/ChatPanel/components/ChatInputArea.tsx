@@ -22,6 +22,11 @@ interface ChatInputAreaProps {
 
   // Styling
   disabled?: boolean;
+
+  // Conditional Feature Support
+  supportsUpload?: boolean;
+  supportsSearch?: boolean;
+  supportsThinking?: boolean;
 }
 
 export function ChatInputArea({
@@ -38,6 +43,9 @@ export function ChatInputArea({
   searchEnabled,
   setSearchEnabled,
   disabled,
+  supportsUpload = true,
+  supportsSearch = true,
+  supportsThinking = true,
 }: ChatInputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,54 +114,64 @@ export function ChatInputArea({
         <div className="flex items-center justify-between px-1 pt-1 border-t border-border/50">
           <div className="flex items-center gap-1">
             {/* Attachment Button */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={onFileSelect}
-              className="hidden"
-              multiple
-            />
-            <button
-              className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || isLoading}
-              title="Add Attachment"
-            >
-              <Paperclip className="w-4 h-4" />
-            </button>
+            {supportsUpload && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={onFileSelect}
+                  className="hidden"
+                  multiple
+                />
+                <button
+                  className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled || isLoading}
+                  title="Add Attachment"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
+              </>
+            )}
 
-            <div className="h-4 w-px bg-border mx-1" />
+            {(supportsUpload || supportsThinking || supportsSearch) && (
+              <div className="h-4 w-px bg-border mx-1" />
+            )}
 
             {/* Feature Toggles */}
-            <button
-              className={cn(
-                'h-7 px-2 flex items-center justify-center rounded-md text-xs gap-1.5 transition-colors disabled:opacity-50',
-                thinkingEnabled
-                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                  : 'text-muted-foreground hover:bg-muted/50',
-              )}
-              onClick={() => setThinkingEnabled(!thinkingEnabled)}
-              title="Toggle Thinking Mode"
-              disabled={disabled}
-            >
-              <Brain className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Think</span>
-            </button>
+            {supportsThinking && (
+              <button
+                className={cn(
+                  'h-7 px-2 flex items-center justify-center rounded-md text-xs gap-1.5 transition-colors disabled:opacity-50',
+                  thinkingEnabled
+                    ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                    : 'text-muted-foreground hover:bg-muted/50',
+                )}
+                onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                title="Toggle Thinking Mode"
+                disabled={disabled}
+              >
+                <Brain className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Think</span>
+              </button>
+            )}
 
-            <button
-              className={cn(
-                'h-7 px-2 flex items-center justify-center rounded-md text-xs gap-1.5 transition-colors disabled:opacity-50',
-                searchEnabled
-                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                  : 'text-muted-foreground hover:bg-muted/50',
-              )}
-              onClick={() => setSearchEnabled(!searchEnabled)}
-              title="Toggle Web Search"
-              disabled={disabled}
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Search</span>
-            </button>
+            {supportsSearch && (
+              <button
+                className={cn(
+                  'h-7 px-2 flex items-center justify-center rounded-md text-xs gap-1.5 transition-colors disabled:opacity-50',
+                  searchEnabled
+                    ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                    : 'text-muted-foreground hover:bg-muted/50',
+                )}
+                onClick={() => setSearchEnabled(!searchEnabled)}
+                title="Toggle Web Search"
+                disabled={disabled}
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Search</span>
+              </button>
+            )}
           </div>
 
           {/* Send/Stop Button */}
