@@ -64,8 +64,6 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
 
   // Lifted state from TabPanel
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [port, setPort] = useState<number | null>(null);
-  const [wsConnected, setWsConnected] = useState(false);
 
   const [collectionCount, setCollectionCount] = useState(0);
   const lastActiveSessionRef = useRef<ChatSession | null>(null);
@@ -76,47 +74,6 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     if (savedConfig) {
       setProviderConfig(savedConfig);
     }
-  }, []);
-
-  useEffect(() => {
-    // @ts-ignore
-    const ipc = window.electron?.ipcRenderer;
-    if (ipc) {
-      ipc.invoke('ws:get-port').then((p: number) => setPort(p));
-
-      const removeListener = ipc.on('ws:event', (_: any, { type, data }: any) => {
-        if (type === 'client-connected') {
-          setWsConnected(true);
-          // Ask for real tabs from the connected agent
-          ipc.invoke('ws:send', { type: 'requestFocusedTabs', timestamp: Date.now() });
-        } else if (type === 'client-disconnected') {
-          if (data.count === 0) {
-            setWsConnected(false);
-            setSessions([]);
-          }
-        } else if (type === 'message') {
-          const wsData = data;
-          if (wsData.type === 'focusedTabsUpdate') {
-            if (Array.isArray(wsData.data)) {
-              const mappedSessions = wsData.data.map((tab: any) => ({
-                id: String(tab.tabId), // Ensure string ID
-                title: tab.title || `Tab ${tab.tabId}`,
-                timestamp: Date.now(),
-                messageCount: tab.requestCount || 0,
-                preview: tab.url || 'Ready for analysis',
-                status: tab.status || 'free',
-                provider: tab.provider || 'deepseek',
-                containerName: tab.containerName,
-                // conversationId: tab.conversationId, // Always start fresh when selecting from list
-              }));
-              setSessions(mappedSessions);
-            }
-          }
-        }
-      });
-      return () => removeListener();
-    }
-    return undefined;
   }, []);
 
   useEffect(() => {
@@ -245,14 +202,16 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     return (
       <TabPanel
         sessions={sessions}
-        port={port}
-        wsConnected={wsConnected}
         onSelectSession={setSelectedSessionId}
         onOpenHistory={() => setShowHistory(true)}
         onOpenSettings={() => setShowSettings(true)}
         onSessionsChange={setSessions}
         onOpenProviderSelection={() => setShowProviderSelection(true)}
         currentProviderConfig={providerConfig}
+        onUpdateProviderConfig={(newConfig) => {
+          setProviderConfig(newConfig);
+          ProviderStorage.saveConfig(newConfig);
+        }}
       />
     );
   };

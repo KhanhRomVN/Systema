@@ -58,6 +58,7 @@ export interface BaseProviderConfig {
 export interface ElaraFreeConfig extends BaseProviderConfig {
   type: ProviderType.ELARA_FREE;
   baseURL: string;
+  accountId?: string;
 }
 
 export interface ClineConfig extends BaseProviderConfig {

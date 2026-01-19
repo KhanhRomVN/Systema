@@ -3,10 +3,9 @@ import { useState } from 'react';
 
 interface TabFooterProps {
   onModelChange?: (modelIds: string[]) => void;
-  port: number | null;
 }
 
-export default function TabFooter({ onModelChange, port }: TabFooterProps) {
+export default function TabFooter({ onModelChange }: TabFooterProps) {
   // Mock available models for now as we don't have useModels hook
   const availableModels = [
     { id: 'deepseek-web', provider: 'deepseek', name: 'DeepSeek' },
@@ -41,10 +40,7 @@ export default function TabFooter({ onModelChange, port }: TabFooterProps) {
 
   const handleModelToggle = (modelId: string) => {
     if (modelId === 'claude-cookie-web') {
-      if (port) {
-        // @ts-ignore
-        window.api.invoke('app:launch', 'open-claude', 'http://127.0.0.1:' + port);
-      }
+      // Logic removed as it depended on WebSocket port
       return;
     }
 

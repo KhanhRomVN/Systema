@@ -271,6 +271,74 @@ export async function executeTool(action: ToolAction, context: InspectorContext)
       return `[Task Completed]: ${action.params.result}`;
     }
 
+    case 'read_file': {
+      try {
+        // @ts-ignore
+        const ipc = window.electron?.ipcRenderer;
+        if (!ipc) return 'Electron IPC not available';
+        const content = await ipc.invoke('fs:read-file', action.params.path);
+        return `File Content (${action.params.path}):\n\n${content}`;
+      } catch (e: any) {
+        return `Error reading file: ${e.message}`;
+      }
+    }
+
+    case 'write_file': {
+      try {
+        // @ts-ignore
+        const ipc = window.electron?.ipcRenderer;
+        if (!ipc) return 'Electron IPC not available';
+        await ipc.invoke('fs:write-file', action.params.path, action.params.content);
+        return `Successfully wrote to ${action.params.path}`;
+      } catch (e: any) {
+        return `Error writing file: ${e.message}`;
+      }
+    }
+
+    case 'list_dir': {
+      try {
+        // @ts-ignore
+        const ipc = window.electron?.ipcRenderer;
+        if (!ipc) return 'Electron IPC not available';
+        const items = await ipc.invoke('fs:list-dir', action.params.path);
+        return `Directory Listing (${action.params.path}):\n${items
+          .map((i: any) => `${i.isDirectory ? '[DIR] ' : '[FILE]'} ${i.name}`)
+          .join('\n')}`;
+      } catch (e: any) {
+        return `Error listing directory: ${e.message}`;
+      }
+    }
+
+    case 'delete_file': {
+      try {
+        // @ts-ignore
+        const ipc = window.electron?.ipcRenderer;
+        if (!ipc) return 'Electron IPC not available';
+        const success = await ipc.invoke('fs:delete', action.params.path);
+        return success
+          ? `Successfully deleted ${action.params.path}`
+          : 'Failed to delete (not found?)';
+      } catch (e: any) {
+        return `Error deleting: ${e.message}`;
+      }
+    }
+
+    case 'run_command': {
+      try {
+        // @ts-ignore
+        const ipc = window.electron?.ipcRenderer;
+        if (!ipc) return 'Electron IPC not available';
+        const res = await ipc.invoke('shell:exec', action.params.command, action.params.cwd);
+        if (res.success) {
+          return `Command Output:\n${res.stdout}\n${res.stderr ? `Stderr:\n${res.stderr}` : ''}`;
+        } else {
+          return `Command Failed:\n${res.error}\nStderr:\n${res.stderr}`;
+        }
+      } catch (e: any) {
+        return `Error executing command: ${e.message}`;
+      }
+    }
+
     default:
       return `Tool ${action.type} not implemented yet in InspectorState.`;
   }

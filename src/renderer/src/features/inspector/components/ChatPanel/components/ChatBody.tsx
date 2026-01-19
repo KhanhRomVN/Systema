@@ -11,6 +11,8 @@ export interface Message {
   timestamp: number;
   timestampStr?: string;
   executedToolIndices?: number[]; // Track executed tools
+  isStreaming?: boolean;
+  reasoning?: string;
 }
 
 interface ChatBodyProps {

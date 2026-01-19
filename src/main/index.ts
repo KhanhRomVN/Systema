@@ -612,6 +612,67 @@ app.whenReady().then(async () => {
     return await scanInstalledApps();
   });
 
+  // ===== File System & Shell IPC Handlers =====
+  ipcMain.handle('fs:read-file', async (_, filePath: string) => {
+    try {
+      if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
+      return fs.readFileSync(filePath, 'utf-8');
+    } catch (e: any) {
+      throw new Error(`Failed to read file: ${e.message}`);
+    }
+  });
+
+  ipcMain.handle('fs:write-file', async (_, filePath: string, content: string) => {
+    try {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, content, 'utf-8');
+      return true;
+    } catch (e: any) {
+      throw new Error(`Failed to write file: ${e.message}`);
+    }
+  });
+
+  ipcMain.handle('fs:list-dir', async (_, dirPath: string) => {
+    try {
+      if (!fs.existsSync(dirPath)) throw new Error(`Directory not found: ${dirPath}`);
+      const items = fs.readdirSync(dirPath, { withFileTypes: true });
+      return items.map((item) => ({
+        name: item.name,
+        isDirectory: item.isDirectory(),
+        path: path.join(dirPath, item.name),
+      }));
+    } catch (e: any) {
+      throw new Error(`Failed to list directory: ${e.message}`);
+    }
+  });
+
+  ipcMain.handle('fs:delete', async (_, targetPath: string) => {
+    try {
+      if (!fs.existsSync(targetPath)) return false;
+      const stat = fs.statSync(targetPath);
+      if (stat.isDirectory()) {
+        fs.rmSync(targetPath, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(targetPath);
+      }
+      return true;
+    } catch (e: any) {
+      throw new Error(`Failed to delete: ${e.message}`);
+    }
+  });
+
+  ipcMain.handle('shell:exec', async (_, command: string, cwd?: string) => {
+    return new Promise((resolve, reject) => {
+      exec(command, { cwd: cwd || process.cwd() }, (error, stdout, stderr) => {
+        if (error) {
+          resolve({ success: false, error: error.message, stderr, stdout });
+        } else {
+          resolve({ success: true, stdout, stderr });
+        }
+      });
+    });
+  });
+
   // ===== Mobile IPC Handlers =====
 
   // Mobile System Check

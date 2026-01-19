@@ -1,4 +1,4 @@
-import { Activity, Zap, Folder, MessageSquare } from 'lucide-react';
+import { Activity, Zap, Folder } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 
 export interface ChatSession {
@@ -20,7 +20,7 @@ interface TabListProps {
   onNewChat: () => void;
 }
 
-export function TabList({ sessions, onSelect, onNewChat }: TabListProps) {
+export function TabList({ sessions, onSelect }: TabListProps) {
   const getStatusColor = (status: string = 'free') => {
     if (status === 'busy') return 'text-yellow-500';
     if (status === 'sleep') return 'text-purple-500';
@@ -35,9 +35,7 @@ export function TabList({ sessions, onSelect, onNewChat }: TabListProps) {
 
   return (
     <div className="flex-1 overflow-auto p-4 space-y-3">
-      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1 mb-2">
-        Active AI Tabs ({sessions.length})
-      </div>
+      {/* Header Removed */}
 
       {sessions.map((session) => (
         <button
@@ -77,13 +75,6 @@ export function TabList({ sessions, onSelect, onNewChat }: TabListProps) {
           </div>
         </button>
       ))}
-
-      {sessions.length === 0 && (
-        <div className="h-32 flex flex-col items-center justify-center text-muted-foreground text-xs gap-2 border border-dashed border-border rounded-lg bg-muted/10 m-1">
-          <Activity className="w-8 h-8 opacity-20" />
-          <span>No active tabs</span>
-        </div>
-      )}
     </div>
   );
 }

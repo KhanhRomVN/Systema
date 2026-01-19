@@ -13,7 +13,12 @@ export interface ToolAction {
     | 'export_har'
     | 'generate_table'
     | 'ask_followup_question'
-    | 'attempt_completion';
+    | 'attempt_completion'
+    | 'read_file'
+    | 'write_file'
+    | 'list_dir'
+    | 'delete_file'
+    | 'run_command';
   params: Record<string, any>;
   rawXml: string;
   taskProgress?: TaskProgressItem[] | null;
@@ -179,6 +184,28 @@ const parseToolAction = (toolName: string, innerContent: string, rawXml: string)
     case 'attempt_completion':
       params.result = extractParamValue(innerContent, 'result');
       break;
+
+    case 'read_file':
+      params.path = extractParamValue(innerContent, 'path');
+      break;
+
+    case 'write_file':
+      params.path = extractParamValue(innerContent, 'path');
+      params.content = extractParamValue(innerContent, 'content');
+      break;
+
+    case 'list_dir':
+      params.path = extractParamValue(innerContent, 'path');
+      break;
+
+    case 'delete_file':
+      params.path = extractParamValue(innerContent, 'path');
+      break;
+
+    case 'run_command':
+      params.command = extractParamValue(innerContent, 'command');
+      params.cwd = extractParamValue(innerContent, 'cwd');
+      break;
   }
 
   return {
@@ -233,7 +260,13 @@ export const parseAIResponse = (content: string): ParsedResponse => {
     'export_har',
     'generate_table',
     'ask_followup_question',
+    'ask_followup_question',
     'attempt_completion',
+    'read_file',
+    'write_file',
+    'list_dir',
+    'delete_file',
+    'run_command',
     'text',
     'code',
     'table', // New explicit table tag support if agent uses it directly or via generate_table
