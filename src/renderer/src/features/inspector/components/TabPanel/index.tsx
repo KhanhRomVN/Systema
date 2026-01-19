@@ -1,7 +1,8 @@
-import { RefreshCw, History, Plus, Settings, Check, Copy } from 'lucide-react';
+import { RefreshCw, History, Plus, Settings, Check, Copy, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { TabList, ChatSession } from './TabList';
 import TabFooter from './TabFooter';
+import { ProviderConfig } from '../../types/provider-types';
 
 interface TabPanelProps {
   sessions: ChatSession[];
@@ -11,6 +12,8 @@ interface TabPanelProps {
   onOpenHistory: () => void;
   onOpenSettings: () => void;
   onSessionsChange: (sessions: ChatSession[]) => void;
+  onOpenProviderSelection: () => void;
+  currentProviderConfig: ProviderConfig | null;
 }
 
 export function TabPanel({
@@ -21,6 +24,8 @@ export function TabPanel({
   onOpenHistory,
   onOpenSettings,
   onSessionsChange,
+  onOpenProviderSelection,
+  currentProviderConfig,
 }: TabPanelProps) {
   const [copiedPort, setCopiedPort] = useState(false);
 
@@ -71,6 +76,13 @@ export function TabPanel({
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={onOpenProviderSelection}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
+            title="Select AI Provider"
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
+          <button
             onClick={onOpenHistory}
             className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
             title="History"
@@ -93,6 +105,20 @@ export function TabPanel({
           </button>
         </div>
       </div>
+
+      {/* Current Provider Info */}
+      {currentProviderConfig && (
+        <div className="px-4 py-2 bg-muted/30 border-b border-border">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Provider:</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{currentProviderConfig.name}</span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground">{currentProviderConfig.model}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <TabList sessions={sessions} onSelect={onSelectSession} onNewChat={handleNewChat} />
 

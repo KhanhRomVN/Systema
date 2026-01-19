@@ -13,12 +13,15 @@ import { CryptoTab } from './CryptoTab';
 import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, KeyRound } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 import { DiffView } from './DiffView';
+import { ProviderSelectionPanel } from './ProviderSelectionPanel';
+import { ProviderConfig } from '../types/provider-types';
+import { ProviderStorage } from '../../../services/provider-storage';
 
 import { WasmPanel } from './WasmPanel';
 import { MediaPanel } from './MediaPanel';
 import { ControlFlowPanel, FlowCard } from './ControlFlowPanel';
 
-interface InspectorContext {
+export interface InspectorContext {
   requests: NetworkRequest[];
   filteredRequests?: NetworkRequest[]; // Optional for backward compact
   selectedRequestId: string | null;
@@ -56,6 +59,8 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProviderSelection, setShowProviderSelection] = useState(false);
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
 
   // Lifted state from TabPanel
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -64,6 +69,14 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
 
   const [collectionCount, setCollectionCount] = useState(0);
   const lastActiveSessionRef = useRef<ChatSession | null>(null);
+
+  // Load saved provider config on mount
+  useEffect(() => {
+    const savedConfig = ProviderStorage.loadConfig();
+    if (savedConfig) {
+      setProviderConfig(savedConfig);
+    }
+  }, []);
 
   useEffect(() => {
     // @ts-ignore
@@ -178,6 +191,19 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       return <SettingsPanel onClose={() => setShowSettings(false)} />;
     }
 
+    if (showProviderSelection) {
+      return (
+        <ProviderSelectionPanel
+          onProviderConfigured={(config) => {
+            setProviderConfig(config);
+            ProviderStorage.saveConfig(config);
+            setShowProviderSelection(false);
+          }}
+          onBack={() => setShowProviderSelection(false)}
+        />
+      );
+    }
+
     if (selectedSessionId) {
       let activeSession = sessions.find((s) => s.id === selectedSessionId);
 
@@ -211,6 +237,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           initialConversationId={activeSession.conversationId}
           onBack={() => setSelectedSessionId(null)}
           inspectorContext={inspectorContext}
+          providerConfig={providerConfig}
         />
       );
     }
@@ -224,6 +251,8 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
         onOpenHistory={() => setShowHistory(true)}
         onOpenSettings={() => setShowSettings(true)}
         onSessionsChange={setSessions}
+        onOpenProviderSelection={() => setShowProviderSelection(true)}
+        currentProviderConfig={providerConfig}
       />
     );
   };
@@ -284,7 +313,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
               )}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              Chat &amp; AI
+              Chat
             </button>
             <button
               onClick={() => setActiveTab('sources')}

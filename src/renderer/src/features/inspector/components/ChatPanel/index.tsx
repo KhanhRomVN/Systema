@@ -8,6 +8,7 @@ import { executeTool } from './services/ToolExecutor';
 import { ChatStorage } from '../../../../services/ChatStorage';
 import { combinePrompts } from '../../components/SettingsPanel/prompts'; // Import Systema Prompts
 import { AgentOptionDrawer, ToolPermission } from './components/AgentOptionDrawer';
+import { ProviderConfig } from '../../types/provider-types';
 
 interface ChatPanelProps {
   sessionId: string;
@@ -16,6 +17,7 @@ interface ChatPanelProps {
   initialConversationId?: string;
   onBack: () => void;
   inspectorContext: InspectorContext;
+  providerConfig?: ProviderConfig | null;
 }
 
 export function ChatPanel({
@@ -25,6 +27,7 @@ export function ChatPanel({
   initialConversationId,
   onBack,
   inspectorContext,
+  providerConfig: _providerConfig, // Will be used for provider-specific API calls
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
