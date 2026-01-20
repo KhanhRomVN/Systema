@@ -242,19 +242,28 @@ export function useChatLogic(
       };
 
       if (providerConfig.type === ProviderType.ELARA_FREE) {
+        // --- ELARA SPECIFIC LOGIC ---
         const config = providerConfig as ElaraFreeConfig;
         if (!config.baseURL) throw new Error('Base URL missing for Elara');
+        if (!config.accountId) throw new Error('Account ID missing for Elara');
 
-        // Use the Chat Completions endpoint
-        url = `${config.baseURL}/v1/chat/completions`;
+        url = `${config.baseURL}/v1/chat/accounts/${config.accountId}/messages`;
 
-        // Add Account ID if present
-        if (config.accountId) {
-          url += `?accountId=${encodeURIComponent(config.accountId)}`;
-          headers['x-account-id'] = config.accountId;
-        }
+        // UUID validation check: Elara/DeepSeek requires valid UUID for conversationId
+        const isUUID = (str: string) =>
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+        // Update payload to match Elara API
+        payload.search = searchEnabled;
+        payload.thinking = thinkingEnabled;
+        payload.ref_file_ids = fileIds;
+        payload.conversationId = _sessionId && isUUID(_sessionId) ? _sessionId : undefined;
+        // Remove standard fields if they conflict or duplicate custom ones, but usually okay.
+        delete payload.files;
+        delete payload.search_enabled;
+        delete payload.thinking_enabled;
       } else {
-        // Generic handling for other providers
+        // --- GENERIC GENERIC LOGIC ---
         const config = providerConfig as any;
         if (config.baseURL) {
           url = `${config.baseURL}/v1/chat/completions`;
@@ -267,6 +276,9 @@ export function useChatLogic(
         }
       }
 
+      console.log(`[ChatDebug] Sending request to: ${url}`);
+      console.log(`[ChatDebug] Payload:`, JSON.stringify(payload, null, 2));
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
@@ -274,7 +286,14 @@ export function useChatLogic(
         signal: abortControllerRef.current.signal,
       });
 
+      console.log(`[ChatDebug] Response status: ${response.status} ${response.statusText}`);
+      console.log(`[ChatDebug] Response headers:`, Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
+        try {
+          const errorText = await response.text();
+          console.error(`[ChatDebug] API Error Body:`, errorText);
+        } catch (e) {}
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
 
@@ -286,54 +305,97 @@ export function useChatLogic(
       let done = false;
       let streamedContent = '';
       let thinkingBuffer = '';
+      let buffer = '';
+
+      console.log(`[ChatDebug] Starting stream reader...`);
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
-        const chunkValue = decoder.decode(value, { stream: true });
+        if (value) {
+          const chunkStr = decoder.decode(value, { stream: true });
+          console.log(`[ChatDebug] Received chunk (${value.byteLength} bytes):`, chunkStr);
+          buffer += chunkStr;
+        }
 
-        // Parse SSE Format (data: {...})
-        const lines = chunkValue.split('\n');
+        // Parse SSE Format
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last partial line in buffer
+
         for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-            const jsonStr = line.slice(6);
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          console.log(`[ChatDebug] Processing line:`, trimmedLine);
+
+          if (trimmedLine.startsWith('data: ')) {
+            const dataStr = trimmedLine.slice(6).trim();
+            if (dataStr === '[DONE]') {
+              console.log(`[ChatDebug] Stream [DONE] received`);
+              continue;
+            }
+
             try {
-              const data = JSON.parse(jsonStr);
+              const data = JSON.parse(dataStr);
+              console.log(`[ChatDebug] Parsed data:`, data);
 
-              // Handle Content
-              const contentDelta = data.choices?.[0]?.delta?.content || '';
-              if (contentDelta) {
-                streamedContent += contentDelta;
-                // Update UI
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          content: streamedContent,
-                        }
-                      : m,
-                  ),
-                );
+              // HANDLE ELARA FORMAT (Direct fields)
+              if (providerConfig.type === ProviderType.ELARA_FREE) {
+                if (data.error) {
+                  console.error(`[ChatDebug] Backend Error:`, data.error);
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId
+                        ? { ...m, content: m.content + `\n\n[Error: ${data.error}]` }
+                        : m,
+                    ),
+                  );
+                }
+
+                if (data.content) {
+                  streamedContent += data.content;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId ? { ...m, content: streamedContent } : m,
+                    ),
+                  );
+                }
+
+                if (data.thinking) {
+                  thinkingBuffer += data.thinking;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId ? { ...m, reasoning: thinkingBuffer } : m,
+                    ),
+                  );
+                }
+
+                // Handle Meta (e.g. Conversation ID update) could go here
               }
+              // HANDLE GENERIC OPENAI FORMAT (choices array)
+              else {
+                const contentDelta = data.choices?.[0]?.delta?.content || '';
+                if (contentDelta) {
+                  streamedContent += contentDelta;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId ? { ...m, content: streamedContent } : m,
+                    ),
+                  );
+                }
 
-              // Handle Thinking
-              const reasoningDelta = data.choices?.[0]?.delta?.reasoning_content;
-              if (reasoningDelta) {
-                thinkingBuffer += reasoningDelta;
-                // Update UI with thinking state
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          reasoning: thinkingBuffer,
-                        }
-                      : m,
-                  ),
-                );
+                const reasoningDelta = data.choices?.[0]?.delta?.reasoning_content;
+                if (reasoningDelta) {
+                  thinkingBuffer += reasoningDelta;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId ? { ...m, reasoning: thinkingBuffer } : m,
+                    ),
+                  );
+                }
               }
             } catch (e) {
+              console.error(`[ChatDebug] JSON Parse error:`, e, 'on data:', dataStr);
               // Ignore parse errors for partial chunks
             }
           }

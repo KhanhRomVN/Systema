@@ -16,7 +16,6 @@ interface ChatPanelProps {
   inspectorContext: InspectorContext;
   providerConfig?: ProviderConfig | null;
   initialInput?: string;
-  initialInput?: string;
   initialAttachments?: File[];
   initialAttachmentData?: any[]; // PendingAttachment[]
   initialStreamEnabled?: boolean;
@@ -123,49 +122,6 @@ export function ChatPanel({
 
       {/* Bottom Section: Toolbars + Input */}
       <div className="border-t border-border bg-background">
-        {/* Configuration Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-muted/20 border-b border-border text-xs">
-          {/* Provider Badge / Selector */}
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-secondary/50 text-secondary-foreground">
-            <Zap className="w-3 h-3" />
-            <span className="font-medium">{localProviderConfig?.name || 'Unknown Provider'}</span>
-          </div>
-
-          {/* Elara Specific: Sub-Provider Selector */}
-          {localProviderConfig?.type === ProviderType.ELARA_FREE && subProviders.length > 0 && (
-            <div className="flex items-center gap-1">
-              <select
-                className="h-6 bg-background border border-border rounded px-1 outline-none text-[10px] min-w-[80px]"
-                // Logic to update model list based on this would go here
-              >
-                <option value="">Select Provider</option>
-                {subProviders.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Model Info */}
-          <div className="flex items-center gap-1.5 px-2 py-1 border border-border rounded text-muted-foreground">
-            <Settings2 className="w-3 h-3" />
-            <span>{localProviderConfig?.model}</span>
-          </div>
-
-          {/* Elara Specific: Account Info */}
-          {localProviderConfig?.type === ProviderType.ELARA_FREE &&
-            (localProviderConfig as ElaraFreeConfig).accountId && (
-              <div className="flex items-center gap-1.5 px-2 py-1 border border-border rounded text-muted-foreground">
-                <User className="w-3 h-3" />
-                <span className="max-w-[100px] truncate">
-                  {(localProviderConfig as ElaraFreeConfig).accountId}
-                </span>
-              </div>
-            )}
-        </div>
-
         <ChatInputArea
           input={input}
           setInput={setInput}
