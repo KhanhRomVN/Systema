@@ -8,6 +8,8 @@ import {
   Music,
   Film,
   ExternalLink,
+  Filter,
+  ChevronDown,
 } from 'lucide-react';
 import { MediaModal } from './MediaModal';
 
@@ -24,54 +26,127 @@ interface MediaItem {
   contentType: string;
   size: string;
   timestamp: number;
+  isCached?: boolean;
 }
 
 export function MediaPanel({ requests, onClose }: MediaPanelProps) {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [showFilterSettings, setShowFilterSettings] = useState(false);
+  const [mediaFilters, setMediaFilters] = useState({
+    images: true,
+    videos: true,
+    audio: true,
+  });
+
+  const [cacheManifest, setCacheManifest] = useState<Record<string, { size?: number }>>({});
+
+  useEffect(() => {
+    const fetchManifest = async () => {
+      try {
+        const manifest = await (window as any).api.invoke('media:get-cache-manifest');
+        setCacheManifest(manifest);
+      } catch (e) {
+        console.error('Failed to fetch media cache manifest:', e);
+      }
+    };
+
+    fetchManifest();
+    const interval = setInterval(fetchManifest, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     setIsScanning(true);
-    const items: MediaItem[] = [];
+    // Deduplication Map: URL -> Latest Item
+    const uniqueItemsFn = () => {
+      const itemMap = new Map<string, MediaItem>();
 
-    requests.forEach((req) => {
-      let type: MediaItem['type'] | null = null;
-      const contentType = (
-        req.responseHeaders?.['content-type'] ||
-        req.responseHeaders?.['Content-Type'] ||
-        ''
-      ).toLowerCase();
+      requests.forEach((req) => {
+        let type: MediaItem['type'] | null = null;
+        const contentType = (
+          req.responseHeaders?.['content-type'] ||
+          req.responseHeaders?.['Content-Type'] ||
+          ''
+        ).toLowerCase();
 
-      // Check Content-Type
-      if (contentType.startsWith('image/')) type = 'image';
-      else if (contentType.startsWith('video/')) type = 'video';
-      else if (contentType.startsWith('audio/')) type = 'audio';
+        // Check Content-Type
+        if (contentType.startsWith('image/')) type = 'image';
+        else if (contentType.startsWith('video/')) type = 'video';
+        else if (contentType.startsWith('audio/')) type = 'audio';
 
-      // Fallback: Check Extension
-      if (!type) {
-        const path = req.path.toLowerCase().split('?')[0];
-        if (path.match(/\.(png|jpg|jpeg|gif|svg|ico|webp|bmp)$/)) type = 'image';
-        else if (path.match(/\.(mp4|webm|ogg|mov|avi|mkv)$/)) type = 'video';
-        else if (path.match(/\.(mp3|wav|aac|flac|m4a)$/)) type = 'audio';
-      }
+        // Fallback: Check Extension
+        if (!type) {
+          const path = req.path.toLowerCase().split('?')[0];
+          if (path.match(/\.(png|jpg|jpeg|gif|svg|ico|webp|bmp)$/)) type = 'image';
+          else if (path.match(/\.(mp4|webm|ogg|mov|avi|mkv|ts)$/)) type = 'video';
+          else if (path.match(/\.(mp3|wav|aac|flac|m4a)$/)) type = 'audio';
+        }
 
-      if (type) {
-        items.push({
-          id: req.id,
-          filename: req.path.split('/').pop()?.split('?')[0] || `unknown.${type}`,
-          url: `media://${req.protocol}://${req.host}${req.path}`,
-          type,
-          contentType,
-          size: req.size,
-          timestamp: req.timestamp,
-        });
-      }
-    });
+        if (type) {
+          const originalReferer =
+            req.requestHeaders?.['referer'] || req.requestHeaders?.['Referer'] || '';
+          const queryParams = new URLSearchParams();
+          if (originalReferer) queryParams.set('_referer', originalReferer);
+          queryParams.set('_requestId', req.id);
 
+          const queryStr = (req.path.includes('?') ? '&' : '?') + queryParams.toString();
+
+          const itemUrl = req.url.startsWith('media://')
+            ? req.url
+            : `media://${req.protocol}://${req.host}${req.path}${queryStr}`;
+
+          const cachedEntry = cacheManifest[req.id];
+          const isCached = !!cachedEntry;
+
+          // Helper to format bytes
+          const formatBytes = (bytes: number) => {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+          };
+
+          const displaySize =
+            isCached && cachedEntry?.size ? formatBytes(cachedEntry.size) : req.size || 'Unknown';
+
+          // Use the base URL (without Systema params) key for deduplication to avoid duplicates from same resource
+          // We must be careful not to dedup distinct resources that just happen to have same path but different query
+          // But for media inspector, usually we want unique resource content.
+          // Let's use the full actual URL as key, but maybe we should strip the _requestId param we just added?
+          // Actually, `req.url` from the request object is the original URL. Let's use that.
+          const uniqueKey = req.url;
+
+          itemMap.set(uniqueKey, {
+            id: req.id,
+            filename: req.path.split('/').pop()?.split('?')[0] || `unknown.${type}`,
+            url: itemUrl,
+            type,
+            contentType,
+            size: displaySize === '0 B' ? 'Unknown' : displaySize, // Hide 0 B
+            timestamp: req.timestamp,
+            isCached,
+          });
+        }
+      });
+
+      return Array.from(itemMap.values());
+    };
+
+    const items = uniqueItemsFn();
     setMediaItems(items.sort((a, b) => b.timestamp - a.timestamp));
     setIsScanning(false);
-  }, [requests]);
+  }, [requests, cacheManifest]);
+
+  // Filter media items based on filter settings
+  const filteredMediaItems = mediaItems.filter((item) => {
+    if (item.type === 'image' && !mediaFilters.images) return false;
+    if (item.type === 'video' && !mediaFilters.videos) return false;
+    if (item.type === 'audio' && !mediaFilters.audio) return false;
+    return true;
+  });
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
@@ -81,20 +156,98 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
           <ImageIcon className="w-4 h-4" />
           Media Inspector
           <span className="ml-2 text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
-            {mediaItems.length} found
+            {filteredMediaItems.length} / {mediaItems.length}
           </span>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowFilterSettings(!showFilterSettings)}
+            className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+            title="Filter Media"
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+
+      {/* Filter Settings Section */}
+      {showFilterSettings && (
+        <div className="border-b border-border bg-card/50 backdrop-blur-sm shadow-lg z-20">
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-blue-400" />
+                <span className="font-medium text-sm">Filter by Format</span>
+              </div>
+              <button
+                onClick={() => setShowFilterSettings(false)}
+                className="p-1 hover:bg-muted rounded transition-colors"
+              >
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <label className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-3.5 h-3.5"
+                  checked={mediaFilters.images}
+                  onChange={(e) =>
+                    setMediaFilters((prev) => ({ ...prev, images: e.target.checked }))
+                  }
+                />
+                <span className="flex items-center gap-1.5">
+                  <ImageIcon className="w-3 h-3 text-blue-400" />
+                  Show Images
+                </span>
+              </label>
+              <label className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-3.5 h-3.5"
+                  checked={mediaFilters.videos}
+                  onChange={(e) =>
+                    setMediaFilters((prev) => ({ ...prev, videos: e.target.checked }))
+                  }
+                />
+                <span className="flex items-center gap-1.5">
+                  <Film className="w-3 h-3 text-purple-400" />
+                  Show Videos
+                </span>
+              </label>
+              <label className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-3.5 h-3.5"
+                  checked={mediaFilters.audio}
+                  onChange={(e) =>
+                    setMediaFilters((prev) => ({ ...prev, audio: e.target.checked }))
+                  }
+                />
+                <span className="flex items-center gap-1.5">
+                  <Music className="w-3 h-3 text-green-400" />
+                  Show Audio
+                </span>
+              </label>
+            </div>
+
+            <div className="pt-2 border-t border-border/50 text-[10px] text-muted-foreground">
+              Filter media resources by their format type.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {mediaItems.map((item) => (
+          {filteredMediaItems.map((item) => (
             <div
               key={item.id}
               onClick={() => setSelectedMedia(item)}
@@ -111,7 +264,11 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = ''; // Clear broken image
                       (e.target as HTMLImageElement).classList.add('hidden');
-                      (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                      const fallback = (e.target as HTMLImageElement).nextElementSibling;
+                      if (fallback) {
+                        fallback.classList.remove('hidden');
+                        fallback.classList.add('flex');
+                      }
                     }}
                   />
                 ) : item.type === 'video' ? (
@@ -126,8 +283,15 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
                   </div>
                 )}
 
+                {/* Cached Badge */}
+                {item.isCached && (
+                  <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-green-500/80 text-[10px] font-bold text-white rounded flex items-center gap-1 backdrop-blur-sm z-10 shadow-sm">
+                    {item.size}
+                  </div>
+                )}
+
                 {/* Fallback Icon (Hidden by default, shown on error) */}
-                <div className="absolute inset-0 hidden flex items-center justify-center text-muted-foreground">
+                <div className="absolute inset-0 hidden items-center justify-center text-muted-foreground">
                   <ImageIcon className="w-8 h-8 opacity-20" />
                 </div>
 
@@ -165,6 +329,16 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
               </div>
             </div>
           ))}
+
+          {filteredMediaItems.length === 0 && mediaItems.length > 0 && (
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Filter className="w-8 h-8 opacity-50" />
+              </div>
+              <p>No media matches current filters.</p>
+              <p className="text-xs opacity-70 mt-1">Try adjusting your filter settings.</p>
+            </div>
+          )}
 
           {mediaItems.length === 0 && !isScanning && (
             <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground">

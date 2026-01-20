@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { EventEmitter } from 'events';
 import { INJECT_SCRIPT } from './injection';
 import * as zlib from 'zlib'; // Ensure zlib is imported for decompression
+import { cacheHeaders } from './headerCache';
 
 export class ProxyServer extends EventEmitter {
   private proxy: any;
@@ -360,6 +361,8 @@ export class ProxyServer extends EventEmitter {
           delete req.headers['x-systema-initiator'];
         } catch (e) {}
       }
+
+      cacheHeaders(requestId, req.headers);
 
       this.sendToRenderer('proxy:request', {
         id: requestId,

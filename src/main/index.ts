@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
 
 protocol.registerSchemesAsPrivileged([
@@ -16,6 +16,8 @@ protocol.registerSchemesAsPrivileged([
 import { windowManager } from './core/window';
 import { setupEventHandlers } from './core/events';
 import { ProxyManager } from './proxy/ProxyManager';
+import { getCachedHeaders } from './proxy/headerCache';
+import { mediaCache } from './proxy/mediaCache';
 import { SingletonWSManager } from './server/SingletonWSManager';
 import {
   createGenericWebWindow,
@@ -134,26 +136,138 @@ app.whenReady().then(async () => {
 
   // Register 'media' protocol for serving local and remote files (bypassing CORS/CORP)
   protocol.handle('media', async (request) => {
+    const requestId = `media-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const mainWindow = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+
     try {
       // 1. Extract and normalize the URL
-      let targetUrl = request.url.replace(/^media:\/\/+/i, '');
+      // Remove media:// prefix
+      let target = request.url.replace(/^media:\/\/+/i, '');
 
-      // Fix potential transformation media://https:// becomes media://https/
-      if (targetUrl.startsWith('https/') && !targetUrl.startsWith('https://')) {
-        targetUrl = 'https://' + targetUrl.slice(6);
-      } else if (targetUrl.startsWith('http/') && !targetUrl.startsWith('http://')) {
-        targetUrl = 'http://' + targetUrl.slice(5);
+      // Handle mangled prefix (e.g., https// -> https://)
+      target = target.replace(/^(https?)\/+/i, '$1://');
+
+      // Parse as URL to handle query parameters cleanly
+      let actualUrl = target;
+      let cachedRequestId = '';
+      let refererOverride = '';
+      let originOverride = '';
+      try {
+        const parsed = new URL(target);
+        refererOverride = parsed.searchParams.get('_referer') || '';
+        originOverride = parsed.searchParams.get('_origin') || '';
+        cachedRequestId = parsed.searchParams.get('_requestId') || '';
+
+        // Remove Systema-specific parameters
+        parsed.searchParams.delete('_referer');
+        parsed.searchParams.delete('_origin');
+        parsed.searchParams.delete('_requestId');
+        actualUrl = parsed.toString();
+      } catch (e) {
+        // Fallback for non-URL targets (like local file paths)
+        actualUrl = target.startsWith('http')
+          ? target
+          : `file://${target.startsWith('/') ? '' : '/'}${target}`;
       }
 
-      const decodedUrl = decodeURIComponent(targetUrl);
-      console.log(`[Protocol Media] Handling: ${request.url} -> ${decodedUrl}`);
+      console.log(`[Protocol Media] Normalized: ${actualUrl} (Cached ID: ${cachedRequestId})`);
 
-      const actualUrl =
-        decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://')
-          ? decodedUrl
-          : `file://${decodedUrl.startsWith('/') ? '' : '/'}${decodedUrl}`;
+      // 2. Check Disk Cache first if we have a requestId
+      if (cachedRequestId) {
+        const cachedMedia = mediaCache.get(cachedRequestId);
+        if (cachedMedia) {
+          console.log(`[Protocol Media] Serving from disk cache: ${cachedRequestId}`);
+          const cleanHeaders = new Headers();
+          cleanHeaders.set('content-type', cachedMedia.contentType);
+          cleanHeaders.set('access-control-allow-origin', '*');
+          cleanHeaders.set('x-systema-cached', 'true');
+          cleanHeaders.set('x-systema-size', cachedMedia.buffer.length.toString());
 
-      const response = await net.fetch(actualUrl, { bypassCustomProtocolHandlers: true });
+          return new Response(cachedMedia.buffer, {
+            status: 200,
+            headers: cleanHeaders,
+          });
+        }
+      }
+
+      // Log request to inspector
+      if (mainWindow) {
+        mainWindow.webContents.send('proxy:request', {
+          id: requestId,
+          url: request.url,
+          method: request.method,
+          headers: request.headers,
+          timestamp: Date.now(),
+          isIntercepted: false,
+        });
+      }
+
+      const fetchHeaders = new Headers();
+      // Only forward essential headers to avoid conflicts with net.fetch internal logic
+      const headersToForward = [
+        'user-agent',
+        'referer',
+        'cookie',
+        'authorization',
+        'range',
+        'accept',
+        'accept-language',
+      ];
+      // 1. Use original headers if we have a requestId
+      if (cachedRequestId) {
+        const cached = getCachedHeaders(cachedRequestId);
+        if (cached) {
+          console.log(`[Protocol Media] Using cached headers for ${cachedRequestId}`);
+          Object.entries(cached).forEach(([key, value]) => {
+            // Forward everything except Host and a few sensitive ones that might conflict
+            const k = key.toLowerCase();
+            if (
+              !['host', 'connection', 'content-length', 'upgrade-insecure-requests'].includes(k)
+            ) {
+              fetchHeaders.set(key, value);
+            }
+          });
+        }
+      }
+
+      // 2. Overlay with current request headers from browser
+      request.headers.forEach((value, key) => {
+        if (headersToForward.includes(key.toLowerCase())) {
+          fetchHeaders.set(key, value);
+        }
+      });
+
+      // Apply overrides if provided (critical for HLS segments in separate windows)
+      if (refererOverride) fetchHeaders.set('referer', refererOverride);
+      if (originOverride) fetchHeaders.set('origin', originOverride);
+
+      const response = await net.fetch(actualUrl, {
+        method: request.method,
+        headers: fetchHeaders,
+        bypassCustomProtocolHandlers: true,
+      });
+
+      // Extract headers for logging
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+
+      // Log response to inspector
+      if (mainWindow) {
+        mainWindow.webContents.send('proxy:response', {
+          id: requestId,
+          url: request.url,
+          statusCode: response.status,
+          headers: responseHeaders,
+          timestamp: Date.now(),
+        });
+      }
+
+      if (!response.ok && response.status !== 304) {
+        console.error(`[Protocol Media] Upstream error ${response.status} for ${actualUrl}`);
+        // If it's a 4xx or 5xx from the server, we might want to return it as is but it's often better to know it's upstream
+      }
 
       // 3. Create a response with stripped restrictive headers to fix CORS/CORP/COEP/COOP
       const cleanHeaders = new Headers(response.headers);
@@ -164,17 +278,57 @@ app.whenReady().then(async () => {
         'cross-origin-opener-policy',
       ];
       headersToRemove.forEach((h) => cleanHeaders.delete(h));
-
-      // Ensure cross-origin access
       cleanHeaders.set('access-control-allow-origin', '*');
 
-      return new Response(response.body, {
+      const buffer = await response.arrayBuffer();
+      const bufferObj = Buffer.from(buffer);
+
+      // 4. Save to Disk Cache if it's a media segment and we have a requestId
+      if (cachedRequestId && response.ok) {
+        // Save ALL media to cache unconditionally
+        const fileName = actualUrl.split('/').pop()?.split('?')[0] || 'file.bin';
+        mediaCache.save(
+          cachedRequestId,
+          bufferObj,
+          responseHeaders['content-type'] || 'application/octet-stream',
+          fileName,
+        );
+        cleanHeaders.set('x-systema-cached', 'saved');
+        cleanHeaders.set('x-systema-size', bufferObj.length.toString());
+      }
+
+      if (mainWindow) {
+        const contentType = responseHeaders['content-type'] || '';
+        const isBinary = !contentType.includes('text') && !contentType.includes('json');
+        const bodyContent = isBinary ? bufferObj.toString('base64') : bufferObj.toString('utf8');
+
+        mainWindow.webContents.send('proxy:response-body', {
+          id: requestId,
+          body: bodyContent,
+          size: `${(buffer.byteLength / 1024).toFixed(1)} KB`,
+          isBinary,
+          contentType,
+        });
+      }
+
+      return new Response(buffer, {
         status: response.status,
         statusText: response.statusText,
         headers: cleanHeaders,
       });
     } catch (error: any) {
       console.error(`[Protocol Media] Load Error for ${request.url}:`, error);
+
+      if (mainWindow) {
+        mainWindow.webContents.send('proxy:response', {
+          id: requestId,
+          url: request.url,
+          statusCode: 500,
+          headers: {},
+          timestamp: Date.now(),
+        });
+      }
+
       return new Response(`Media Load Error: ${error.message}`, { status: 500 });
     }
   });
@@ -642,9 +796,64 @@ app.whenReady().then(async () => {
     return true;
   });
 
-  // IPC for memory usage monitoring
   ipcMain.handle('app:get-memory-usage', () => {
     return process.memoryUsage();
+  });
+
+  // Media Cache IPC
+  ipcMain.handle('media:get-cache-manifest', () => {
+    return mediaCache.getManifest();
+  });
+
+  // Session Management IPC
+  ipcMain.handle('session:clear-data', async (_, appId: string) => {
+    try {
+      const partition = `persist:${appId}`;
+      const ses = session.fromPartition(partition);
+      await ses.clearStorageData();
+      await ses.clearCache();
+      console.log(`[Session] Data cleared for app: ${appId} (partition: ${partition})`);
+      return true;
+    } catch (e: any) {
+      console.error(`[Session] Failed to clear data for ${appId}:`, e);
+      throw e;
+    }
+  });
+
+  ipcMain.handle('session:get-info', async (_, appId: string) => {
+    try {
+      const partition = `persist:${appId}`;
+      const ses = session.fromPartition(partition);
+      const cookies = await ses.cookies.get({});
+
+      // Get storage size if possible (simple estimation)
+      const storagePath = ses.getStoragePath();
+      let storageSize = 0;
+      if (storagePath && fs.existsSync(storagePath)) {
+        const stats = fs.statSync(storagePath);
+        storageSize = stats.size;
+        // Note: fs.stat on a directory doesn't give recursive size easily,
+        // but it's a start.
+      }
+
+      return {
+        cookieCount: cookies.length,
+        storagePath: storagePath,
+        storageSize: storageSize,
+        partition: partition,
+        cookies: cookies.map((c: any) => ({
+          name: c.name,
+          domain: c.domain,
+          path: c.path,
+          secure: c.secure,
+          httpOnly: c.httpOnly,
+          expirationDate: c.expirationDate,
+        })),
+      };
+    } catch (e: any) {
+      console.error(`[Session] Failed to get info for ${appId}:`, e);
+      throw e;
+    }
   });
 
   // User Apps IPC
@@ -714,7 +923,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('shell:exec', async (_, command: string, cwd?: string) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       exec(command, { cwd: cwd || process.cwd() }, (error, stdout, stderr) => {
         if (error) {
           resolve({ success: false, error: error.message, stderr, stdout });

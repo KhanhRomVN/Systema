@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserApp, AppPlatform, AppMode, MobileEmulator } from '../../types/apps'; // Updated import path
 import { AddAppModal } from './components/AddAppModal';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Zap } from 'lucide-react';
+import { SessionDataModal } from './components/SessionDataModal';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Zap, Database } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { SavedProfiles } from './components/SavedProfiles';
@@ -42,6 +43,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
   // Device State
   const [connectedDevices, setConnectedDevices] = useState<MobileEmulator[]>([]);
 
+  // Session State
+  const [sessionInfo, setSessionInfo] = useState<{
+    cookieCount: number;
+    storageSize?: number;
+    storagePath?: string;
+  } | null>(null);
+  const [isClearingSession, setIsClearingSession] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+
   // Track previous tab to prevent infinite loops
   const prevTabRef = useRef<AppPlatform>(activeTab);
 
@@ -64,6 +74,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
       setConnectedDevices(devices);
     } catch (e) {
       console.error('Failed to fetch connected devices', e);
+    }
+  };
+
+  const fetchSessionInfo = async (appId: string) => {
+    try {
+      const info = await window.api.invoke('session:get-info', appId);
+      setSessionInfo(info);
+    } catch (e) {
+      console.error('Failed to fetch session info', e);
+      setSessionInfo(null);
     }
   };
 
@@ -161,6 +181,33 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
     if (!selectedApp) return;
     onSelect(selectedApp.id, 'http://127.0.0.1:8081', selectedApp.url, mode);
   };
+
+  const handleClearSession = async () => {
+    if (!selectedApp || isClearingSession) return;
+    if (
+      confirm(
+        `Are you sure you want to clear ALL session data (cookies, storage) for ${selectedApp.name}? This will log you out.`,
+      )
+    ) {
+      setIsClearingSession(true);
+      try {
+        await window.api.invoke('session:clear-data', selectedApp.id);
+        await fetchSessionInfo(selectedApp.id);
+      } catch (e) {
+        console.error('Failed to clear session data', e);
+      } finally {
+        setIsClearingSession(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (activeAppId) {
+      fetchSessionInfo(activeAppId);
+    } else {
+      setSessionInfo(null);
+    }
+  }, [activeAppId]);
 
   const handleAndroidConnect = async () => {
     if (!selectedApp || selectedApp.platform !== 'android') return;
@@ -487,6 +534,39 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                         Launch App
                         <Monitor className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
                       </button>
+
+                      {sessionInfo && sessionInfo.cookieCount > 0 && (
+                        <div className="flex items-center space-x-2 ml-4 animate-in slide-in-from-left-2 duration-300">
+                          <button
+                            onClick={handleClearSession}
+                            disabled={isClearingSession}
+                            title="Clear Session Data (Logout)"
+                            className="p-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-300 transition-all group"
+                          >
+                            <Trash2
+                              className={cn('w-6 h-6', isClearingSession && 'animate-pulse')}
+                            />
+                          </button>
+
+                          <button
+                            onClick={() => setShowSessionModal(true)}
+                            title="View Session Data"
+                            className="p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-300 transition-all group"
+                          >
+                            <Database className="w-6 h-6" />
+                          </button>
+
+                          <div className="flex flex-col items-start px-3 py-1 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                            <span className="text-[10px] uppercase font-bold text-gray-500">
+                              Stored Profile
+                            </span>
+                            <span className="text-xs font-medium text-emerald-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Active Session
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -585,6 +665,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
         onAdd={handleAddPcApp}
         existingApps={apps.filter((app) => app.platform === 'android')}
       />
+
+      {selectedApp && (
+        <SessionDataModal
+          isOpen={showSessionModal}
+          onClose={() => setShowSessionModal(false)}
+          appName={selectedApp.name}
+          data={sessionInfo as any}
+        />
+      )}
     </div>
   );
 };

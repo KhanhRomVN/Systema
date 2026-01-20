@@ -6,6 +6,7 @@ export interface NetworkRequest {
   protocol: string;
   host: string;
   path: string;
+  url: string;
   status: number;
   type: string;
   size: string;
@@ -35,6 +36,7 @@ export const MOCK_REQUESTS: NetworkRequest[] = [
     protocol: 'https',
     host: 'api.github.com',
     path: '/users/khanhromvn',
+    url: 'https://api.github.com/users/khanhromvn',
     status: 200,
     type: 'JSON',
     size: '1.2kb',
@@ -50,6 +52,7 @@ export const MOCK_REQUESTS: NetworkRequest[] = [
     protocol: 'https',
     host: 'api.google.com',
     path: '/analytics/collect',
+    url: 'https://api.google.com/analytics/collect',
     status: 204,
     type: 'XHR',
     size: '0b',
@@ -64,6 +67,7 @@ export const MOCK_REQUESTS: NetworkRequest[] = [
     protocol: 'https',
     host: 'fonts.googleapis.com',
     path: '/css2?family=Inter',
+    url: 'https://fonts.googleapis.com/css2?family=Inter',
     status: 200,
     type: 'CSS',
     size: '4.5kb',
@@ -78,6 +82,7 @@ export const MOCK_REQUESTS: NetworkRequest[] = [
     protocol: 'https',
     host: 'avatars.githubusercontent.com',
     path: '/u/12345',
+    url: 'https://avatars.githubusercontent.com/u/12345',
     status: 200,
     type: 'IMG',
     size: '12kb',
@@ -92,6 +97,7 @@ export const MOCK_REQUESTS: NetworkRequest[] = [
     protocol: 'https',
     host: 'example.com',
     path: '/404',
+    url: 'https://example.com/404',
     status: 404,
     type: 'HTML',
     size: '1.5kb',

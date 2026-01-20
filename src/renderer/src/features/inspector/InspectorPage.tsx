@@ -173,6 +173,7 @@ export default function InspectorPage() {
       protocol: data.protocol || 'https',
       host: new URL(data.url).hostname,
       path: new URL(data.url).pathname + new URL(data.url).search,
+      url: data.url,
       status: 0,
       type: 'Pending',
       size: '0 B',
