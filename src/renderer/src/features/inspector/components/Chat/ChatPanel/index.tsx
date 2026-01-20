@@ -15,6 +15,12 @@ interface ChatPanelProps {
   onBack: () => void;
   inspectorContext: InspectorContext;
   providerConfig?: ProviderConfig | null;
+  initialInput?: string;
+  initialInput?: string;
+  initialAttachments?: File[];
+  initialAttachmentData?: any[]; // PendingAttachment[]
+  initialStreamEnabled?: boolean;
+  initialThinkingEnabled?: boolean;
 }
 
 export function ChatPanel({
@@ -25,6 +31,11 @@ export function ChatPanel({
   onBack,
 
   providerConfig: initialProviderConfig,
+  initialInput,
+  initialAttachments,
+  initialAttachmentData,
+  initialStreamEnabled,
+  initialThinkingEnabled,
 }: ChatPanelProps) {
   // Local state for configuration within this panel (can override global)
   const [localProviderConfig, setLocalProviderConfig] = useState<ProviderConfig | null>(
@@ -52,7 +63,18 @@ export function ChatPanel({
     attachments,
     handleFileSelect,
     handleRemoveAttachment,
-  } = useChatLogic(localProviderConfig, sessionId);
+    streamEnabled,
+    setStreamEnabled,
+    isUploadingAttachment,
+  } = useChatLogic(
+    localProviderConfig,
+    sessionId,
+    initialInput,
+    initialAttachments,
+    initialAttachmentData,
+    initialStreamEnabled,
+    initialThinkingEnabled,
+  );
 
   // Elara Sub-Provider Logic
   const [subProviders, setSubProviders] = useState<any[]>([]);
@@ -149,6 +171,7 @@ export function ChatPanel({
           setInput={setInput}
           onSend={handleSend}
           isLoading={isLoading}
+          isUploadingAttachment={isUploadingAttachment}
           onStop={handleStop}
           attachments={attachments}
           onFileSelect={handleFileSelect}
@@ -157,6 +180,18 @@ export function ChatPanel({
           setThinkingEnabled={setThinkingEnabled}
           searchEnabled={searchEnabled}
           setSearchEnabled={setSearchEnabled}
+          streamEnabled={streamEnabled}
+          setStreamEnabled={setStreamEnabled}
+          supportsThinking={
+            !!(
+              (localProviderConfig?.model &&
+                subProviders.some((p) =>
+                  p.models?.some((m: any) => m.id === localProviderConfig.model && m.is_thinking),
+                )) ||
+              localProviderConfig?.type === ProviderType.DEEPSEEK ||
+              (localProviderConfig as any)?.provider_id === 'deepseek'
+            )
+          }
         />
       </div>
     </div>

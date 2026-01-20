@@ -35,6 +35,7 @@ function FlowRequestDetails({
 }) {
   const [resTab, setResTab] = useState<'body' | 'headers'>('body');
   const codeBlockRef = useRef<CodeBlockRef>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (resTab === 'body' && request.responseBody) {
@@ -54,86 +55,241 @@ function FlowRequestDetails({
     }));
   }, [request.responseHeaders]);
 
+  // Handle Send Request
+  const handleSend = async () => {
+    if (!onChange) return;
+    setIsLoading(true);
+
+    try {
+      let protocol = (request.protocol || 'https').replace(':', '');
+      const host = request.host?.trim();
+      const path = request.path?.trim() || '/';
+
+      if (!host) {
+        alert('Error: Host is required to send a request.');
+        setIsLoading(false);
+        return;
+      }
+
+      let urlString = `${protocol}://${host}${path}`;
+
+      // Validate URL
+      try {
+        new URL(urlString);
+      } catch (e) {
+        alert(`Error: Invalid URL constructed: ${urlString}`);
+        setIsLoading(false);
+        return;
+      }
+
+      // Sanitize Headers
+      // net::ERR_INVALID_ARGUMENT can occur if restricted headers like 'Host' or 'Connection' are manually set,
+      // or if headers contain invalid characters.
+      const cleanHeaders = { ...request.requestHeaders };
+      const unsafeHeaders = ['host', 'connection', 'content-length', 'expect'];
+      Object.keys(cleanHeaders).forEach((key) => {
+        if (unsafeHeaders.includes(key.toLowerCase())) {
+          delete cleanHeaders[key];
+        }
+      });
+
+      console.log('[ControlFlowPanel] Sending request:', {
+        url: urlString,
+        method: request.method,
+        headers: cleanHeaders,
+      });
+
+      // Use IPC to send request
+      const res = await (window as any).api.invoke('inspector:send-request', {
+        url: urlString,
+        method: request.method,
+        headers: cleanHeaders,
+        body:
+          request.method !== 'GET' && request.method !== 'HEAD' ? request.requestBody : undefined,
+      });
+
+      console.log('[ControlFlowPanel] Response:', res);
+
+      const updatedRequest: NetworkRequest = {
+        ...request,
+        status: res.status || 0,
+        time: res.time ? String(res.time) + 'ms' : '0ms',
+        size: res.size ? String(res.size) + ' B' : '0 B',
+        responseHeaders: res.headers || {},
+        responseBody: res.body || '',
+      };
+
+      onChange(updatedRequest);
+
+      if (res.error) {
+        console.error(res.error);
+      }
+    } catch (error: any) {
+      console.error(error);
+      const updatedRequest: NetworkRequest = {
+        ...request,
+        status: 0,
+        responseBody: `Error: ${error.message}`,
+      };
+      onChange(updatedRequest);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onChange?.({ ...request, method: e.target.value });
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    try {
+      // Try to parse as full URL first
+      const urlObj = new URL(val);
+      onChange?.({
+        ...request,
+        protocol: urlObj.protocol.replace(':', ''),
+        host: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+      });
+    } catch {
+      // If it's just a path update (starts with /)
+      if (val.startsWith('/')) {
+        onChange?.({ ...request, path: val });
+      }
+      // Otherwise, we might want to let them type freely,
+      // but for strict sync we need valid protocol/host.
+      // For now, let's assume they might be pasting a full URL or editing path.
+    }
+  };
+
+  // Construct display URL
+  const displayUrl = useMemo(() => {
+    return `${request.protocol || 'https'}://${request.host}${request.path}`;
+  }, [request.protocol, request.host, request.path]);
+
   return (
-    <ResizableSplit direction="vertical" initialSize={50} minSize={20} maxSize={80}>
-      {/* Top: Request Pane (Editor) */}
-      <div className="flex flex-col h-full bg-background overflow-hidden relative border-b border-border">
-        <RequestEditor request={request} onChange={onChange} />
+    <div className="flex flex-col h-full bg-background">
+      {/* Top Control Bar */}
+      <div className="h-12 border-b border-border flex items-center px-2 gap-2 shrink-0 bg-muted/5">
+        <select
+          value={request.method}
+          onChange={handleMethodChange}
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs font-bold uppercase min-w-[80px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          {['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'].map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="text"
+          value={displayUrl}
+          onChange={handleUrlChange}
+          className="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs font-mono focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          placeholder="https://api.example.com/v1/..."
+        />
+
+        <button
+          onClick={handleSend}
+          disabled={isLoading}
+          className={cn(
+            'h-8 px-4 rounded-md flex items-center gap-2 text-xs font-medium transition-colors',
+            isLoading
+              ? 'bg-muted text-muted-foreground cursor-not-allowed'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90',
+          )}
+        >
+          {isLoading ? (
+            <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Network className="w-3.5 h-3.5" />
+          )}
+          Send
+        </button>
       </div>
 
-      {/* Bottom: Response Pane (Read-only) */}
-      <div className="flex flex-col h-full bg-background overflow-hidden border-t border-border">
-        {/* Helper to show response logic only if there is a response component, 
-            but here we just show what we have in the request object (status etc) */}
-
-        <div className="flex border-b border-border bg-muted/10 items-center justify-between h-10 shrink-0">
-          <div className="flex px-2">
-            <button
-              onClick={() => setResTab('body')}
-              className={cn(
-                'px-3 py-2 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
-                resTab === 'body'
-                  ? 'border-primary bg-background'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
-              )}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Body
-            </button>
-            <button
-              onClick={() => setResTab('headers')}
-              className={cn(
-                'px-3 py-2 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
-                resTab === 'headers'
-                  ? 'border-primary bg-background'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
-              )}
-            >
-              <Braces className="w-3.5 h-3.5" />
-              Headers
-            </button>
+      <div className="flex-1 overflow-hidden">
+        <ResizableSplit direction="vertical" initialSize={50} minSize={20} maxSize={80}>
+          {/* Top: Request Pane (Editor) */}
+          <div className="flex flex-col h-full bg-background overflow-hidden relative border-b border-border">
+            <RequestEditor request={request} onChange={onChange} />
           </div>
 
-          {/* Status Info */}
-          <div className="flex items-center gap-3 px-4">
-            <div className="flex items-center gap-1.5">
-              <span
-                className={cn(
-                  'text-xs font-bold px-1.5 py-0.5 rounded',
-                  request.status >= 200 && request.status < 300
-                    ? 'bg-green-500/10 text-green-500'
-                    : request.status >= 400
-                      ? 'bg-red-500/10 text-red-500'
-                      : 'bg-yellow-500/10 text-yellow-500',
-                )}
-              >
-                {request.status}
-              </span>
+          {/* Bottom: Response Pane (Read-only) */}
+          <div className="flex flex-col h-full bg-background overflow-hidden border-t border-border">
+            <div className="flex border-b border-border bg-muted/10 items-center justify-between h-10 shrink-0">
+              <div className="flex px-2">
+                <button
+                  onClick={() => setResTab('body')}
+                  className={cn(
+                    'px-3 py-2 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
+                    resTab === 'body'
+                      ? 'border-primary bg-background'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
+                  )}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Body
+                </button>
+                <button
+                  onClick={() => setResTab('headers')}
+                  className={cn(
+                    'px-3 py-2 text-xs font-medium border-b-2 transition-all flex items-center gap-2',
+                    resTab === 'headers'
+                      ? 'border-primary bg-background'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20',
+                  )}
+                >
+                  <Braces className="w-3.5 h-3.5" />
+                  Headers
+                </button>
+              </div>
+
+              {/* Status Info */}
+              <div className="flex items-center gap-3 px-4">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      'text-xs font-bold px-1.5 py-0.5 rounded',
+                      request.status >= 200 && request.status < 300
+                        ? 'bg-green-500/10 text-green-500'
+                        : request.status >= 400
+                          ? 'bg-red-500/10 text-red-500'
+                          : 'bg-yellow-500/10 text-yellow-500',
+                    )}
+                  >
+                    {request.status}
+                  </span>
+                </div>
+                <div className="text-xs font-mono text-muted-foreground">{request.time}</div>
+                <div className="text-xs font-mono text-muted-foreground">{request.size}</div>
+              </div>
             </div>
-            <div className="text-xs font-mono text-muted-foreground">{request.time}</div>
-            <div className="text-xs font-mono text-muted-foreground">{request.size}</div>
-          </div>
-        </div>
 
-        <div className="flex-1 overflow-hidden relative">
-          <div className="absolute inset-0 overflow-auto p-0">
-            {resTab === 'body' && (
-              <CodeBlock
-                ref={codeBlockRef}
-                code={request.responseBody || ''}
-                language="json"
-                themeConfig={{ background: '#00000000' }}
-                editorOptions={{ readOnly: true, minimap: { enabled: false } }}
-                className="h-full"
-              />
-            )}
-            {resTab === 'headers' && (
-              <KeyValueTable items={resHeaders} onChange={() => {}} readOnly={true} />
-            )}
+            <div className="flex-1 overflow-hidden relative">
+              <div className="absolute inset-0 overflow-auto p-0">
+                {resTab === 'body' && (
+                  <CodeBlock
+                    ref={codeBlockRef}
+                    code={request.responseBody || ''}
+                    language="json"
+                    themeConfig={{ background: '#00000000' }}
+                    editorOptions={{ readOnly: true, minimap: { enabled: false } }}
+                    className="h-full"
+                  />
+                )}
+                {resTab === 'headers' && (
+                  <KeyValueTable items={resHeaders} onChange={() => {}} readOnly={true} />
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </ResizableSplit>
       </div>
-    </ResizableSplit>
+    </div>
   );
 }
 

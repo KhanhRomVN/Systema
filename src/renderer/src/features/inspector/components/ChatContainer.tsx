@@ -162,6 +162,10 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           onBack={() => setActiveSession(null)}
           inspectorContext={inspectorContext}
           providerConfig={providerConfig}
+          initialInput={activeSession.initialInput}
+          initialAttachments={activeSession.initialAttachments}
+          initialStreamEnabled={activeSession.initialStreamEnabled}
+          initialThinkingEnabled={activeSession.initialThinkingEnabled}
         />
       );
     }
@@ -212,11 +216,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
         onDeleteFlow={inspectorContext.onDeleteFlow || (() => {})}
         onUpdateFlow={inspectorContext.onUpdateFlow || (() => {})}
         activeFlowData={inspectorContext.activeFlowData}
-        selectedRequest={
-          inspectorContext.selectedFlowRequest ||
-          inspectorContext.requests.find((r) => r.id === inspectorContext.selectedRequestId) ||
-          null
-        }
+        selectedRequest={inspectorContext.selectedFlowRequest || null}
         onRequestChange={inspectorContext.onUpdateNodeRequest}
       />
     );

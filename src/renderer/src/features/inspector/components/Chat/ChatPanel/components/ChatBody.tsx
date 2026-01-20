@@ -1,6 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Bot, Terminal, CheckCircle2, PlayCircle, Eye, EyeOff } from 'lucide-react';
 import { ParsedResponse, ContentBlock } from '../../../../../../services/ResponseParser';
+import { FilePreviewModal } from './FilePreviewModal';
+import { getFileIconPath } from '../../../../../../shared/utils/fileIconMapper';
 
 export interface Message {
   id: string;
@@ -13,6 +15,12 @@ export interface Message {
   executedToolIndices?: number[]; // Track executed tools
   isStreaming?: boolean;
   reasoning?: string;
+  attachments?: {
+    name: string;
+    type: string;
+    url?: string;
+    fileId?: string;
+  }[];
 }
 
 interface ChatBodyProps {
@@ -242,6 +250,7 @@ const RenderBlock = ({
 
 export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool }: ChatBodyProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [previewFile, setPreviewFile] = useState<any | null>(null);
   let requestCount = 0;
 
   useEffect(() => {
@@ -340,10 +349,51 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 )}
               </div>
+
+              {/* Message Attachments */}
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 mb-1">
+                  {msg.attachments.map((att, idx) => (
+                    <div
+                      key={att.fileId || idx}
+                      className="group relative flex items-center gap-2 p-1.5 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors max-w-[200px]"
+                      onClick={() => setPreviewFile(att)}
+                    >
+                      <div className="w-8 h-8 rounded shrink-0 flex items-center justify-center bg-background border border-border overflow-hidden">
+                        {att.type?.startsWith('image/') ? (
+                          <img
+                            src={att.url}
+                            alt={att.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={getFileIconPath(att.name)}
+                            alt=""
+                            className="w-5 h-5 object-contain"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0 pr-1">
+                        <span className="text-[11px] font-medium truncate text-foreground/80">
+                          {att.name}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground uppercase opacity-70">
+                          {att.type?.split('/')[1] || 'FILE'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
       })}
+
+      {/* Preview Modal */}
+      {previewFile && <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />}
 
       {isProcessing && (
         <div className="flex flex-col w-full gap-2 mt-4 animate-in fade-in">

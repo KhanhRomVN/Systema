@@ -320,9 +320,107 @@ function FlowBoardInner({
     setNodes((nds) => [...nds, newNode]);
   };
 
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    request: NetworkRequest | null;
+  } | null>(null);
+
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+
+    if (node.type === 'httpsRequest') {
+      // Extract request data from node
+      let request: NetworkRequest | null = null;
+      if (node.data?.method) {
+        request = node.data as any;
+      } else if (node.data?.request) {
+        request = node.data.request as any;
+      }
+
+      if (request) {
+        setContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          request,
+        });
+      }
+    } else {
+      setContextMenu(null);
+    }
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setContextMenu(null);
+    onNodeSelect?.(null, null);
+  }, [onNodeSelect]);
+
+  const handleTestRequest = async () => {
+    if (!contextMenu?.request) return;
+
+    const request = contextMenu.request;
+    setContextMenu(null); // Close menu
+
+    try {
+      let protocol = (request.protocol || 'https').replace(':', '');
+      const host = request.host?.trim();
+      const path = request.path?.trim() || '/';
+
+      if (!host) {
+        alert('Error: Host is required to send a request.');
+        return;
+      }
+
+      const urlString = `${protocol}://${host}${path}`;
+
+      try {
+        new URL(urlString);
+      } catch (e) {
+        alert(`Error: Invalid URL constructed: ${urlString}`);
+        return;
+      }
+
+      // Sanitize Headers
+      const cleanHeaders = { ...request.requestHeaders };
+      const unsafeHeaders = ['host', 'connection', 'content-length', 'expect'];
+      Object.keys(cleanHeaders).forEach((key) => {
+        if (unsafeHeaders.includes(key.toLowerCase())) {
+          delete cleanHeaders[key];
+        }
+      });
+
+      console.log('[FlowBoard] Sending request:', {
+        url: urlString,
+        method: request.method,
+        headers: cleanHeaders,
+      });
+
+      // Use IPC to send request
+      const res = await (window as any).api.invoke('inspector:send-request', {
+        url: urlString,
+        method: request.method,
+        headers: cleanHeaders,
+        body:
+          request.method !== 'GET' && request.method !== 'HEAD' ? request.requestBody : undefined,
+      });
+
+      console.log('[FlowBoard] Response:', res);
+
+      if (res.error) {
+        alert(`Request Failed:\n${res.error}`);
+      } else {
+        alert(
+          `Request Sent Successfully!\nStatus: ${res.status} ${res.statusText}\nTime: ${res.time}ms\nSize: ${res.size} B`,
+        );
+      }
+    } catch (error: any) {
+      alert(`Error sending request:\n${error.message}`);
+    }
+  };
+
   return (
     <FlowLayoutContext.Provider value={{ direction }}>
-      <div className="flex flex-col h-full w-full">
+      <div className="flex flex-col h-full w-full relative">
         {/* Header */}
         <div className="h-12 border-b border-border flex items-center px-4 justify-between bg-card text-card-foreground shadow-sm shrink-0">
           <div className="flex items-center gap-2 font-bold text-green-500">
@@ -376,9 +474,10 @@ function FlowBoardInner({
         </div>
 
         <div
-          className="flex-1 w-full h-full bg-neutral-900/50"
+          className="flex-1 w-full h-full bg-neutral-900/50 relative"
           onDragOver={onDragOver}
           onDrop={onDrop}
+          onClick={() => setContextMenu(null)}
         >
           <ReactFlow
             nodes={nodes}
@@ -388,13 +487,26 @@ function FlowBoardInner({
             onConnect={onConnect}
             nodeTypes={nodeTypes}
             onNodeClick={(_, node) => {
-              if (node.type === 'httpsRequest' && node.data?.request) {
-                onNodeSelect?.(node.id, node.data.request as NetworkRequest);
+              setContextMenu(null); // Close context menu on click
+              if (node.type === 'httpsRequest') {
+                let req: NetworkRequest | null = null;
+                if (node.data?.method) {
+                  req = node.data as any;
+                } else if (node.data?.request) {
+                  req = node.data.request as any;
+                }
+
+                if (req) {
+                  onNodeSelect?.(node.id, req);
+                } else {
+                  onNodeSelect?.(null, null);
+                }
               } else {
                 onNodeSelect?.(null, null);
               }
             }}
-            onPaneClick={() => onNodeSelect?.(null, null)}
+            onPaneClick={onPaneClick}
+            onNodeContextMenu={onNodeContextMenu}
             onNodeDrag={onNodeDrag}
             fitView
             className="bg-background"
@@ -408,6 +520,36 @@ function FlowBoardInner({
             <Background />
             <Controls />
           </ReactFlow>
+
+          {/* Context Menu */}
+          {contextMenu && (
+            <div
+              className="fixed z-50 min-w-[160px] bg-card border border-border rounded-md shadow-md p-1 animate-in fade-in zoom-in-95"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={handleTestRequest}
+                className="flex items-center w-full px-2 py-1.5 text-xs rounded-sm hover:bg-green-500/10 hover:text-green-500 transition-colors text-left"
+              >
+                <div className="w-4 h-4 mr-2 flex items-center justify-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-3 h-3"
+                  >
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </div>
+                Test Request
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Drop Zone Hint */}

@@ -1,26 +1,160 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Message } from '../components/ChatBody';
 import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../../types/provider-types';
 
-export function useChatLogic(providerConfig: ProviderConfig | null, _sessionId?: string) {
+// Attachments state
+interface PendingAttachment {
+  id: string;
+  file: File;
+  status: 'pending' | 'uploading' | 'completed' | 'error';
+  previewUrl?: string;
+  progress?: number;
+  fileId?: string;
+  accountId?: string;
+}
+
+export function useChatLogic(
+  providerConfig: ProviderConfig | null,
+  _sessionId?: string,
+  initialInput?: string,
+  initialAttachments?: File[],
+  initialAttachmentData?: PendingAttachment[],
+  initialStreamEnabled?: boolean,
+  initialThinkingEnabled?: boolean,
+) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialInput || '');
   const [isLoading, setIsLoading] = useState(false);
-  const [thinkingEnabled, setThinkingEnabled] = useState(false);
+  const [thinkingEnabled, setThinkingEnabled] = useState(initialThinkingEnabled || false);
   const [searchEnabled, setSearchEnabled] = useState(false);
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [streamEnabled, setStreamEnabled] = useState(initialStreamEnabled ?? true);
+
+  // Transform initial attachments
+  const [attachments, setAttachments] = useState<PendingAttachment[]>(() => {
+    if (initialAttachmentData && initialAttachmentData.length > 0) {
+      return initialAttachmentData;
+    }
+    return initialAttachments
+      ? initialAttachments.map((f) => ({
+          id: Math.random().toString(36).substring(7),
+          file: f,
+          status: 'pending',
+          previewUrl: URL.createObjectURL(f),
+          progress: 0,
+        }))
+      : [];
+  });
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const hasAutoSent = useRef(false);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Auto-Send on Mount if initial data exists
+  useEffect(() => {
+    if (
+      (initialInput ||
+        (initialAttachments && initialAttachments.length > 0) ||
+        (initialAttachmentData && initialAttachmentData.length > 0)) &&
+      !hasAutoSent.current &&
+      providerConfig
+    ) {
+      hasAutoSent.current = true;
+      // Small timeout to allow state to settle or component to mount fully
+      setTimeout(() => {
+        handleSend();
+      }, 100);
+    }
+  }, [initialInput, initialAttachments, initialAttachmentData, providerConfig]);
+
+  const handleFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement> | { target: { files: FileList } },
+  ) => {
     if (e.target.files) {
-      setAttachments((prev) => [...prev, ...Array.from(e.target.files!)]);
+      const newFiles = Array.from(e.target.files);
+      const newAttachments: PendingAttachment[] = newFiles.map((file) => ({
+        id: Math.random().toString(36).substring(7),
+        file,
+        status: 'pending',
+        previewUrl: URL.createObjectURL(file),
+        progress: 0,
+      }));
+      setAttachments((prev) => [...prev, ...newAttachments]);
     }
   };
 
   const handleRemoveAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // Handle File Uploads (Smart Upload Management) - Ported from Playground
+  useEffect(() => {
+    const uploadPendingFiles = async () => {
+      if (providerConfig?.type !== ProviderType.ELARA_FREE) return;
+
+      const config = providerConfig as ElaraFreeConfig;
+      if (!config.accountId) return;
+
+      const itemsToUpload = attachments.filter(
+        (a) => a.status === 'pending' || (a.status === 'error' && !a.fileId),
+      );
+
+      if (itemsToUpload.length === 0) return;
+
+      const baseURL = config.baseURL || 'http://localhost:11434';
+      const uploadUrl = `${baseURL}/v1/chat/accounts/${config.accountId}/uploads`;
+
+      // Mark as uploading
+      setAttachments((prev) =>
+        prev.map((a) =>
+          itemsToUpload.some((i) => i.id === a.id) ? { ...a, status: 'uploading', progress: 0 } : a,
+        ),
+      );
+
+      // Upload sequentially or in small batches to avoid overwhelming the bridge/backend
+      for (const att of itemsToUpload) {
+        try {
+          const formData = new FormData();
+          formData.append('file', att.file);
+
+          console.log('[useChatLogic] Uploading file to:', uploadUrl, 'Account:', config.accountId);
+
+          const res = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.data?.file_id) {
+              setAttachments((prev) =>
+                prev.map((p) =>
+                  p.id === att.id
+                    ? {
+                        ...p,
+                        status: 'completed',
+                        fileId: data.data.file_id,
+                        accountId: config.accountId,
+                        progress: 100,
+                      }
+                    : p,
+                ),
+              );
+            } else {
+              throw new Error(data.error || 'Invalid upload response');
+            }
+          } else {
+            throw new Error(`Upload failed ${res.status}`);
+          }
+        } catch (err) {
+          console.error(`Error uploading ${att.file.name}:`, err);
+          setAttachments((prev) =>
+            prev.map((p) => (p.id === att.id ? { ...p, status: 'error' } : p)),
+          );
+        }
+      }
+    };
+
+    uploadPendingFiles();
+  }, [attachments, providerConfig]);
 
   const handleStop = () => {
     if (abortControllerRef.current) {
@@ -30,8 +164,18 @@ export function useChatLogic(providerConfig: ProviderConfig | null, _sessionId?:
     }
   };
 
+  const isUploadingAttachment = attachments.some(
+    (a) => a.status === 'pending' || a.status === 'uploading',
+  );
+
   const handleSend = async () => {
-    if ((!input.trim() && attachments.length === 0) || isLoading || !providerConfig) return;
+    if (
+      (!input.trim() && attachments.length === 0) ||
+      isLoading ||
+      !providerConfig ||
+      isUploadingAttachment
+    )
+      return;
 
     const userMsgId = Date.now().toString();
     const userMsg: Message = {
@@ -40,12 +184,17 @@ export function useChatLogic(providerConfig: ProviderConfig | null, _sessionId?:
       content: input,
       timestamp: Date.now(),
       timestampStr: new Date().toLocaleTimeString(),
-      // Store attachment metadata if needed
+      attachments: attachments.map((a) => ({
+        name: a.file.name,
+        type: a.file.type,
+        url: a.previewUrl,
+        fileId: a.fileId,
+      })),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
-    setAttachments([]);
+    setAttachments([]); // Clear from input area
     setIsLoading(true);
 
     const assistantMsgId = (Date.now() + 1).toString();
@@ -63,19 +212,27 @@ export function useChatLogic(providerConfig: ProviderConfig | null, _sessionId?:
 
     try {
       // 1. Prepare Payload
+      // Extract file IDs
+      const fileIds = userMsg.attachments?.map((a) => a.fileId).filter(Boolean) as string[];
+
       const payload: any = {
         messages: [
           ...messages.map((m) => ({
             role: m.role,
             content: m.content,
           })),
-          { role: 'user', content: userMsg.content },
+          {
+            role: 'user',
+            content: userMsg.content,
+            // Some providers take 'files' or 'images' in message object,
+            // others take it at top level. Systema usually takes 'files' in the request body for standard chat.
+          },
         ],
         model: providerConfig.model,
-        stream: true, // Always stream for better UX
+        stream: streamEnabled, // Determine streaming based on toggle
         thinking_enabled: thinkingEnabled,
         search_enabled: searchEnabled,
-        // Add images if any (convert to base64)
+        files: fileIds, // Add file IDs to top level payload
       };
 
       // 2. Determine Endpoint & Headers
@@ -218,8 +375,11 @@ export function useChatLogic(providerConfig: ProviderConfig | null, _sessionId?:
     setThinkingEnabled,
     searchEnabled,
     setSearchEnabled,
-    attachments,
+    attachments, // Pass full PendingAttachment[] objects
     handleFileSelect,
     handleRemoveAttachment,
+    streamEnabled,
+    setStreamEnabled,
+    isUploadingAttachment, // Also return this state for UI to disable send button if needed
   };
 }
