@@ -3,7 +3,7 @@ import { memo, useContext } from 'react';
 import { Handle, Position, useEdges, useReactFlow } from '@xyflow/react';
 import { cn } from '../../../shared/lib/utils';
 import { GitFork, Plus, Minus } from 'lucide-react';
-import { FlowLayoutContext } from './FlowContext';
+import { FlowLayoutContext } from './Flow';
 
 interface IfNodeData {
   label?: string;

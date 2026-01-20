@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Eye, Trash2, Network, Pencil, Braces, FileText } from 'lucide-react';
-import { CodeBlock, CodeBlockRef } from '../../../components/CodeBlock';
-import { NetworkRequest } from '../types';
-import { ResizableSplit } from '../../../components/ResizableSplit';
-import { cn } from '../../../shared/lib/utils';
-import { KeyValueTable } from './ComposerEditors/KeyValueTable';
-import { RequestEditor } from './RequestEditor';
+import { CodeBlock, CodeBlockRef } from '../../../../components/CodeBlock';
+import { NetworkRequest } from '../../types';
+import { ResizableSplit } from '../../../../components/ResizableSplit';
+import { cn } from '../../../../shared/lib/utils';
+import { KeyValueTable } from '../ComposerEditors/KeyValueTable';
+import { RequestEditor } from '../RequestEditor';
 
 interface FlowCard {
   id: string;

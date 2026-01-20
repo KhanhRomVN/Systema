@@ -13,9 +13,9 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { X, Network, ArrowRightFromLine, ArrowDownFromLine, GitFork } from 'lucide-react';
-import { HttpsRequestNode } from './HttpsRequestNode';
-import { IfNode } from './IfNode';
-import { NetworkRequest } from '../types';
+import { HttpsRequestNode } from '../HttpsRequestNode';
+import { IfNode } from '../IfNode';
+import { NetworkRequest } from '../../types';
 import { FlowLayoutContext } from './FlowContext';
 
 interface FlowBoardProps {

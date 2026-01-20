@@ -9,9 +9,9 @@ import { SaveProfileModal } from './SaveProfileModal';
 import { formatDistanceToNow } from 'date-fns';
 import { Play, Pause, Clock, FileCode, Image, Network } from 'lucide-react';
 import { RequestComposer } from './RequestComposer';
-import { FlowBoard } from './FlowBoard';
-import { CreateFlowModal } from './CreateFlowModal';
-import type { FlowCard } from './ControlFlowPanel';
+import { FlowBoard } from './Flow';
+import { CreateFlowModal } from './Flow';
+import type { FlowCard } from './Flow';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';

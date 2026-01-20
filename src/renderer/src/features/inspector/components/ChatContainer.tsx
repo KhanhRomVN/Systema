@@ -17,7 +17,7 @@ import { ProviderStorage } from '../../../services/provider-storage';
 
 import { WasmPanel } from './WasmPanel';
 import { MediaPanel } from './Media';
-import { ControlFlowPanel, FlowCard } from './ControlFlowPanel';
+import { ControlFlowPanel, FlowCard } from './Flow';
 
 export interface InspectorContext {
   requests: NetworkRequest[];

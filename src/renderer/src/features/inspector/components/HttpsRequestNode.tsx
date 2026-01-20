@@ -2,7 +2,7 @@ import { memo, useContext } from 'react';
 import { Handle, Position, useEdges } from '@xyflow/react';
 import { NetworkRequest } from '../types';
 import { cn } from '../../../shared/lib/utils';
-import { FlowLayoutContext } from './FlowContext';
+import { FlowLayoutContext } from './Flow';
 
 interface HttpsRequestNodeData extends NetworkRequest {
   sequence?: number; // Add sequence support
