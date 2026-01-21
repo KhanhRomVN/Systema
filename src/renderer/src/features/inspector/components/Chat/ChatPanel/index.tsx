@@ -3,9 +3,8 @@ import { ChatHeader } from './components/ChatHeader';
 import { ChatBody } from './components/ChatBody';
 import { ChatInputArea } from './components/ChatInputArea';
 import { InspectorContext } from '../../ChatContainer';
-import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../types/provider-types';
+import { ProviderConfig, ProviderType } from '../../../types/provider-types';
 import { useChatLogic } from './hooks/useChatLogic';
-import { Settings2, Zap, User } from 'lucide-react';
 
 interface ChatPanelProps {
   sessionId: string;

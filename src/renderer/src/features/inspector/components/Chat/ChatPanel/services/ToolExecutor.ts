@@ -1,5 +1,5 @@
 import { InspectorContext } from '../../../ChatContainer';
-import { initialFilterState, InspectorFilter } from '../../../FilterPanel';
+import { initialFilterState, InspectorFilter } from '../../../Network/NetworkFilter';
 import { ToolAction } from '../../../../../../services/ResponseParser';
 
 export async function executeTool(action: ToolAction, context: InspectorContext): Promise<string> {

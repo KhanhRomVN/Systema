@@ -1,6 +1,6 @@
-import { NetworkRequest } from '../../types';
-import { IssuesAnalysis } from '../../analysisTypes';
-import { cn } from '../../../../shared/lib/utils';
+import { NetworkRequest } from '../../../types';
+import { IssuesAnalysis } from '../../../analysisTypes';
+import { cn } from '../../../../../shared/lib/utils';
 import { AlertOctagon, CheckCircle2 } from 'lucide-react';
 
 interface IssuesDetailsProps {

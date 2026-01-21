@@ -1,8 +1,8 @@
 import React from 'react';
 import { ResizableSplit } from '../../../components/ResizableSplit';
-import { RequestList } from './RequestList';
-import { RequestDetails } from './RequestDetails';
-import { initialFilterState, InspectorFilter } from './FilterPanel';
+import { NetworkTracker } from './Network/NetworkTracker';
+import { NetworkDetails } from './Network/NetworkDetails';
+import { initialFilterState, InspectorFilter } from './Network/NetworkFilter';
 import { ChatContainer } from './ChatContainer';
 import { MemoryMonitor } from './MemoryMonitor';
 import { SaveProfileModal } from './SaveProfileModal';
@@ -724,7 +724,7 @@ export function InspectorLayout({
                   </button>
                 </div>
               )}
-              <RequestList
+              <NetworkTracker
                 requests={filteredRequests}
                 selectedId={selectedId}
                 onSelect={(id) => {
@@ -747,7 +747,7 @@ export function InspectorLayout({
               />
             </div>
 
-            {/* Bottom Panel: FlowBoard OR RequestDetails/RequestComposer */}
+            {/* Bottom Panel: FlowBoard OR NetworkDetails/RequestComposer */}
             {activeFlowData ? (
               <FlowBoard
                 initialData={activeFlowData}
@@ -768,7 +768,7 @@ export function InspectorLayout({
             ) : composerRequest ? (
               <RequestComposer initialRequest={composerRequest} appId={appId} />
             ) : (
-              <RequestDetails
+              <NetworkDetails
                 request={selectedRequest}
                 searchTerm={searchTerm}
                 activeTab={detailsTab}

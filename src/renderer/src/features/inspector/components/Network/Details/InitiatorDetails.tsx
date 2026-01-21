@@ -1,8 +1,8 @@
-import { NetworkRequest } from '../../types';
+import { NetworkRequest } from '../../../types';
 import { useState, useRef } from 'react';
-import { cn } from '../../../../shared/lib/utils';
+import { cn } from '../../../../../shared/lib/utils';
 import { FileCode, Play, X, Copy, Check, Search } from 'lucide-react';
-import { CodeBlock } from '../../../../components/CodeBlock';
+import { CodeBlock } from '../../../../../components/CodeBlock';
 
 interface InitiatorDetailsProps {
   request: NetworkRequest;

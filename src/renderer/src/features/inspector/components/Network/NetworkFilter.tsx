@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { cn } from '../../../shared/lib/utils';
-import { Slider } from '../../../components/ui/slider';
+import { cn } from '../../../../shared/lib/utils';
+import { Slider } from '../../../../components/ui/slider';
 
 export interface NetworkRequest {
   id: string;
@@ -182,13 +182,13 @@ export const initialFilterState: InspectorFilter = {
   time: { min: '', max: '' },
 };
 
-interface FilterPanelProps {
+interface NetworkFilterProps {
   filter: InspectorFilter;
   onChange: (filter: InspectorFilter) => void;
   requests?: NetworkRequest[];
 }
 
-export function FilterPanel({ filter, onChange, requests = [] }: FilterPanelProps) {
+export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilterProps) {
   // Extract all unique hosts and paths from requests
   const allHosts = Array.from(new Set(requests.map((r) => r.host).filter(Boolean)));
   const allPaths = Array.from(new Set(requests.map((r) => r.path).filter(Boolean)));

@@ -1,5 +1,5 @@
-import { NetworkRequest } from '../../types';
-import { cn } from '../../../../shared/lib/utils';
+import { NetworkRequest } from '../../../types';
+import { cn } from '../../../../../shared/lib/utils';
 
 interface ResponseGeneralProps {
   request: NetworkRequest;

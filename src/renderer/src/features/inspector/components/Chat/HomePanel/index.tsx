@@ -1,15 +1,4 @@
-import {
-  Plus,
-  ChevronRight,
-  Brain,
-  ChevronDown,
-  Globe,
-  Sparkles,
-  Loader2,
-  AlertCircle,
-  X,
-  CheckCircle2,
-} from 'lucide-react';
+import { Plus, ChevronRight, Brain, ChevronDown, Globe, Sparkles } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 // TabList removed

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { cn } from '../../../../shared/lib/utils';
+import { cn } from '../../../../../shared/lib/utils';
 
 interface HighlightTextProps {
   text: string;

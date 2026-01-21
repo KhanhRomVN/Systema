@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { HomePanel } from './Chat/HomePanel';
 import { ChatPanel } from './Chat/ChatPanel';
 import SettingsPanel from './Chat/SettingsPanel';
-import { InspectorFilter } from './FilterPanel';
+import { InspectorFilter } from './Network/NetworkFilter';
 import { NetworkRequest } from '../types';
 import { SourcesPanel } from './SourcesPanel';
 import { LogViewer } from './LogViewer';

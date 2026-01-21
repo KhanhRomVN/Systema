@@ -1,5 +1,5 @@
-import { NetworkRequest } from '../types';
-import { cn } from '../../../shared/lib/utils';
+import { NetworkRequest } from '../../types';
+import { cn } from '../../../../shared/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import {
   BarChart2,
@@ -21,21 +21,21 @@ import {
   KeyRound,
 } from 'lucide-react';
 
-import { RequestOverview } from './RequestDetails/RequestOverview';
-import { RequestGeneral } from './RequestDetails/RequestGeneral';
-import { ResponseGeneral } from './RequestDetails/ResponseGeneral';
-import { HeadersDetails } from './RequestDetails/HeadersDetails';
-import { CookiesDetails } from './RequestDetails/CookiesDetails';
-import { BodyDetails, BodyDetailsRef } from './RequestDetails/BodyDetails';
-import { SecurityDetails } from './RequestDetails/SecurityDetails';
-import { CertDetails } from './RequestDetails/CertDetails';
-import { NetworkDetails } from './RequestDetails/NetworkDetails';
-import { TimingDetails } from './RequestDetails/TimingDetails';
-import { IssuesDetails } from './RequestDetails/IssuesDetails';
-import { InitiatorDetails } from './RequestDetails/InitiatorDetails';
-import { InspectorFilter, FilterPanel } from './FilterPanel';
-import { ResizableSplit } from '../../../components/ResizableSplit';
-import { CodeBlock } from '../../../components/CodeBlock';
+import { RequestOverview } from './Details/RequestOverview';
+import { RequestGeneral } from './Details/RequestGeneral';
+import { ResponseGeneral } from './Details/ResponseGeneral';
+import { HeadersDetails } from './Details/HeadersDetails';
+import { CookiesDetails } from './Details/CookiesDetails';
+import { BodyDetails, BodyDetailsRef } from './Details/BodyDetails';
+import { SecurityDetails } from './Details/SecurityDetails';
+import { CertDetails } from './Details/CertDetails';
+import { NetworkDetails as NetworkDetailsSub } from './Details/NetworkDetails';
+import { TimingDetails } from './Details/TimingDetails';
+import { IssuesDetails } from './Details/IssuesDetails';
+import { InitiatorDetails } from './Details/InitiatorDetails';
+import { InspectorFilter, NetworkFilter } from './NetworkFilter';
+import { ResizableSplit } from '../../../../components/ResizableSplit';
+import { CodeBlock } from '../../../../components/CodeBlock';
 
 function Badge({ count, className }: { count: number; className?: string }) {
   if (count === 0) return null;
@@ -51,7 +51,7 @@ function Badge({ count, className }: { count: number; className?: string }) {
   );
 }
 
-interface RequestDetailsProps {
+interface NetworkDetailsProps {
   request: NetworkRequest | null;
   searchTerm: string;
   activeTab?: string;
@@ -128,7 +128,7 @@ function TextSelectionMenu({
   );
 }
 
-export function RequestDetails({
+export function NetworkDetails({
   request,
   searchTerm,
   activeTab: propsActiveTab,
@@ -139,7 +139,7 @@ export function RequestDetails({
   onFilterChange,
   requests = [],
   onSearchTermChange,
-}: RequestDetailsProps) {
+}: NetworkDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview');
   const [isRawMode, setIsRawMode] = useState(false);
 
@@ -596,7 +596,7 @@ export function RequestDetails({
           )}
           {activeTab === 'security' && <SecurityDetails request={request} />}
           {activeTab === 'cert' && <CertDetails request={request} />}
-          {activeTab === 'network' && <NetworkDetails request={request} />}
+          {activeTab === 'network' && <NetworkDetailsSub request={request} />}
           {activeTab === 'timing' && <TimingDetails request={request} />}
           {activeTab === 'issues' && <IssuesDetails request={request} />}
           {activeTab === 'initiator' && <InitiatorDetails request={request} requests={requests} />}
@@ -719,7 +719,7 @@ export function RequestDetails({
           {isFilterOpen ? (
             <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
               {content}
-              <FilterPanel filter={filter} onChange={onFilterChange} requests={requests} />
+              <NetworkFilter filter={filter} onChange={onFilterChange} requests={requests} />
             </ResizableSplit>
           ) : (
             content

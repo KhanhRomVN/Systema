@@ -127,11 +127,10 @@ export const FilePreviewModal = ({ file, onClose }: FilePreviewModalProps) => {
               <CodeBlock
                 code={content}
                 language={getLanguage(file.name)}
-                readOnly={true}
-                maxLines={5000}
                 className="min-h-full"
                 showLineNumbers={false}
                 editorOptions={{
+                  readOnly: true,
                   guides: {
                     indentation: false,
                     bracketPairs: false,

@@ -8,9 +8,9 @@ import {
   SortingState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { NetworkRequest } from '../types';
+import { NetworkRequest } from '../../types';
 import { useState, useMemo, useRef, useCallback } from 'react';
-import { cn } from '../../../shared/lib/utils';
+import { cn } from '../../../../shared/lib/utils';
 import {
   ArrowUpDown,
   Search,
@@ -31,15 +31,15 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../../components/ui/dropdown-menu';
+} from '../../../../components/ui/dropdown-menu';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from '../../../components/ui/context-menu';
-import { addRequestToDefaultCollection } from '../utils/collections';
+} from '../../../../components/ui/context-menu';
+import { addRequestToDefaultCollection } from '../../utils/collections';
 
 interface RequestActionsProps {
   request: NetworkRequest;
@@ -177,7 +177,7 @@ function RequestActions({
   );
 }
 
-interface RequestListProps {
+interface NetworkTrackerProps {
   requests: NetworkRequest[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -196,7 +196,7 @@ interface RequestListProps {
   onCreateFlow?: (req: NetworkRequest) => void;
 }
 
-export function RequestList({
+export function NetworkTracker({
   requests,
   selectedId,
   onSelect,
@@ -213,7 +213,7 @@ export function RequestList({
   onAddToFlow,
   isFlowActive,
   onCreateFlow,
-}: RequestListProps) {
+}: NetworkTrackerProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
   const [matchWholeWord, setMatchWholeWord] = useState(false);

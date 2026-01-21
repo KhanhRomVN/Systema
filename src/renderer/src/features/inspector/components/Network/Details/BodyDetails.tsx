@@ -1,6 +1,6 @@
 import { AlignLeft } from 'lucide-react';
-import { NetworkRequest } from '../../types';
-import { CodeBlock, CodeBlockRef } from '../../../../components/CodeBlock';
+import { NetworkRequest } from '../../../types';
+import { CodeBlock, CodeBlockRef } from '../../../../../components/CodeBlock';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 
 interface BodyDetailsProps {
