@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Copy, Trash2, KeyRound } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 import CryptoJS from 'crypto-js';
@@ -292,7 +292,4 @@ export function CryptoTab() {
       </div>
     </div>
   );
-}
-function useEffect(_arg0: () => () => void, _arg1: never[]) {
-  throw new Error('Function not implemented.');
 }

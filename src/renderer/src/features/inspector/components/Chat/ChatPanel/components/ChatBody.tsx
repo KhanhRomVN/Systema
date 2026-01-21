@@ -275,6 +275,7 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
     <div className="flex-1 overflow-y-auto p-4 space-y-2 scroll-smooth">
       {messages.map((msg) => {
         const isUser = msg.role === 'user';
+        if (msg.role === 'system') return null;
         if (isUser) requestCount++;
 
         // Calculate tool execution state for this message

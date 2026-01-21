@@ -14,7 +14,7 @@ import {
   Regex,
 } from 'lucide-react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
-import { cn } from '../../../shared/lib/utils';
+import { cn } from '../../../../shared/lib/utils';
 
 interface LogEntry {
   timestamp: string;

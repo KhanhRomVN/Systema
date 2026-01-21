@@ -5,7 +5,7 @@ import SettingsPanel from './Chat/SettingsPanel';
 import { InspectorFilter } from './Network/NetworkFilter';
 import { NetworkRequest } from '../types';
 import { SourcesPanel } from './SourcesPanel';
-import { LogViewer } from './LogViewer';
+import { LogViewer } from './Log/LogViewer';
 import { CollectionsTab } from './CollectionsTab';
 import { CryptoTab } from './CryptoTab';
 import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, KeyRound } from 'lucide-react';

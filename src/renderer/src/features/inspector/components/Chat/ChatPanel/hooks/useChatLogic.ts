@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Message } from '../components/ChatBody';
 import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../../types/provider-types';
+import { DEFAULT_RULE_PROMPT } from '../../../../prompt';
 
 // Attachments state
 interface PendingAttachment {
@@ -192,7 +193,21 @@ export function useChatLogic(
       })),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const messagesToAdd: Message[] = [];
+
+    // Inject System Prompt if first message
+    if (messages.length === 0) {
+      messagesToAdd.push({
+        id: 'system_' + Date.now(),
+        role: 'system',
+        content: DEFAULT_RULE_PROMPT,
+        timestamp: Date.now(),
+      });
+    }
+
+    messagesToAdd.push(userMsg);
+
+    setMessages((prev) => [...prev, ...messagesToAdd]);
     setInput('');
     setAttachments([]); // Clear from input area
     setIsLoading(true);
@@ -221,12 +236,10 @@ export function useChatLogic(
             role: m.role,
             content: m.content,
           })),
-          {
-            role: 'user',
-            content: userMsg.content,
-            // Some providers take 'files' or 'images' in message object,
-            // others take it at top level. Systema usually takes 'files' in the request body for standard chat.
-          },
+          ...messagesToAdd.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
         ],
         model: providerConfig.model,
         stream: streamEnabled, // Determine streaming based on toggle
