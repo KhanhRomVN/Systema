@@ -347,7 +347,7 @@ export function ControlFlowPanel({
         <div className="h-10 border-b border-border flex items-center shrink-0 bg-background/50 z-10 px-4 justify-between">
           <div className="flex items-center gap-2 font-medium text-green-400">
             <Network className="w-4 h-4" />
-            Flow Details
+            {activeFlowData.nodes.length === 0 ? 'Replay Request' : 'Flow Details'}
           </div>
           <button
             onClick={onClose}

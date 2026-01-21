@@ -10,6 +10,11 @@ export interface ToolAction {
     | 'get_request_details'
     | 'get_values'
     | 'get_active_filters'
+    | 'list_https'
+    | 'get_https_details'
+    | 'get_filter'
+    | 'delete_https'
+    | 'edit_filter'
     | 'export_har'
     | 'generate_table'
     | 'ask_followup_question'
@@ -202,6 +207,46 @@ const parseToolAction = (toolName: string, innerContent: string, rawXml: string)
       params.path = extractParamValue(innerContent, 'path');
       break;
 
+    // --- Systema Toolset ---
+    case 'list_https':
+      params.limit = extractParamValue(innerContent, 'limit');
+      params.offset = extractParamValue(innerContent, 'offset');
+      params.methods = extractParamArray(innerContent, 'method');
+      params.hosts = extractParamArray(innerContent, 'host');
+      params.paths = extractParamArray(innerContent, 'path');
+      params.statuses = extractParamArray(innerContent, 'status');
+      params.types = extractParamArray(innerContent, 'type');
+      break;
+
+    case 'get_https_details':
+      params.id = extractParamValue(innerContent, 'id');
+      params.data = extractParamArray(innerContent, 'data');
+      break;
+
+    case 'delete_https':
+      params.id = extractParamValue(innerContent, 'id');
+      break;
+
+    case 'get_filter':
+      // No params
+      break;
+
+    case 'edit_filter': {
+      // Handles <host><value>v1</value><value>v2</value></host> structure
+      const parseNestedValues = (tag: string) => {
+        const tagMatch = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(innerContent);
+        if (!tagMatch) return [];
+        return extractParamArray(tagMatch[1], 'value');
+      };
+
+      params.methods = parseNestedValues('method');
+      params.hosts = parseNestedValues('host');
+      params.paths = parseNestedValues('path');
+      params.statuses = parseNestedValues('status');
+      params.types = parseNestedValues('type');
+      break;
+    }
+
     case 'run_command':
       params.command = extractParamValue(innerContent, 'command');
       params.cwd = extractParamValue(innerContent, 'cwd');
@@ -257,6 +302,11 @@ export const parseAIResponse = (content: string): ParsedResponse => {
     'get_request_details',
     'get_values',
     'get_active_filters',
+    'list_https',
+    'get_https_details',
+    'get_filter',
+    'delete_https',
+    'edit_filter',
     'export_har',
     'generate_table',
     'ask_followup_question',

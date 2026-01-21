@@ -113,6 +113,9 @@ app.whenReady().then(async () => {
   // Initialize WS Server
   await wsManager.initialize();
 
+  // Clear media cache for a fresh session
+  mediaCache.clear();
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron');
 

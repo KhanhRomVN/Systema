@@ -29,7 +29,7 @@ export const NETWORK = `NETWORK REFERENCE
 <data>body</data>
 </get_https_details>
 
-</get_filter>
+<get_filter></get_filter>
 
 <delete_https>
 --- id (required): the id of the request to delete

@@ -99,8 +99,8 @@ export function InspectorLayout({
   const handleFlowRequestChange = (updatedReq: NetworkRequest) => {
     if (selectedFlowNodeId && flowMethods) {
       flowMethods.updateNodeRequest(selectedFlowNodeId, updatedReq);
-      setSelectedFlowRequest(updatedReq);
     }
+    setSelectedFlowRequest(updatedReq);
   };
 
   // Flow Management State
@@ -165,6 +165,12 @@ export function InspectorLayout({
   const handleCreateFlowRequest = (request: NetworkRequest) => {
     setPendingFlowRequest(request);
     setCreateFlowModalOpen(true);
+  };
+
+  const handleEditAndReplay = (request: NetworkRequest) => {
+    setSelectedFlowRequest({ ...request });
+    setActiveFlowData({ nodes: [], edges: [] }); // Dummy flow data to trigger Flow Details view
+    setIsControlFlowMode(true);
   };
 
   const handleCreateFlow = (title: string) => {
@@ -744,6 +750,7 @@ export function InspectorLayout({
                 onAddToFlow={addNodeToFlowRef || undefined}
                 isFlowActive={!!activeFlowData}
                 onCreateFlow={handleCreateFlowRequest}
+                onEditAndReplay={handleEditAndReplay}
               />
             </div>
 
@@ -791,6 +798,7 @@ export function InspectorLayout({
               filter,
               onSetFilter: setFilter,
               onSelectRequest: setSelectedId,
+              onDeleteRequest: onDelete,
               onSelectSavedRequest: setComposerRequest,
               targetApp: appName,
               emulatorSerial,

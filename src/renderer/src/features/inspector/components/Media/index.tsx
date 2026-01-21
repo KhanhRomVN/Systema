@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { NetworkRequest } from '../../types';
 import {
   X,
@@ -27,6 +27,7 @@ interface MediaItem {
   size: string;
   timestamp: number;
   isCached?: boolean;
+  source: string;
 }
 
 export function MediaPanel({ requests, onClose }: MediaPanelProps) {
@@ -39,6 +40,7 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
     videos: true,
     audio: true,
   });
+  const [selectedSource, setSelectedSource] = useState<string>('all');
 
   const [cacheManifest, setCacheManifest] = useState<Record<string, { size?: number }>>({});
 
@@ -128,6 +130,7 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
             size: displaySize === '0 B' ? 'Unknown' : displaySize, // Hide 0 B
             timestamp: req.timestamp,
             isCached,
+            source: req.url.split('?')[0].substring(0, req.url.split('?')[0].lastIndexOf('/') + 1),
           });
         }
       });
@@ -140,11 +143,26 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
     setIsScanning(false);
   }, [requests, cacheManifest]);
 
+  const videoSources = useMemo(() => {
+    const sources = new Set<string>();
+    mediaItems.forEach((item) => {
+      if (item.type === 'video' && item.source) {
+        sources.add(item.source);
+      }
+    });
+    return Array.from(sources).sort();
+  }, [mediaItems]);
+
   // Filter media items based on filter settings
   const filteredMediaItems = mediaItems.filter((item) => {
     if (item.type === 'image' && !mediaFilters.images) return false;
     if (item.type === 'video' && !mediaFilters.videos) return false;
     if (item.type === 'audio' && !mediaFilters.audio) return false;
+
+    if (item.type === 'video' && selectedSource !== 'all' && item.source !== selectedSource) {
+      return false;
+    }
+
     return true;
   });
 
@@ -241,6 +259,38 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
             <div className="pt-2 border-t border-border/50 text-[10px] text-muted-foreground">
               Filter media resources by their format type.
             </div>
+
+            {mediaFilters.videos && videoSources.length > 1 && (
+              <div className="pt-3 border-t border-border/50 space-y-2">
+                <div className="text-xs font-medium flex items-center gap-2">
+                  <Film className="w-3 h-3 text-purple-400" />
+                  Filter by Video Source
+                </div>
+                <select
+                  value={selectedSource}
+                  onChange={(e) => setSelectedSource(e.target.value)}
+                  className="w-full bg-muted border border-border rounded px-2 py-1.5 text-[10px] outline-none focus:border-blue-500/50"
+                >
+                  <option value="all">All Video Sources ({videoSources.length})</option>
+                  {videoSources.map((src) => {
+                    // Try to make source more readable by showing domain + last few path segments
+                    let displaySource = src;
+                    try {
+                      const url = new URL(src);
+                      const pathParts = url.pathname.split('/').filter(Boolean);
+                      const lastPart = pathParts.slice(-2).join('/');
+                      displaySource = `${url.hostname}/.../${lastPart}`;
+                    } catch (e) {}
+
+                    return (
+                      <option key={src} value={src}>
+                        {displaySource}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}

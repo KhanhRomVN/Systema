@@ -1,4 +1,4 @@
-import { X, ExternalLink, Download, FileWarning } from 'lucide-react';
+import { X, ExternalLink, FileWarning } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 
@@ -61,15 +61,6 @@ export function MediaModal({ url, filename, type, onClose }: MediaModalProps) {
     return undefined;
   }, [type, isTS, url]);
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = rawUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
@@ -88,13 +79,6 @@ export function MediaModal({ url, filename, type, onClose }: MediaModalProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleDownload}
-              className="p-2 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground"
-              title="Download"
-            >
-              <Download className="w-4 h-4" />
-            </button>
             <a
               href={rawUrl}
               target="_blank"
@@ -120,12 +104,6 @@ export function MediaModal({ url, filename, type, onClose }: MediaModalProps) {
             <div className="flex flex-col items-center gap-4 text-red-400">
               <FileWarning className="w-12 h-12 opacity-50" />
               <p className="text-sm font-medium">{hlsError}</p>
-              <button
-                onClick={handleDownload}
-                className="text-xs px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-all text-red-300"
-              >
-                Download and play locally
-              </button>
             </div>
           ) : (
             <>

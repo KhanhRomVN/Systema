@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { INJECT_SCRIPT } from './injection';
 import * as zlib from 'zlib'; // Ensure zlib is imported for decompression
 import { cacheHeaders } from './headerCache';
+import { mediaCache } from './mediaCache';
 
 export class ProxyServer extends EventEmitter {
   private proxy: any;
@@ -541,6 +542,19 @@ export class ProxyServer extends EventEmitter {
           } else {
             body = `[Systema Info] Content encoded with '${contentEncoding}' which is currently not supported for preview.`;
           }
+
+          // --- AUTO-SAVE MEDIA ---
+          const contentType = (res?.headers['content-type'] || '').toLowerCase();
+          const isMedia =
+            contentType.startsWith('image/') ||
+            contentType.startsWith('video/') ||
+            contentType.startsWith('audio/');
+
+          if (isMedia && ctx.requestId) {
+            const fileName = url.split('/').pop()?.split('?')[0] || 'media_file';
+            mediaCache.save(ctx.requestId, buffer, contentType, fileName);
+          }
+          // ------------------------
 
           this.sendToRenderer('proxy:response-body', {
             id: ctx.requestId,

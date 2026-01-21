@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Message } from '../components/ChatBody';
 import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../../types/provider-types';
 import { DEFAULT_RULE_PROMPT } from '../../../../prompt';
+import { parseAIResponse } from '../../../../../../services/ResponseParser';
 
 // Attachments state
 interface PendingAttachment {
@@ -22,8 +23,17 @@ export function useChatLogic(
   initialAttachmentData?: PendingAttachment[],
   initialStreamEnabled?: boolean,
   initialThinkingEnabled?: boolean,
+  initialConversationId?: string,
+  onConversationIdUpdate?: (id: string) => void,
 ) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState(initialConversationId || '');
+  const conversationIdRef = useRef(initialConversationId || '');
+
+  useEffect(() => {
+    conversationIdRef.current = currentConversationId;
+  }, [currentConversationId]);
+
   const [input, setInput] = useState(initialInput || '');
   const [isLoading, setIsLoading] = useState(false);
   const [thinkingEnabled, setThinkingEnabled] = useState(initialThinkingEnabled || false);
@@ -169,9 +179,11 @@ export function useChatLogic(
     (a) => a.status === 'pending' || a.status === 'uploading',
   );
 
-  const handleSend = async () => {
+  const handleSend = async (options?: { isHidden?: boolean; customInput?: string }) => {
+    const textToSend = options?.customInput || input;
+
     if (
-      (!input.trim() && attachments.length === 0) ||
+      (!textToSend.trim() && attachments.length === 0) ||
       isLoading ||
       !providerConfig ||
       isUploadingAttachment
@@ -182,7 +194,7 @@ export function useChatLogic(
     const userMsg: Message = {
       id: userMsgId,
       role: 'user',
-      content: input,
+      content: textToSend,
       timestamp: Date.now(),
       timestampStr: new Date().toLocaleTimeString(),
       attachments: attachments.map((a) => ({
@@ -191,25 +203,19 @@ export function useChatLogic(
         url: a.previewUrl,
         fileId: a.fileId,
       })),
+      isHidden: options?.isHidden,
     };
 
     const messagesToAdd: Message[] = [];
 
-    // Inject System Prompt if first message
-    if (messages.length === 0) {
-      messagesToAdd.push({
-        id: 'system_' + Date.now(),
-        role: 'system',
-        content: DEFAULT_RULE_PROMPT,
-        timestamp: Date.now(),
-      });
-    }
-
     messagesToAdd.push(userMsg);
 
     setMessages((prev) => [...prev, ...messagesToAdd]);
-    setInput('');
-    setAttachments([]); // Clear from input area
+
+    if (!options?.customInput) {
+      setInput('');
+      setAttachments([]); // Clear from input area
+    }
     setIsLoading(true);
 
     const assistantMsgId = (Date.now() + 1).toString();
@@ -236,9 +242,12 @@ export function useChatLogic(
             role: m.role,
             content: m.content,
           })),
-          ...messagesToAdd.map((m) => ({
+          ...messagesToAdd.map((m, index) => ({
             role: m.role,
-            content: m.content,
+            content:
+              messages.length === 0 && index === 0
+                ? `${DEFAULT_RULE_PROMPT}\n\n${m.content}`
+                : m.content,
           })),
         ],
         model: providerConfig.model,
@@ -270,7 +279,8 @@ export function useChatLogic(
         payload.search = searchEnabled;
         payload.thinking = thinkingEnabled;
         payload.ref_file_ids = fileIds;
-        payload.conversationId = _sessionId && isUUID(_sessionId) ? _sessionId : undefined;
+        const cid = conversationIdRef.current;
+        payload.conversationId = cid && isUUID(cid) ? cid : undefined;
         // Remove standard fields if they conflict or duplicate custom ones, but usually okay.
         delete payload.files;
         delete payload.search_enabled;
@@ -369,7 +379,13 @@ export function useChatLogic(
                   streamedContent += data.content;
                   setMessages((prev) =>
                     prev.map((m) =>
-                      m.id === assistantMsgId ? { ...m, content: streamedContent } : m,
+                      m.id === assistantMsgId
+                        ? {
+                            ...m,
+                            content: streamedContent,
+                            parsed: parseAIResponse(streamedContent),
+                          }
+                        : m,
                     ),
                   );
                 }
@@ -383,7 +399,15 @@ export function useChatLogic(
                   );
                 }
 
-                // Handle Meta (e.g. Conversation ID update) could go here
+                // Handle Meta (e.g. Conversation ID update)
+                if (
+                  data.meta?.conversation_id &&
+                  data.meta.conversation_id !== currentConversationId
+                ) {
+                  console.log('[ChatDebug] New conversation ID:', data.meta.conversation_id);
+                  setCurrentConversationId(data.meta.conversation_id);
+                  onConversationIdUpdate?.(data.meta.conversation_id);
+                }
               }
               // HANDLE GENERIC OPENAI FORMAT (choices array)
               else {
@@ -392,7 +416,13 @@ export function useChatLogic(
                   streamedContent += contentDelta;
                   setMessages((prev) =>
                     prev.map((m) =>
-                      m.id === assistantMsgId ? { ...m, content: streamedContent } : m,
+                      m.id === assistantMsgId
+                        ? {
+                            ...m,
+                            content: streamedContent,
+                            parsed: parseAIResponse(streamedContent),
+                          }
+                        : m,
                     ),
                   );
                 }

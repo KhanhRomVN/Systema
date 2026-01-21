@@ -26,6 +26,7 @@ export interface InspectorContext {
   filter: InspectorFilter;
   onSetFilter: (filter: InspectorFilter) => void;
   onSelectRequest: (id: string) => void;
+  onDeleteRequest?: (id: string) => void;
   onSelectSavedRequest?: (request: NetworkRequest) => void;
   targetApp: string;
   emulatorSerial?: string;
@@ -166,6 +167,9 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           initialAttachments={activeSession.initialAttachments}
           initialStreamEnabled={activeSession.initialStreamEnabled}
           initialThinkingEnabled={activeSession.initialThinkingEnabled}
+          onUpdateSession={(updates) => {
+            setActiveSession((prev: any) => (prev ? { ...prev, ...updates } : prev));
+          }}
         />
       );
     }

@@ -23,6 +23,7 @@ import {
   BookmarkPlus,
   Star,
   Network,
+  Pencil,
 } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import {
@@ -40,6 +41,7 @@ import {
   ContextMenuTrigger,
 } from '../../../../components/ui/context-menu';
 import { addRequestToDefaultCollection } from '../../utils/collections';
+import { calculateSimilarity } from '../../utils/similarity';
 
 interface RequestActionsProps {
   request: NetworkRequest;
@@ -52,6 +54,7 @@ interface RequestActionsProps {
   onAddToFlow?: (req: NetworkRequest) => void;
   isFlowActive?: boolean;
   onCreateFlow?: (req: NetworkRequest) => void;
+  onEditAndReplay?: (req: NetworkRequest) => void;
 }
 
 function RequestActions({
@@ -65,6 +68,7 @@ function RequestActions({
   onAddToFlow,
   isFlowActive,
   onCreateFlow,
+  onEditAndReplay,
 }: RequestActionsProps) {
   return (
     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -144,6 +148,19 @@ function RequestActions({
             </DropdownMenuItem>
           )}
 
+          {onEditAndReplay && (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditAndReplay(request);
+              }}
+              className="text-blue-500 focus:text-blue-500 focus:bg-blue-500/10"
+            >
+              <Pencil className="mr-2 h-3.5 w-3.5" />
+              <span>Edit & Replay</span>
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
@@ -194,6 +211,7 @@ interface NetworkTrackerProps {
   onAddToFlow?: (req: NetworkRequest) => void;
   isFlowActive?: boolean;
   onCreateFlow?: (req: NetworkRequest) => void;
+  onEditAndReplay?: (req: NetworkRequest) => void;
 }
 
 export function NetworkTracker({
@@ -213,6 +231,7 @@ export function NetworkTracker({
   onAddToFlow,
   isFlowActive,
   onCreateFlow,
+  onEditAndReplay,
 }: NetworkTrackerProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
@@ -233,6 +252,11 @@ export function NetworkTracker({
 
   // Debounce search term to reduce re-renders
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+
+  const selectedRequest = useMemo(
+    () => requests.find((r) => r.id === selectedId),
+    [requests, selectedId],
+  );
 
   const columns = useMemo<ColumnDef<NetworkRequest>[]>(
     () => [
@@ -366,8 +390,26 @@ export function NetworkTracker({
             onAddToFlow={onAddToFlow}
             isFlowActive={isFlowActive}
             onCreateFlow={onCreateFlow}
+            onEditAndReplay={onEditAndReplay}
           />
         ),
+      },
+      {
+        id: 'similarity',
+        header: 'Similarity',
+        size: 100,
+        cell: ({ row }) => {
+          if (!selectedRequest || selectedRequest.id === row.original.id) {
+            return <span className="text-muted-foreground">-</span>;
+          }
+          const similarity = calculateSimilarity(selectedRequest, row.original);
+          let colorClass = 'text-muted-foreground';
+          if (similarity >= 80) colorClass = 'text-green-400 font-bold';
+          else if (similarity >= 50) colorClass = 'text-yellow-400';
+          else if (similarity >= 30) colorClass = 'text-orange-400';
+
+          return <span className={colorClass}>{similarity}%</span>;
+        },
       },
     ],
     [
@@ -382,6 +424,8 @@ export function NetworkTracker({
       onAddToFlow,
       isFlowActive,
       onCreateFlow,
+      onEditAndReplay,
+      selectedRequest,
     ],
   );
 
@@ -691,6 +735,18 @@ export function NetworkTracker({
                     >
                       <Network className="mr-2 h-3.5 w-3.5" />
                       <span>Create Flow with Request</span>
+                    </ContextMenuItem>
+                  )}
+
+                  {onEditAndReplay && (
+                    <ContextMenuItem
+                      onClick={() => {
+                        onEditAndReplay(row.original);
+                      }}
+                      className="text-blue-500 focus:text-blue-500 focus:bg-blue-500/10"
+                    >
+                      <Pencil className="mr-2 h-3.5 w-3.5" />
+                      <span>Edit & Replay</span>
                     </ContextMenuItem>
                   )}
 
