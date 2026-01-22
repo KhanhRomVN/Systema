@@ -88,7 +88,12 @@ export class ProxyServer extends EventEmitter {
       // http-mitm-proxy might pass (ctx, err) or just (err) depending on version/context
       const error = err || ctxOrErr;
       const code = error?.code;
-      if (code === 'ECONNRESET' || error?.message === 'socket hang up') {
+      if (
+        code === 'ECONNRESET' ||
+        code === 'HPE_INVALID_METHOD' ||
+        code === 'HPE_INVALID_CONSTANT' ||
+        error?.message === 'socket hang up'
+      ) {
         return;
       }
       console.error('[ProxyServer Error]', error);

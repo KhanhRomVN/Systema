@@ -48,6 +48,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\"",
     "test": "vitest run",
+    "check:security": "njsscan .",
+    "check:secrets": "scripts/bin/gitleaks detect --source . -v && scripts/bin/talisman --checksum && ggshield secret scan path . --recursive",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "postinstall": "electron-builder install-app-deps",
@@ -130,7 +132,8 @@
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix",
-      "prettier --write"
+      "prettier --write",
+      "npm run typecheck"
     ],
     "*.{json,css,md}": [
       "prettier --write"

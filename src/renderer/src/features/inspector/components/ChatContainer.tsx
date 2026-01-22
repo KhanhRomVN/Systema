@@ -10,7 +10,7 @@ import { CollectionsTab } from './CollectionsTab';
 import { CryptoTab } from './CryptoTab';
 import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, KeyRound } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
-import { DiffView } from './DiffView';
+import { DiffView, DiffTab } from './DiffView';
 import { ProviderSelectionPanel } from './ProviderSelectionPanel';
 import { ProviderConfig } from '../types/provider-types';
 import { ProviderStorage } from '../../../services/provider-storage';
@@ -47,6 +47,15 @@ export interface InspectorContext {
   activeFlowData?: { nodes: any[]; edges: any[] } | null;
   selectedFlowRequest?: NetworkRequest | null;
   onUpdateNodeRequest?: (req: NetworkRequest) => void;
+  onJumpToValue?: (requestId: string, tab: string, value: string) => void;
+  onCompareRequests?: (
+    req1: NetworkRequest,
+    req2: NetworkRequest,
+    initialTab?: DiffTab,
+    value?: string,
+  ) => void;
+  initialDiffTab?: DiffTab;
+  initialDiffSearch?: string;
 }
 
 interface ChatContainerProps {
@@ -314,6 +323,8 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
             request1={inspectorContext.compareRequest1 || null}
             request2={inspectorContext.compareRequest2 || null}
             onClose={() => inspectorContext.onClearComparison?.()}
+            initialTab={inspectorContext.initialDiffTab}
+            initialSearchTerm={inspectorContext.initialDiffSearch}
           />
         ) : (
           renderContent()

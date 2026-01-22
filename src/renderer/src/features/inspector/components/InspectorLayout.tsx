@@ -7,11 +7,12 @@ import { ChatContainer } from './ChatContainer';
 import { MemoryMonitor } from './MemoryMonitor';
 import { SaveProfileModal } from './SaveProfileModal';
 import { formatDistanceToNow } from 'date-fns';
-import { Play, Pause, Clock, FileCode, Image, Network } from 'lucide-react';
+import { Play, Pause, Clock, FileCode, Image, Network, Download } from 'lucide-react';
 import { RequestComposer } from './RequestComposer';
 import { FlowBoard } from './Flow';
 import { CreateFlowModal } from './Flow';
 import type { FlowCard } from './Flow';
+import { DiffTab } from './DiffView';
 
 import { useState, useMemo, useEffect } from 'react';
 import { NetworkRequest } from '../types';
@@ -108,6 +109,10 @@ export function InspectorLayout({
   const [createFlowModalOpen, setCreateFlowModalOpen] = useState(false);
   const [pendingFlowRequest, setPendingFlowRequest] = useState<NetworkRequest | null>(null);
 
+  // Navigation & Comparison State Extensions
+  const [initialDiffTab, setInitialDiffTab] = useState<DiffTab | undefined>();
+  const [initialDiffSearch, setInitialDiffSearch] = useState<string | undefined>();
+
   // Auto-save State
   const [autoSaveInterval, setAutoSaveInterval] = useState<number>(0); // 0 = off, minutes
   const [nextSaveTime, setNextSaveTime] = useState<number | null>(null);
@@ -173,6 +178,38 @@ export function InspectorLayout({
     setIsControlFlowMode(true);
   };
 
+  const handleDownloadHttps = () => {
+    const httpsRequests = requests.filter((r) => r.protocol === 'https');
+    if (httpsRequests.length === 0) {
+      alert('No HTTPS requests found to download.');
+      return;
+    }
+
+    const dataStr = JSON.stringify(
+      httpsRequests.map((r) => ({
+        method: r.method,
+        url: r.url,
+        status: r.status,
+        requestHeaders: r.requestHeaders,
+        requestBody: r.requestBody,
+        responseHeaders: r.responseHeaders,
+        responseBody: r.responseBody,
+      })),
+      null,
+      2,
+    );
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.href = url;
+    link.download = `https-requests-${appName.replace(/\s+/g, '-')}-${timestamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleCreateFlow = (title: string) => {
     if (!pendingFlowRequest) return;
 
@@ -204,6 +241,26 @@ export function InspectorLayout({
 
   const handleUpdateFlow = (id: string, data: { nodes: any[]; edges: any[] }) => {
     setFlows((prev) => prev.map((f) => (f.id === id ? { ...f, ...data } : f)));
+  };
+
+  const handleJumpToValue = (requestId: string, tab: string, value: string) => {
+    setSelectedId(requestId);
+    setDetailsTab(tab);
+    setSearchTerm(value);
+    // Ensure Tracker is closed if we jump to details
+    // (Actually user might want it open, but let's toggle logically if needed)
+  };
+
+  const handleCompareRequests = (
+    req1: NetworkRequest,
+    req2: NetworkRequest,
+    initialTab?: DiffTab,
+    value?: string,
+  ) => {
+    setCompareRequest1(req1);
+    setCompareRequest2(req2);
+    setInitialDiffTab(initialTab);
+    setInitialDiffSearch(value);
   };
 
   // Track new requests for interception
@@ -580,6 +637,15 @@ export function InspectorLayout({
             Save
           </button>
 
+          <button
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all border border-transparent hover:border-border"
+            title="Download all HTTPS requests as JSON"
+            onClick={handleDownloadHttps}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download
+          </button>
+
           <div className="w-px h-4 bg-border/50 mx-1" />
 
           <button
@@ -786,6 +852,9 @@ export function InspectorLayout({
                 onFilterChange={setFilter}
                 requests={requests}
                 onSearchTermChange={setSearchTerm}
+                onSelectRequest={setSelectedId}
+                onJumpToValue={handleJumpToValue}
+                onCompareRequests={handleCompareRequests}
               />
             )}
           </ResizableSplit>
@@ -822,6 +891,10 @@ export function InspectorLayout({
               activeFlowData,
               selectedFlowRequest,
               onUpdateNodeRequest: handleFlowRequestChange,
+              onJumpToValue: handleJumpToValue,
+              onCompareRequests: handleCompareRequests,
+              initialDiffTab,
+              initialDiffSearch,
             }}
           />
         </ResizableSplit>

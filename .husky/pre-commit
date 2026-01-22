@@ -1,0 +1,27 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Đang chạy 8 công cụ kiểm tra (ESLint, tsc, ggshield, Gitleaks, Talisman, njsscan, Prettier, Husky)..."
+
+# 1. Prettier & ESLint & tsc (thông qua lint-staged)
+npx lint-staged || exit 1
+
+# 2. njsscan (Security)
+echo "🛡️ Chạy njsscan..."
+njsscan . || exit 1
+
+# 3. Gitleaks (Secrets)
+echo "🔑 Chạy Gitleaks..."
+./scripts/bin/gitleaks detect --source . --staged -v || exit 1
+
+# 4. Talisman (Secrets & sensitive files)
+echo "💎 Chạy Talisman..."
+./scripts/bin/talisman --githook pre-commit || exit 1
+
+# 5. ggshield (GitGuardian)
+# Lưu ý: Chế độ offline của ggshield vẫn cần cấu hình ban đầu, 
+# nhưng chúng ta ép nó chạy scan cục bộ.
+echo "🛡️ Chạy ggshield..."
+ggshield secret scan pre-commit || exit 1
+
+echo "✅ Đã vượt qua tất cả các bài kiểm tra. Đang thực hiện commit..."

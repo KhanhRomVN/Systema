@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { NetworkRequest } from '../types';
 import { X, ArrowRightLeft, Wand2 } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
@@ -9,14 +9,36 @@ interface DiffViewProps {
   request1: NetworkRequest | null;
   request2: NetworkRequest | null;
   onClose: () => void;
+  initialTab?: DiffTab;
+  initialSearchTerm?: string;
 }
 
-type DiffTab = 'body' | 'headers' | 'params' | 'cookies';
+export type DiffTab = 'body' | 'headers' | 'params' | 'cookies';
 
-export function DiffView({ request1, request2, onClose }: DiffViewProps) {
+export function DiffView({
+  request1,
+  request2,
+  onClose,
+  initialTab,
+  initialSearchTerm,
+}: DiffViewProps) {
   const [activeTab, setActiveTab] = useState<DiffTab>('body');
   const codeBlockRef1 = useRef<CodeBlockRef>(null);
   const codeBlockRef2 = useRef<CodeBlockRef>(null);
+
+  useState(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  });
+
+  useEffect(() => {
+    if (initialSearchTerm) {
+      // In a real implementation with CodeBlock/Monaco, we might need a ref to trigger search
+      // For now, highlight ranges are computed via useMemo, so we just need to ensure the values are correct.
+      // If we want to scroll, we'd need to call methods on codeBlockRef.
+    }
+  }, [initialSearchTerm]);
 
   const getContent = (req: NetworkRequest | null) => {
     if (!req) return '';
@@ -207,6 +229,30 @@ export function DiffView({ request1, request2, onClose }: DiffViewProps) {
     return { originalRanges, modifiedRanges };
   }, [content1, content2, isValidForDiff]);
 
+  const searchRanges = useMemo(() => {
+    if (!initialSearchTerm) return { ranges1: [], ranges2: [] };
+
+    const getRanges = (content: string) => {
+      const ranges: HighlightRange[] = [];
+      const lines = content.split('\n');
+      lines.forEach((line, i) => {
+        if (line.includes(initialSearchTerm)) {
+          ranges.push({
+            startLine: i + 1,
+            endLine: i + 1,
+            color: 'monaco-range-highlight-yellow', // Assuming yellow for search
+          });
+        }
+      });
+      return ranges;
+    };
+
+    return {
+      ranges1: getRanges(content1),
+      ranges2: getRanges(content2),
+    };
+  }, [content1, content2, initialSearchTerm]);
+
   const handleFormat = () => {
     codeBlockRef1.current?.format();
     codeBlockRef2.current?.format();
@@ -334,7 +380,11 @@ export function DiffView({ request1, request2, onClose }: DiffViewProps) {
                 showLineNumbers={false}
                 className="absolute inset-0"
                 themeConfig={{ background: '#00000000' }}
-                highlightRanges={isValidForDiff ? originalRanges : []}
+                highlightRanges={
+                  isValidForDiff
+                    ? [...originalRanges, ...searchRanges.ranges1]
+                    : searchRanges.ranges1
+                }
                 editorOptions={{
                   readOnly: true,
                   domReadOnly: true,
@@ -394,7 +444,11 @@ export function DiffView({ request1, request2, onClose }: DiffViewProps) {
                 showLineNumbers={false}
                 className="absolute inset-0"
                 themeConfig={{ background: '#00000000' }}
-                highlightRanges={isValidForDiff ? modifiedRanges : []}
+                highlightRanges={
+                  isValidForDiff
+                    ? [...modifiedRanges, ...searchRanges.ranges2]
+                    : searchRanges.ranges2
+                }
                 editorOptions={{
                   readOnly: true,
                   domReadOnly: true,

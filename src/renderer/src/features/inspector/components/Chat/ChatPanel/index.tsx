@@ -26,10 +26,9 @@ export function ChatPanel({
   sessionId,
   title,
   provider,
-
+  initialConversationId,
   onBack,
   inspectorContext, // Added this
-
   providerConfig: initialProviderConfig,
   initialInput,
   initialAttachments,

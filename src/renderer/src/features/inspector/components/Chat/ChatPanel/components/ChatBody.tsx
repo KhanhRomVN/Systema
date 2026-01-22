@@ -424,7 +424,6 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
 
       {isProcessing && (
         <div className="flex flex-col w-full gap-2 mt-4 animate-in fade-in">
-          {/* No Avatar, just a loader indicator */}
           <div className="flex items-center gap-2 pl-1 opacity-50">
             <div
               className="w-1.5 h-1.5 bg-primary/50 rounded-full animate-bounce"

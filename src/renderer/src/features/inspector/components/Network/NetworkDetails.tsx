@@ -19,6 +19,7 @@ import {
   ScanEye,
   PlayCircle,
   KeyRound,
+  History,
 } from 'lucide-react';
 
 import { RequestOverview } from './Details/RequestOverview';
@@ -33,7 +34,9 @@ import { NetworkDetails as NetworkDetailsSub } from './Details/NetworkDetails';
 import { TimingDetails } from './Details/TimingDetails';
 import { IssuesDetails } from './Details/IssuesDetails';
 import { InitiatorDetails } from './Details/InitiatorDetails';
+import { DiffTab } from '../DiffView';
 import { InspectorFilter, NetworkFilter } from './NetworkFilter';
+import { VariableTrackerPanel } from './VariableTrackerPanel';
 import { ResizableSplit } from '../../../../components/ResizableSplit';
 import { CodeBlock } from '../../../../components/CodeBlock';
 
@@ -62,6 +65,14 @@ interface NetworkDetailsProps {
   onFilterChange: (filter: InspectorFilter) => void;
   requests?: NetworkRequest[];
   onSearchTermChange?: (term: string) => void;
+  onSelectRequest?: (id: string) => void;
+  onJumpToValue?: (requestId: string, tab: string, value: string) => void;
+  onCompareRequests?: (
+    req1: NetworkRequest,
+    req2: NetworkRequest,
+    initialTab?: DiffTab,
+    value?: string,
+  ) => void;
 }
 
 // Text Selection Menu Component
@@ -139,9 +150,13 @@ export function NetworkDetails({
   onFilterChange,
   requests = [],
   onSearchTermChange,
+  onSelectRequest,
+  onJumpToValue,
+  onCompareRequests,
 }: NetworkDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview');
   const [isRawMode, setIsRawMode] = useState(false);
+  const [isTrackerOpen, setIsTrackerOpen] = useState(false);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -701,17 +716,36 @@ export function NetworkDetails({
               })}
           </div>
           {onToggleFilter && (
-            <button
-              onClick={onToggleFilter}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
-                isFilterOpen ? 'border-primary text-primary' : 'text-muted-foreground',
-              )}
-              title={isFilterOpen ? 'Collapse Filters' : 'Expand Filters'}
-            >
-              <Filter className="w-3.5 h-3.5" />
-              Filter
-            </button>
+            <div className="flex border-l border-border/50">
+              <button
+                onClick={() => {
+                  setIsTrackerOpen(!isTrackerOpen);
+                  if (!isTrackerOpen && isFilterOpen) onToggleFilter();
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
+                  isTrackerOpen ? 'border-primary text-primary' : 'text-muted-foreground',
+                )}
+                title={isTrackerOpen ? 'Collapse Tracker' : 'Expand Variable Tracker'}
+              >
+                <History className="w-3.5 h-3.5" />
+                Tracker
+              </button>
+              <button
+                onClick={() => {
+                  onToggleFilter();
+                  if (!isFilterOpen && isTrackerOpen) setIsTrackerOpen(false);
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
+                  isFilterOpen ? 'border-primary text-primary' : 'text-muted-foreground',
+                )}
+                title={isFilterOpen ? 'Collapse Filters' : 'Expand Filters'}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                Filter
+              </button>
+            </div>
           )}
         </div>
 
@@ -720,6 +754,17 @@ export function NetworkDetails({
             <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
               {content}
               <NetworkFilter filter={filter} onChange={onFilterChange} requests={requests} />
+            </ResizableSplit>
+          ) : isTrackerOpen ? (
+            <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
+              {content}
+              <VariableTrackerPanel
+                requests={requests}
+                onSelectRequest={onSelectRequest || (() => {})}
+                selectedRequestId={request?.id}
+                onJumpToValue={onJumpToValue}
+                onCompareRequests={onCompareRequests}
+              />
             </ResizableSplit>
           ) : (
             content
