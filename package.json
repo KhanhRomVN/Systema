@@ -133,10 +133,16 @@
     "*.{ts,tsx}": [
       "eslint --fix",
       "prettier --write",
-      "npm run typecheck"
+      "npm run typecheck",
+      "bash -c 'njsscan . --exit-zero'"
     ],
     "*.{json,css,md}": [
       "prettier --write"
+    ],
+    "*": [
+      "bash -c 'ggshield secret scan pre-commit --exit-zero || true'",
+      "bash -c 'scripts/bin/gitleaks protect --staged -v'",
+      "bash -c 'scripts/bin/talisman --pattern staged'"
     ]
   }
 }
