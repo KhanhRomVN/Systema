@@ -12,6 +12,7 @@ export interface TrackedVariable {
   sourceRequestId: string;
   sourceTimestamp: number;
   usages: VariableUsage[];
+  matcherName?: string;
 }
 
 /**
@@ -35,12 +36,12 @@ function isPotentialVariable(val: string): boolean {
 /**
  * Extracts potential variables from a string or object
  */
-function extractPotentialValues(data: any, results: Set<string>) {
+function extractPotentialValues(data: unknown, results: Set<{ value: string; matcher: string }>) {
   if (!data) return;
 
   if (typeof data === 'string') {
     if (isPotentialVariable(data)) {
-      results.add(data);
+      results.add({ value: data, matcher: 'Heuristic' });
     }
     // Also try to find patterns inside the string (e.g. JSON inside string)
     // For now keep it simple
@@ -61,7 +62,7 @@ export function findVariableRelationships(requests: NetworkRequest[]): TrackedVa
   const variables = new Map<string, TrackedVariable>();
 
   // Map of value -> Set of Request IDs that provided this value in Response
-  const valueSources = new Map<string, { id: string; timestamp: number }>();
+  const valueSources = new Map<string, { id: string; timestamp: number; matcher: string }>();
 
   for (const req of sorted) {
     // 1. Scan for USAGES of known values in this request
@@ -77,6 +78,7 @@ export function findVariableRelationships(requests: NetworkRequest[]): TrackedVa
               value: discoveredValue,
               sourceRequestId: source.id,
               sourceTimestamp: source.timestamp,
+              matcherName: source.matcher,
               usages: [],
             };
             variables.set(discoveredValue, variable);
@@ -113,12 +115,10 @@ export function findVariableRelationships(requests: NetworkRequest[]): TrackedVa
     }
 
     // 2. Scan for NEW potential values in this request's RESPONSE
-    const newValues = new Set<string>();
+    const newValues = new Set<{ value: string; matcher: string }>();
 
     // Check response headers (e.g. Set-Cookie, Authorization)
-    Object.entries(req.responseHeaders || {}).forEach(([k, v]) =>
-      extractPotentialValues(v, newValues),
-    );
+    Object.values(req.responseHeaders || {}).forEach((v) => extractPotentialValues(v, newValues));
 
     // Check response body
     if (req.responseBody) {
@@ -136,15 +136,15 @@ export function findVariableRelationships(requests: NetworkRequest[]): TrackedVa
         const jwts = req.responseBody.match(jwtRegex) || [];
         const uuids = req.responseBody.match(uuidRegex) || [];
 
-        jwts.forEach((v) => newValues.add(v));
-        uuids.forEach((v) => newValues.add(v));
+        jwts.forEach((v) => newValues.add({ value: v, matcher: 'JWT' }));
+        uuids.forEach((v) => newValues.add({ value: v, matcher: 'UUID' }));
       }
     }
 
     // Register new discovered values as potential sources
-    newValues.forEach((val) => {
-      if (!valueSources.has(val) && isPotentialVariable(val)) {
-        valueSources.set(val, { id: req.id, timestamp: req.timestamp });
+    newValues.forEach(({ value, matcher }) => {
+      if (!valueSources.has(value) && isPotentialVariable(value)) {
+        valueSources.set(value, { id: req.id, timestamp: req.timestamp, matcher });
       }
     });
   }

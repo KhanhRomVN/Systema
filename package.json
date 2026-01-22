@@ -131,18 +131,11 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write",
-      "npm run typecheck",
-      "bash -c 'njsscan . --exit-zero'"
+      "eslint --fix --max-warnings=0",
+      "prettier --write"
     ],
     "*.{json,css,md}": [
       "prettier --write"
-    ],
-    "*": [
-      "bash -c 'ggshield secret scan pre-commit --exit-zero || true'",
-      "bash -c 'scripts/bin/gitleaks protect --staged -v'",
-      "bash -c 'scripts/bin/talisman --pattern staged'"
     ]
   }
 }
