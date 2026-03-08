@@ -49,7 +49,7 @@ export function HighlightText({
           <mark
             key={i}
             className={cn(
-              'bg-yellow-200 dark:bg-yellow-500/30 text-foreground rounded-sm px-0.5 mx-[-2px]',
+              'bg-warning/30 text-text-primary rounded-sm px-0.5 mx-[-2px]',
               highlightClassName,
             )}
           >

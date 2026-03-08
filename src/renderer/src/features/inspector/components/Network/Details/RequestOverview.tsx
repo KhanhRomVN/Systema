@@ -14,7 +14,7 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
 
   if (!analysis?.overview) {
     return (
-      <div className="text-center text-muted-foreground py-8">
+      <div className="text-center text-text-secondary py-8">
         Request details overview not available
       </div>
     );
@@ -22,50 +22,50 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-[10px] font-bold text-muted-foreground uppercase">General Information</h3>
-      <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-muted/20 rounded border border-border/50">
-        <div className="text-muted-foreground">URL</div>
+      <h3 className="text-[10px] font-bold text-text-secondary uppercase">General Information</h3>
+      <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 p-3 bg-secondary/20 rounded border border-divider/50">
+        <div className="text-text-secondary">URL</div>
 
         <div className="break-all">
           <HighlightText text={analysis.overview.url} searchTerm={searchTerm} />
         </div>
 
-        <div className="text-muted-foreground">Method</div>
+        <div className="text-text-secondary">Method</div>
         <div className="flex gap-3">
           <span className="font-bold">
             <HighlightText text={analysis.overview.method} searchTerm={searchTerm} />
           </span>
-          <span className="text-muted-foreground">Status:</span>
+          <span className="text-text-secondary">Status:</span>
           <span
             className={cn(
               'font-bold',
               analysis.overview.statusCode >= 200 && analysis.overview.statusCode < 300
-                ? 'text-green-500'
+                ? 'text-success'
                 : analysis.overview.statusCode >= 300 && analysis.overview.statusCode < 400
-                  ? 'text-yellow-500'
-                  : 'text-red-500',
+                  ? 'text-warning'
+                  : 'text-error',
             )}
           >
             {analysis.overview.statusCode} {analysis.overview.statusText}
           </span>
         </div>
 
-        <div className="text-muted-foreground">Protocol</div>
+        <div className="text-text-secondary">Protocol</div>
         <div className="flex gap-3">
           <span>
             <HighlightText text={analysis.overview.protocol} searchTerm={searchTerm} />
           </span>
-          <span className="text-muted-foreground">Version:</span>
+          <span className="text-text-secondary">Version:</span>
           <span>{analysis.overview.httpVersion}</span>
         </div>
 
-        <div className="text-muted-foreground">Timestamp</div>
+        <div className="text-text-secondary">Timestamp</div>
         <div>{new Date(analysis.overview.timestamp).toLocaleString()}</div>
 
-        <div className="text-muted-foreground">Duration</div>
+        <div className="text-text-secondary">Duration</div>
         <div>{analysis.overview.duration}</div>
 
-        <div className="text-muted-foreground">Size</div>
+        <div className="text-text-secondary">Size</div>
         <div className="flex gap-3 text-[10px] sm:text-xs">
           <span>Req: {analysis.overview.size.request}</span>
           <span>Res: {analysis.overview.size.response}</span>
@@ -73,10 +73,10 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
         </div>
       </div>
 
-      <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Analysis</h3>
+      <h3 className="text-[10px] font-bold text-text-secondary uppercase mb-2">Analysis</h3>
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card p-3 rounded border border-border/50">
-          <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2">
+        <div className="bg-card-background p-3 rounded border border-divider/50">
+          <h3 className="text-[10px] font-bold text-text-secondary uppercase mb-2">
             Performance Score
           </h3>
           <div className="flex items-center gap-3">
@@ -93,34 +93,34 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
               >
                 Grade {analysis.overview.scores.overall.grade}
               </span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[10px] text-text-secondary">
                 Security: {analysis.overview.scores.security.grade} (
                 {analysis.overview.scores.security.value})
               </span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[10px] text-text-secondary">
                 Perf: {analysis.overview.scores.performance.grade} (
                 {analysis.overview.scores.performance.value})
               </span>
             </div>
           </div>
         </div>
-        <div className="bg-card p-3 rounded border border-border/50">
-          <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Summary</h3>
+        <div className="bg-card-background p-3 rounded border border-divider/50">
+          <h3 className="text-[10px] font-bold text-text-secondary uppercase mb-2">Summary</h3>
           <div className="grid grid-cols-2 gap-1 text-xs">
             <div className="flex items-center gap-1.5">
-              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+              <CheckCircle className="w-3.5 h-3.5 text-success" />
               <span>{analysis.overview.summary.passed} Passed</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
+              <AlertTriangle className="w-3.5 h-3.5 text-warning" />
               <span>{analysis.overview.summary.warnings} Warn</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <XCircle className="w-3.5 h-3.5 text-red-500" />
+              <XCircle className="w-3.5 h-3.5 text-error" />
               <span>{analysis.overview.summary.critical} Crit</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5 text-blue-500" />
+              <Info className="w-3.5 h-3.5 text-primary" />
               <span>{analysis.overview.summary.info} Info</span>
             </div>
           </div>
@@ -128,21 +128,16 @@ export function RequestOverview({ request, searchTerm }: RequestOverviewProps) {
       </div>
 
       <div>
-        <h3 className="text-[10px] font-bold text-muted-foreground uppercase mb-2">
-          Quick Insights
-        </h3>
+        <h3 className="text-[10px] font-bold text-text-secondary uppercase mb-2">Quick Insights</h3>
         <div className="space-y-1.5">
           {analysis.overview.quickInsights.map((insight, i) => (
             <div
               key={i}
               className={cn(
                 'flex items-center gap-2 p-2 rounded border text-xs',
-                insight.type === 'success' &&
-                  'bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400',
-                insight.type === 'warning' &&
-                  'bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-400',
-                insight.type === 'info' &&
-                  'bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-400',
+                insight.type === 'success' && 'bg-success/10 border-success/20 text-success',
+                insight.type === 'warning' && 'bg-warning/10 border-warning/20 text-warning',
+                insight.type === 'info' && 'bg-primary/10 border-primary/20 text-primary',
               )}
             >
               <span className="text-base">{insight.icon}</span>

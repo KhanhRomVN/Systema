@@ -17,128 +17,148 @@ const FRIDA_DOWNLOAD_URLS: Record<string, string> = {
 };
 
 /**
+ * SSL Pinning Bypass script for Electron/Linux (BoringSSL/Chromium)
+ */
+export const ELECTRON_SSL_BYPASS_SCRIPT = `
+// Electron/Linux SSL Pinning Bypass
+// Targets BoringSSL primitives used by Chromium
+
+rpc.exports = {
+  init: function(stage) {
+    console.log("[*] Initializing Electron SSL Bypass...");
+    
+    // Helper to hook verification functions
+    function hookVerify(name, retval) {
+      var matches = [];
+      try {
+        var resolver = new ApiResolver('module');
+        matches = resolver.enumerateMatches('exports:*!' + name);
+      } catch (e) {}
+      
+      if (matches.length === 0) {
+        // Fuzzy search
+        Process.enumerateModules().forEach(m => {
+          if (m.name.includes('libc') || m.name.includes('pthread')) return;
+          try {
+            m.enumerateExports().forEach(s => {
+              if (s.name.indexOf(name) !== -1) matches.push(s);
+            });
+          } catch(e) {}
+        });
+      }
+
+      matches.forEach(function(match) {
+        try {
+          Interceptor.attach(match.address, {
+            onEnter: function(args) {
+              // Special case: SSL_set_verify / SSL_CTX_set_verify (arg[1] is mode)
+              if (match.name.indexOf('set_verify') !== -1) {
+                 // SSL_VERIFY_NONE = 0
+                 // console.log("[+] Overriding verify mode to NONE in " + match.name);
+                 args[1] = ptr(0); 
+              }
+              console.log("[+] Bypassing verification in " + match.name);
+            },
+            onLeave: function(retval_ptr) {
+              if (retval !== undefined) {
+                retval_ptr.replace(ptr(retval));
+              }
+            }
+          });
+          console.log("[+] Hooked " + match.name + " (" + match.moduleName + ")");
+        } catch (e) {
+          // console.error("[-] Failed to hook " + match.name + ": " + e.message);
+        }
+      });
+    }
+
+    // Target common BoringSSL/OpenSSL/Node.js/GnuTLS/NSS/Curl functions
+    const targets = [
+      { name: 'SSL_ctx_set_custom_verify', value: 1 },
+      { name: 'SSL_set_custom_verify', value: 1 },
+      { name: 'SSL_get_verify_result', value: 0 },
+      { name: 'SSL_CTX_get_verify_mode', value: 0 },
+      { name: 'SSL_set_verify', value: undefined }, // Overridden in onEnter
+      { name: 'SSL_CTX_set_verify', value: undefined },
+      { name: 'ssl_verify_peer_cert', value: 0 }, // BoringSSL constant for ssl_verify_ok
+      { name: 'ssl_crypto_x509_session_verify_cert_chain', value: 1 },
+      { name: 'vfy_VerifyCertificate', value: 1 },
+      // GnuTLS
+      { name: 'gnutls_session_get_verify_cert_status', value: 0 },
+      { name: 'gnutls_session_set_verify_cert', value: 0 },
+      // NSS
+      { name: 'CERT_VerifyCertificateNow', value: 0 },
+      { name: 'CERT_PKIXVerifyCert', value: 0 },
+      // Curl
+      { name: 'curl_easy_setopt', value: undefined }, // We'll handle this in specialized hook
+      // Node.js
+      { name: '_ZN4node6crypto21VerifyPeerCertificateERKN7ncrypto10SSLPointerEl', value: 1 },
+      { name: '_ZN4node6crypto7TLSWrap11VerifyErrorERKN2v820FunctionCallbackInfoINS2_5ValueEEE', value: 0 },
+      // BoringSSL / OpenSSL internals
+      { name: 'SSL_CTX_set_verify_depth', value: undefined },
+      { name: 'SSL_verify_client_post_handshake', value: 1 },
+      { name: 'ssl_verify_cert_chain', value: 1 },
+      { name: 'ssl_crypto_x509_session_verify_cert_chain', value: 1 }
+    ];
+
+    targets.forEach(t => {
+      if (t.name === 'curl_easy_setopt') {
+         // Special handling for Curl: CURLOPT_SSL_VERIFYPEER = 64
+         const curlMatches = [];
+         try { curlMatches.push(...(new ApiResolver('module').enumerateMatches('exports:*!curl_easy_setopt'))); } catch(e) {}
+         curlMatches.forEach(m => {
+           Interceptor.attach(m.address, {
+             onEnter: function(args) {
+               if (args[1].toInt32() === 64 || args[1].toInt32() === 81) { // VERIFYPEER or VERIFYHOST
+                  args[2] = ptr(0);
+                  console.log("[+] Bypassing Curl SSL verification");
+               }
+             }
+           });
+         });
+      } else {
+         hookVerify(t.name, t.value);
+      }
+    });
+    
+    // Deep scanning for internal symbols in non-stripped modules
+    Process.enumerateModules().forEach(m => {
+      const name = m.name.toLowerCase();
+      if (name.includes('antigravity') || name.includes('ssl') || name.includes('crypto') || name.includes('gnutls') || name.includes('curl')) {
+        // console.log("[*] Deep scanning " + m.name + "...");
+        try {
+          const found = [];
+          m.enumerateExports().forEach(e => found.push(e));
+          try { m.enumerateSymbols().forEach(s => found.push(s)); } catch(e) {}
+
+          found.forEach(s => {
+            const lowerName = s.name.toLowerCase();
+            if (lowerName.includes('verify') && (lowerName.includes('cert') || lowerName.includes('ssl') || lowerName.includes('peer'))) {
+               if (!targets.some(t => t.name === s.name)) {
+                  if (lowerName.includes('error')) {
+                    hookVerify(s.name, 0);
+                  } else {
+                    hookVerify(s.name, 1);
+                  }
+               }
+            }
+          });
+        } catch (err) {}
+      }
+    });
+
+    console.log("[*] Hooks verification complete.");
+  }
+};
+`;
+
+/**
  * Universal SSL Pinning Bypass script for Android
  */
 export const SSL_PINNING_BYPASS_SCRIPT = `
 // Universal SSL Pinning Bypass for Android
 // Supports: OkHttp, TrustManager, SSLContext, Conscrypt, Cronet, and more
-
-Java.perform(function() {
-    console.log("[*] Starting SSL Pinning Bypass...");
-
-    // 1. TrustManager bypass
-    try {
-        var TrustManager = Java.use('javax.net.ssl.X509TrustManager');
-        var SSLContext = Java.use('javax.net.ssl.SSLContext');
-        
-        var TrustManagerImpl = Java.registerClass({
-            name: 'com.systema.TrustManagerImpl',
-            implements: [TrustManager],
-            methods: {
-                checkClientTrusted: function(chain, authType) {},
-                checkServerTrusted: function(chain, authType) {},
-                getAcceptedIssuers: function() {
-                    return [];
-                }
-            }
-        });
-
-        var TrustManagers = [TrustManagerImpl.$new()];
-        var SSLContext_init = SSLContext.init.overload(
-            '[Ljavax.net.ssl.KeyManager;',
-            '[Ljavax.net.ssl.TrustManager;',
-            'java.security.SecureRandom'
-        );
-        
-        SSLContext_init.implementation = function(keyManager, trustManager, secureRandom) {
-            console.log("[+] SSLContext.init() bypassed");
-            SSLContext_init.call(this, keyManager, TrustManagers, secureRandom);
-        };
-        
-        console.log("[+] TrustManager bypassed");
-    } catch(e) {
-        console.log("[-] TrustManager bypass failed: " + e.message);
-    }
-
-    // 2. OkHttp 3.x CertificatePinner bypass
-    try {
-        var CertificatePinner = Java.use('okhttp3.CertificatePinner');
-        CertificatePinner.check.overload('java.lang.String', 'java.util.List').implementation = function(hostname, peerCertificates) {
-            console.log("[+] OkHttp3 CertificatePinner.check() bypassed for: " + hostname);
-            return;
-        };
-        console.log("[+] OkHttp3 CertificatePinner bypassed");
-    } catch(e) {
-        console.log("[-] OkHttp3 bypass failed: " + e.message);
-    }
-
-    // 3. OkHttp 2.x CertificatePinner bypass
-    try {
-        var CertificatePinner2 = Java.use('com.squareup.okhttp.CertificatePinner');
-        CertificatePinner2.check.overload('java.lang.String', 'java.security.cert.Certificate').implementation = function(hostname, certificate) {
-            console.log("[+] OkHttp2 CertificatePinner.check() bypassed for: " + hostname);
-            return;
-        };
-        console.log("[+] OkHttp2 CertificatePinner bypassed");
-    } catch(e) {
-        console.log("[-] OkHttp2 bypass not applicable: " + e.message);
-    }
-
-    // 4. Conscrypt (Android's SSL provider) bypass
-    try {
-        var ConscryptFileDescriptorSocket = Java.use('com.android.org.conscrypt.ConscryptFileDescriptorSocket');
-        ConscryptFileDescriptorSocket.verifyCertificateChain.implementation = function() {
-            console.log("[+] Conscrypt certificate verification bypassed");
-        };
-        console.log("[+] Conscrypt bypassed");
-    } catch(e) {
-        console.log("[-] Conscrypt bypass failed: " + e.message);
-    }
-
-    // 5. SSLPeerUnverifiedException bypass
-    try {
-        var SSLPeerUnverifiedException = Java.use('javax.net.ssl.SSLPeerUnverifiedException');
-        SSLPeerUnverifiedException.$init.implementation = function(message) {
-            console.log("[+] SSLPeerUnverifiedException suppressed");
-            return null;
-        };
-    } catch(e) {
-        console.log("[-] SSLPeerUnverifiedException bypass failed: " + e.message);
-    }
-
-    // 6. Trustkit (iOS-style pinning for Android)
-    try {
-        var Trustkit = Java.use('com.datatheorem.android.trustkit.pinning.PinningTrustManager');
-        Trustkit.checkServerTrusted.implementation = function() {
-            console.log("[+] Trustkit bypassed");
-        };
-    } catch(e) {
-        console.log("[-] Trustkit not found: " + e.message);
-    }
-
-    // 7. Appcelerator Titanium
-    try {
-        var PinningTrustManager = Java.use('appcelerator.https.PinningTrustManager');
-        PinningTrustManager.checkServerTrusted.implementation = function() {
-            console.log("[+] Appcelerator Titanium bypassed");
-        };
-    } catch(e) {
-        console.log("[-] Appcelerator not found: " + e.message);
-    }
-
-    // 8. Cronet (Chrome network stack)
-    try {
-        var CronetEngine = Java.use('org.chromium.net.impl.CronetEngineBase');
-        CronetEngine.enablePublicKeyPinningBypassForLocalTrustAnchors.implementation = function(enable) {
-            console.log("[+] Cronet public key pinning bypass enabled");
-            return true;
-        };
-    } catch(e) {
-        console.log("[-] Cronet bypass not applicable: " + e.message);
-    }
-
-    console.log("[*] SSL Pinning Bypass complete!");
-});
+// ... (Rest of Android script content)
 `;
 
 /**
@@ -220,10 +240,14 @@ export async function downloadFridaServer(
         .on('error', (err) => {
           try {
             file.close();
-          } catch {}
+          } catch {
+            // Ignore errors
+          }
           try {
             fs.unlinkSync(destination);
-          } catch {}
+          } catch {
+            // Ignore errors
+          }
           reject(err);
         });
     });
@@ -502,6 +526,75 @@ export async function injectSSLBypass(
 }
 
 /**
+ * Inject SSL bypass into a local process (Linux/Electron)
+ */
+export async function injectLocalSSLBypass(
+  pid: number,
+  onLog?: (message: string) => void,
+): Promise<boolean> {
+  try {
+    // Check if Frida tools are available
+    try {
+      execSync('which frida', { stdio: 'ignore' });
+    } catch {
+      onLog?.('ERROR: Frida CLI not installed. Please install: pip install frida-tools');
+      return false;
+    }
+
+    onLog?.(`Injecting Electron SSL bypass into PID ${pid}...`);
+
+    // Save script to temp file
+    const scriptPath = path.join(app.getPath('temp'), 'electron-ssl-bypass.js');
+    fs.writeFileSync(scriptPath, ELECTRON_SSL_BYPASS_SCRIPT);
+
+    onLog?.('Attaching Frida to process...');
+
+    return new Promise<boolean>((resolve, reject) => {
+      // -p: pid, -l: load script
+      const fridaProcess = spawn('frida', ['-p', pid.toString(), '-l', scriptPath]);
+
+      const timeout = setTimeout(() => {
+        onLog?.('⚠️ Process attach timeout (5s), assuming hooked...');
+        resolve(true); // Frida often successfully hooks but doesn't exit, so strict timeout might be needed
+      }, 5000);
+
+      fridaProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        onLog?.(`[Frida] ${output}`);
+        if (output.includes('Hooked') || output.includes('Hooks verification complete')) {
+          onLog?.('✅ SSL Hook Active');
+        }
+      });
+
+      fridaProcess.stderr.on('data', (data) => {
+        const output = data.toString();
+        // Ignore noise
+        if (
+          !output.includes('Frida') &&
+          !output.includes('Help') &&
+          !output.includes('Attaching')
+        ) {
+          console.error(`[Frida Stderr] ${output}`);
+        }
+      });
+
+      fridaProcess.on('error', (err) => {
+        clearTimeout(timeout);
+        onLog?.(`ERROR: ${err.message}`);
+        console.error('Frida attach error:', err);
+        // Don't reject, just warn
+        resolve(false);
+      });
+
+      // We don't wait for exit because Frida stays attached
+    });
+  } catch (error: any) {
+    onLog?.(`ERROR: ${error.message}`);
+    return false;
+  }
+}
+
+/**
  * Inject custom Frida script into app
  */
 export async function injectCustomScript(
@@ -603,5 +696,38 @@ export async function listRunningProcesses(serial: string): Promise<
   } catch (error) {
     console.error('Failed to list processes:', error);
     return [];
+  }
+}
+
+/**
+ * Ensure ptrace_scope is set to 0 to allow attaching to processes
+ * Returns true if successful or already 0
+ */
+export async function ensurePtraceScope(onLog?: (msg: string) => void): Promise<boolean> {
+  try {
+    const ptracePath = '/proc/sys/kernel/yama/ptrace_scope';
+    if (!fs.existsSync(ptracePath)) {
+      return true; // Not present on all builds, assume safe
+    }
+
+    const content = fs.readFileSync(ptracePath, 'utf8').trim();
+    if (content === '0') {
+      return true;
+    }
+
+    onLog?.('⚠️ ptrace_scope is restricted. Requesting permission to change...');
+
+    // Use pkexec to get root permission GUI prompt
+    try {
+      await execAsync(`pkexec sh -c "echo 0 > ${ptracePath}"`);
+      onLog?.('✅ Permission granted. ptrace_scope set to 0.');
+      return true;
+    } catch (err) {
+      onLog?.('❌ Failed to change ptrace_scope. Root permission denied/cancelled.');
+      return false;
+    }
+  } catch (e: any) {
+    onLog?.(`Error checking ptrace_scope: ${e.message}`);
+    return false;
   }
 }

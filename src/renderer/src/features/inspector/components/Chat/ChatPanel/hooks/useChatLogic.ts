@@ -24,7 +24,7 @@ export function useChatLogic(
   initialStreamEnabled?: boolean,
   initialThinkingEnabled?: boolean,
   initialConversationId?: string,
-  onConversationIdUpdate?: (id: string) => void,
+  onSessionUpdate?: (updates: { conversationId?: string; title?: string }) => void,
 ) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState(initialConversationId || '');
@@ -185,10 +185,14 @@ export function useChatLogic(
     if (
       (!textToSend.trim() && attachments.length === 0) ||
       isLoading ||
-      !providerConfig ||
-      isUploadingAttachment
-    )
+      isUploadingAttachment ||
+      !providerConfig?.model ||
+      (providerConfig.type === ProviderType.ELARA_FREE &&
+        !(providerConfig as ElaraFreeConfig).accountId)
+    ) {
+      console.warn('[ChatLogic] Missing configuration: model or accountId');
       return;
+    }
 
     const userMsgId = Date.now().toString();
     const userMsg: Message = {
@@ -316,7 +320,9 @@ export function useChatLogic(
         try {
           const errorText = await response.text();
           console.error(`[ChatDebug] API Error Body:`, errorText);
-        } catch (e) {}
+        } catch (e) {
+          // Ignore errors
+        }
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
 
@@ -406,7 +412,12 @@ export function useChatLogic(
                 ) {
                   console.log('[ChatDebug] New conversation ID:', data.meta.conversation_id);
                   setCurrentConversationId(data.meta.conversation_id);
-                  onConversationIdUpdate?.(data.meta.conversation_id);
+                  onSessionUpdate?.({ conversationId: data.meta.conversation_id });
+                }
+
+                if (data.meta?.conversation_title) {
+                  console.log('[ChatDebug] New conversation title:', data.meta.conversation_title);
+                  onSessionUpdate?.({ title: data.meta.conversation_title });
                 }
               }
               // HANDLE GENERIC OPENAI FORMAT (choices array)

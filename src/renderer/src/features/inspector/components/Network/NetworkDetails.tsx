@@ -108,7 +108,7 @@ function TextSelectionMenu({
 
   return (
     <div
-      className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[160px]"
+      className="fixed z-50 bg-dialog-background border border-divider rounded-md shadow-lg py-1 min-w-[160px]"
       style={{
         left: `${x}px`,
         top: `${y}px`,
@@ -130,7 +130,7 @@ function TextSelectionMenu({
           onUseInSearch();
           onClose();
         }}
-        className="w-full px-3 py-1.5 text-xs text-left hover:bg-blue-500/10 hover:text-blue-500 transition-colors flex items-center gap-2"
+        className="w-full px-3 py-1.5 text-xs text-left hover:bg-primary/10 hover:text-primary transition-colors flex items-center gap-2"
       >
         <Filter className="w-3 h-3" />
         Use in Search
@@ -392,11 +392,11 @@ export function NetworkDetails({
       count: matches.overview,
       importantCount: 0,
       colors: {
-        text: 'text-blue-500 dark:text-blue-400',
-        border: 'border-blue-500 dark:border-blue-400',
-        badge: 'bg-blue-500/20 text-blue-600 dark:text-blue-300',
-        hover: 'hover:bg-blue-500/10',
-        activeAction: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
+        text: 'text-primary',
+        border: 'border-primary',
+        badge: 'bg-primary/20 text-primary',
+        hover: 'hover:bg-primary/10',
+        activeAction: 'bg-primary/20 text-primary',
       },
     },
     {
@@ -406,11 +406,11 @@ export function NetworkDetails({
       count: matches.request,
       importantCount: 0,
       colors: {
-        text: 'text-orange-500 dark:text-orange-400',
-        border: 'border-orange-500 dark:border-orange-400',
-        badge: 'bg-orange-500/20 text-orange-600 dark:text-orange-300',
-        hover: 'hover:bg-orange-500/10',
-        activeAction: 'bg-orange-500/20 text-orange-600 dark:text-orange-400',
+        text: 'text-warning',
+        border: 'border-warning',
+        badge: 'bg-warning/20 text-warning',
+        hover: 'hover:bg-warning/10',
+        activeAction: 'bg-warning/20 text-warning',
       },
     },
     {
@@ -420,11 +420,11 @@ export function NetworkDetails({
       count: matches.response,
       importantCount: 0,
       colors: {
-        text: 'text-green-500 dark:text-green-400',
-        border: 'border-green-500 dark:border-green-400',
-        badge: 'bg-green-500/20 text-green-600 dark:text-green-300',
-        hover: 'hover:bg-green-500/10',
-        activeAction: 'bg-green-500/20 text-green-600 dark:text-green-400',
+        text: 'text-success',
+        border: 'border-success',
+        badge: 'bg-success/20 text-success',
+        hover: 'hover:bg-success/10',
+        activeAction: 'bg-success/20 text-success',
       },
     },
     {
@@ -434,11 +434,11 @@ export function NetworkDetails({
       count: matches.headers,
       importantCount: 0,
       colors: {
-        text: 'text-purple-500 dark:text-purple-400',
-        border: 'border-purple-500 dark:border-purple-400',
-        badge: 'bg-purple-500/20 text-purple-600 dark:text-purple-300',
-        hover: 'hover:bg-purple-500/10',
-        activeAction: 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
+        text: 'text-indigo-500',
+        border: 'border-indigo-500',
+        badge: 'bg-indigo-500/20 text-indigo-500',
+        hover: 'hover:bg-indigo-500/10',
+        activeAction: 'bg-indigo-500/20 text-indigo-500',
       },
     },
     {
@@ -448,11 +448,11 @@ export function NetworkDetails({
       count: matches.cookies,
       importantCount: 0,
       colors: {
-        text: 'text-yellow-500 dark:text-yellow-400',
-        border: 'border-yellow-500 dark:border-yellow-400',
-        badge: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-300',
-        hover: 'hover:bg-yellow-500/10',
-        activeAction: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
+        text: 'text-warning',
+        border: 'border-warning',
+        badge: 'bg-warning/20 text-warning',
+        hover: 'hover:bg-warning/10',
+        activeAction: 'bg-warning/20 text-warning',
       },
     },
     {
@@ -476,11 +476,11 @@ export function NetworkDetails({
       count: matches.security,
       importantCount: 0,
       colors: {
-        text: 'text-red-500 dark:text-red-400',
-        border: 'border-red-500 dark:border-red-400',
-        badge: 'bg-red-500/20 text-red-600 dark:text-red-300',
-        hover: 'hover:bg-red-500/10',
-        activeAction: 'bg-red-500/20 text-red-600 dark:text-red-400',
+        text: 'text-error',
+        border: 'border-error',
+        badge: 'bg-error/20 text-error',
+        hover: 'hover:bg-error/10',
+        activeAction: 'bg-error/20 text-error',
       },
     },
     {
@@ -518,11 +518,11 @@ export function NetworkDetails({
       count: matches.timing,
       importantCount: 0,
       colors: {
-        text: 'text-indigo-500 dark:text-indigo-400',
-        border: 'border-indigo-500 dark:border-indigo-400',
-        badge: 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-300',
+        text: 'text-indigo-500',
+        border: 'border-indigo-500',
+        badge: 'bg-indigo-500/20 text-indigo-500',
         hover: 'hover:bg-indigo-500/10',
-        activeAction: 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400',
+        activeAction: 'bg-indigo-500/20 text-indigo-500',
       },
     },
     {
@@ -532,11 +532,11 @@ export function NetworkDetails({
       count: matches.issues,
       importantCount: 0,
       colors: {
-        text: 'text-rose-500 dark:text-rose-400',
-        border: 'border-rose-500 dark:border-rose-400',
-        badge: 'bg-rose-500/20 text-rose-600 dark:text-rose-300',
-        hover: 'hover:bg-rose-500/10',
-        activeAction: 'bg-rose-500/20 text-rose-600 dark:text-rose-400',
+        text: 'text-error',
+        border: 'border-error',
+        badge: 'bg-error/20 text-error',
+        hover: 'hover:bg-error/10',
+        activeAction: 'bg-error/20 text-error',
       },
     },
     {
@@ -547,11 +547,11 @@ export function NetworkDetails({
       count: matches.initiator,
       importantCount: 0,
       colors: {
-        text: 'text-gray-500 dark:text-gray-400',
-        border: 'border-gray-500 dark:border-gray-400',
-        badge: 'bg-gray-500/20 text-gray-600 dark:text-gray-300',
-        hover: 'hover:bg-gray-500/10',
-        activeAction: 'bg-gray-500/20 text-gray-600 dark:text-gray-400',
+        text: 'text-text-secondary',
+        border: 'border-divider',
+        badge: 'bg-secondary text-text-secondary',
+        hover: 'hover:bg-secondary/50',
+        activeAction: 'bg-secondary text-text-primary',
       },
     },
   ] as const;
@@ -588,7 +588,7 @@ export function NetworkDetails({
   const content = (
     <div className="flex-1 overflow-hidden h-full" onContextMenu={handleContextMenu}>
       {!request ? (
-        <div className="h-full flex items-center justify-center text-muted-foreground bg-background/50">
+        <div className="h-full flex items-center justify-center text-text-secondary bg-background/50">
           Select a request to view details
         </div>
       ) : isRawMode ? (
@@ -630,8 +630,8 @@ export function NetworkDetails({
 
   return (
     <div className="h-full">
-      <div className="h-full flex flex-col bg-background/50 border-t border-border/50">
-        <div className="flex items-center border-b border-border/50 bg-muted/20">
+      <div className="h-full flex flex-col bg-table-bodyBg border-t border-divider/50">
+        <div className="flex items-center border-b border-divider/50 bg-secondary/20">
           <div className="flex-1 overflow-x-auto no-scrollbar flex items-center px-2">
             {request &&
               tabs.map((tab) => {
@@ -663,7 +663,7 @@ export function NetworkDetails({
                           <button
                             onClick={scrollToNextMatch}
                             className={cn(
-                              'p-0.5 rounded transition-colors text-muted-foreground',
+                              'p-0.5 rounded transition-colors text-text-secondary',
                               'hover:text-current',
                               tab.colors.hover,
                               'animate-in fade-in zoom-in duration-200',
@@ -677,7 +677,7 @@ export function NetworkDetails({
                         <button
                           onClick={handleCopy}
                           className={cn(
-                            'p-0.5 rounded transition-colors text-muted-foreground',
+                            'p-0.5 rounded transition-colors text-text-secondary',
                             'hover:text-current',
                             tab.colors.hover,
                           )}
@@ -688,7 +688,7 @@ export function NetworkDetails({
                         <button
                           onClick={() => setIsRawMode(!isRawMode)}
                           className={cn(
-                            'p-0.5 rounded transition-colors text-muted-foreground',
+                            'p-0.5 rounded transition-colors text-text-secondary',
                             'hover:text-current',
                             tab.colors.hover,
                             isRawMode && tab.colors.activeAction,
@@ -706,7 +706,7 @@ export function NetworkDetails({
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground text-muted-foreground whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-text-primary text-text-secondary whitespace-nowrap"
                   >
                     <Icon className="w-3.5 h-3.5" />
                     {tab.label}
@@ -716,15 +716,15 @@ export function NetworkDetails({
               })}
           </div>
           {onToggleFilter && (
-            <div className="flex border-l border-border/50">
+            <div className="flex border-l border-divider/50">
               <button
                 onClick={() => {
                   setIsTrackerOpen(!isTrackerOpen);
                   if (!isTrackerOpen && isFilterOpen) onToggleFilter();
                 }}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
-                  isTrackerOpen ? 'border-primary text-primary' : 'text-muted-foreground',
+                  'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-text-primary whitespace-nowrap',
+                  isTrackerOpen ? 'border-primary text-primary' : 'text-text-secondary',
                 )}
                 title={isTrackerOpen ? 'Collapse Tracker' : 'Expand Variable Tracker'}
               >
@@ -737,8 +737,8 @@ export function NetworkDetails({
                   if (!isFilterOpen && isTrackerOpen) setIsTrackerOpen(false);
                 }}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-foreground whitespace-nowrap',
-                  isFilterOpen ? 'border-primary text-primary' : 'text-muted-foreground',
+                  'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 border-transparent transition-colors hover:text-text-primary whitespace-nowrap',
+                  isFilterOpen ? 'border-primary text-primary' : 'text-text-secondary',
                 )}
                 title={isFilterOpen ? 'Collapse Filters' : 'Expand Filters'}
               >

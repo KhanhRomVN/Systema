@@ -16,9 +16,10 @@ export const NETWORK = `NETWORK REFERENCE
 --- status(optional, multi, default=all): filter requests by status
 <status>200</status>
 <status>404</status>
---- type (optional, multi, default=all): filter requests by type
-<type>request</type>
-<type>response</type>
+--- type (optional, multi, default=all): filter requests by content type category
+--- Valid values: xhr (Fetch/XHR), js (JavaScript), css (CSS), img (Images), media (Video/Audio), font (Fonts), doc (Documents), ws (WebSocket), wasm (WebAssembly), manifest, other
+<type>xhr</type>
+<type>js</type>
 </list_https>
 
 <get_https_details>
@@ -55,9 +56,12 @@ export const NETWORK = `NETWORK REFERENCE
 <value>404</value>
 </status>
 <type>
-<value>request</value>
-<value>response</value>
+<value>xhr</value>
+<value>js</value>
 </type>
 </edit_filter>
+
+<text>Critical explanation or complex logic (Visible)</text>
+<temp>Hidden placeholder (Use when no visible response is needed)</temp>
 
 `;

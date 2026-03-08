@@ -212,60 +212,65 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-gray-900 border border-white/5 rounded-xl w-full max-w-2xl flex flex-col shadow-2xl overflow-hidden h-[70vh]">
-        <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
+      <div className="bg-dialog-background border border-divider rounded-xl w-full max-w-2xl flex flex-col shadow-dialogShadow overflow-hidden h-[70vh]">
+        <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
+          <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
             {viewMode === 'connect' && (
-              <button onClick={() => setViewMode('list')} className="hover:bg-gray-800 p-1 rounded">
+              <button
+                onClick={() => setViewMode('list')}
+                className="hover:bg-sidebar-itemHover p-1 rounded"
+              >
                 <X className="w-4 h-4" />
               </button>
             )}
             {viewMode === 'connect' ? 'Wireless ADB Connection' : 'Add Device'}
           </h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-800 rounded-lg">
-            <X className="w-4 h-4 text-gray-400" />
+          <button onClick={onClose} className="p-1.5 hover:bg-sidebar-itemHover rounded-lg">
+            <X className="w-4 h-4 text-text-secondary" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-950/50">
+        <div className="flex-1 overflow-hidden flex flex-col bg-background/50">
           {viewMode === 'list' && (
             <div className="flex flex-col h-full">
-              <div className="p-3 border-b border-gray-800 bg-gray-900/30 flex gap-2">
+              <div className="p-3 border-b border-divider bg-sidebar-background/30 flex gap-2">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
                   <input
                     type="text"
                     placeholder="Search devices..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:border-blue-500/50 outline-none"
+                    className="w-full bg-input-background border border-input-border-default rounded-lg pl-9 pr-3 py-2 text-sm text-text-primary focus:border-primary/50 outline-none"
                   />
                 </div>
                 <button
                   onClick={() => setViewMode('connect')}
-                  className="p-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg"
+                  className="p-2 bg-sidebar-itemHover hover:bg-sidebar-itemFocus border border-divider rounded-lg"
                   title="Wireless ADB"
                 >
-                  <Wifi className="w-4 h-4" />
+                  <Wifi className="w-4 h-4 text-text-primary" />
                 </button>
                 <button
                   onClick={loadDevices}
-                  className="p-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg"
+                  className="p-2 bg-sidebar-itemHover hover:bg-sidebar-itemFocus border border-divider rounded-lg"
                 >
-                  <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
+                  <RefreshCw
+                    className={cn('w-4 h-4 text-text-primary', isLoading && 'animate-spin')}
+                  />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-3">
                 {isLoading && deviceList.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-500 mb-2" />
-                    <p className="text-sm text-gray-500">Scanning...</p>
+                    <Loader2 className="w-6 h-6 animate-spin text-primary mb-2" />
+                    <p className="text-sm text-text-secondary">Scanning...</p>
                   </div>
                 ) : filteredDevices.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full">
-                    <Smartphone className="w-8 h-8 opacity-20 text-gray-500 mb-2" />
-                    <p className="text-sm text-gray-500">
+                    <Smartphone className="w-8 h-8 opacity-20 text-text-secondary mb-2" />
+                    <p className="text-sm text-text-secondary">
                       {deviceList.length > 0 ? 'All devices already added.' : 'No devices found.'}
                     </p>
                   </div>
@@ -295,8 +300,8 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({
                           className={cn(
                             'relative flex flex-col p-3 rounded-xl border text-left transition-all',
                             isSelected
-                              ? 'bg-blue-600/10 border-blue-500/50'
-                              : 'bg-gray-800/40 border-gray-800 hover:bg-gray-800/80',
+                              ? 'bg-primary/10 border-primary/50'
+                              : 'bg-sidebar-itemHover/40 border-divider hover:bg-sidebar-itemHover/80 text-text-primary',
                           )}
                         >
                           {/* Type Badge - Top Right */}
@@ -372,12 +377,12 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({
                           <h4
                             className={cn(
                               'font-medium truncate text-sm',
-                              isSelected ? 'text-blue-100' : 'text-gray-200',
+                              isSelected ? 'text-primary' : 'text-text-primary',
                             )}
                           >
                             {device.name}
                           </h4>
-                          <p className="text-[10px] text-gray-500 truncate font-mono uppercase">
+                          <p className="text-[10px] text-text-secondary truncate font-mono uppercase">
                             {device.type === 'physical'
                               ? isWireless
                                 ? 'Running • Wireless'
@@ -398,11 +403,11 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({
                 )}
               </div>
 
-              <div className="p-3 border-t border-gray-800 bg-gray-900 flex justify-end">
+              <div className="p-3 border-t border-divider bg-dialog-background flex justify-end">
                 <button
                   onClick={handleAddMobile}
                   disabled={!selectedDevice}
-                  className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg text-sm font-bold text-button-text bg-primary hover:bg-primary/90 disabled:opacity-50"
                 >
                   Add to Dashboard
                 </button>
@@ -413,26 +418,26 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({
           {viewMode === 'connect' && (
             <div className="flex flex-col h-full p-6 items-center justify-center">
               <div className="w-full max-w-md space-y-4">
-                <p className="text-sm text-gray-400 text-center mb-4">
+                <p className="text-sm text-text-secondary text-center mb-4">
                   Ensure device is on the same network and ADB over TCP/IP is enabled (port 5555).
                 </p>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                  <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">
                     Device IP Address
                   </label>
                   <div className="relative">
-                    <Wifi className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                    <Wifi className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
                     <input
                       type="text"
                       value={wirelessIp}
                       onChange={(e) => setWirelessIp(e.target.value)}
                       placeholder="192.168.1.x"
-                      className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:border-blue-500/50 outline-none font-mono"
+                      className="w-full bg-input-background border border-divider rounded-xl pl-10 pr-4 py-3 text-text-primary focus:border-primary/50 outline-none font-mono"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                  <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">
                     Port
                   </label>
                   <input
@@ -440,7 +445,7 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({
                     value={wirelessPort}
                     onChange={(e) => setWirelessPort(e.target.value)}
                     placeholder="5555"
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-blue-500/50 outline-none font-mono"
+                    className="w-full bg-input-background border border-divider rounded-xl px-4 py-3 text-text-primary focus:border-primary/50 outline-none font-mono"
                   />
                 </div>
                 {connectStatus.type && (
@@ -459,7 +464,7 @@ export const AddAppModal: React.FC<AddAppModalProps> = ({
                 <button
                   onClick={handleWirelessConnect}
                   disabled={isConnecting || !wirelessIp || !wirelessPort}
-                  className="w-full mt-4 flex items-center justify-center py-3 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
+                  className="w-full mt-4 flex items-center justify-center py-3 rounded-xl font-bold bg-primary hover:bg-primary/90 text-button-text disabled:opacity-50"
                 >
                   {isConnecting ? (
                     <>

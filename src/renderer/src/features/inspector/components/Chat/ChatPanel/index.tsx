@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ChatHeader } from './components/ChatHeader';
 import { ChatBody } from './components/ChatBody';
 import { ChatInputArea } from './components/ChatInputArea';
 import { InspectorContext } from '../../ChatContainer';
 import { ProviderConfig, ProviderType } from '../../../types/provider-types';
 import { useChatLogic } from './hooks/useChatLogic';
+import { parseAIResponse, ContentBlock } from '../../../../../services/ResponseParser';
 
 interface ChatPanelProps {
   sessionId: string;
@@ -76,9 +77,9 @@ export function ChatPanel({
     initialStreamEnabled,
     initialThinkingEnabled,
     initialConversationId,
-    (newId) => {
+    (updates) => {
       if (onUpdateSession) {
-        onUpdateSession({ conversationId: newId });
+        onUpdateSession(updates);
       }
     },
   );
@@ -110,8 +111,21 @@ export function ChatPanel({
   // 3. IF Elara: Selector: Sub-Provider (DeepSeek, Claude...)
   // 4. IF Elara: Selector: Account.
 
-  const handleExecuteTool = async (action: any, msgId: string, index: number) => {
+  // Store for collecting tool results before sending
+  const toolResultsRef = useRef<{ msgId: string; results: string[] }>({ msgId: '', results: [] });
+
+  // Execute tool and return result string (without sending to AI)
+  const executeToolOnly = (action: any, msgId: string, index: number): string | null => {
     const { type, params } = action;
+
+    // Mark as executed
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId
+          ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
+          : m,
+      ),
+    );
 
     if (type === 'get_filter' && inspectorContext.filter) {
       const f = inspectorContext.filter;
@@ -148,20 +162,9 @@ export function ChatPanel({
         `time: ${time}`,
       ]
         .filter((item) => !item.endsWith(': '))
-        .join('\n'); // Filter out empty entries
+        .join('\n');
 
-      const prompt = `Current Inspector Filter State:\n\`\`\`text\n${filterList}\n\`\`\`\n\nUse this information for your next analysis.`;
-
-      // Update message state BEFORE sending follow-up to mark it as executed
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msgId
-            ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
-            : m,
-        ),
-      );
-
-      handleSend({ isHidden: true, customInput: prompt });
+      return `Current Inspector Filter State:\n\`\`\`text\n${filterList}\n\`\`\``;
     } else if (type === 'list_https') {
       const {
         methods = [],
@@ -202,17 +205,7 @@ export function ChatPanel({
         size: r.size,
       }));
 
-      const prompt = `Here are the HTTPS requests matching your criteria:\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msgId
-            ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
-            : m,
-        ),
-      );
-
-      handleSend({ isHidden: true, customInput: prompt });
+      return `HTTPS requests matching criteria:\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
     } else if (type === 'get_https_details') {
       const { id } = params;
       const req = inspectorContext.requests.find((r: any) => r.id === id);
@@ -227,44 +220,18 @@ export function ChatPanel({
           requestBody: req.requestBody,
           responseBody: req.responseBody,
         };
-        const prompt = `Details for Request ${id}:\n\`\`\`json\n${JSON.stringify(details, null, 2)}\n\`\`\``;
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
-              : m,
-          ),
-        );
-
-        handleSend({ isHidden: true, customInput: prompt });
+        return `Details for Request ${id}:\n\`\`\`json\n${JSON.stringify(details, null, 2)}\n\`\`\``;
       } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
-              : m,
-          ),
-        );
-        handleSend({ isHidden: true, customInput: `Request ${id} not found.` });
+        return `Request ${id} not found.`;
       }
     } else if (type === 'delete_https') {
       const { id } = params;
       if (inspectorContext.onDeleteRequest) {
         inspectorContext.onDeleteRequest(id);
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
-              : m,
-          ),
-        );
-
-        handleSend({ isHidden: true, customInput: `Request ${id} deleted successfully.` });
+        return `Request ${id} deleted successfully.`;
       }
+      return null;
     } else if (type === 'edit_filter') {
-      // Map params (methods, hosts, paths, statuses, types) to InspectorFilter
       if (inspectorContext.onSetFilter) {
         const newFilter = { ...inspectorContext.filter };
 
@@ -296,53 +263,72 @@ export function ChatPanel({
         }
 
         inspectorContext.onSetFilter(newFilter);
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
-              : m,
-          ),
-        );
-
-        handleSend({ isHidden: true, customInput: 'Filter updated successfully.' });
+        return 'Filter updated successfully.';
       }
-    } else {
-      // Generic fallback markup for other tools
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msgId
-            ? { ...m, executedToolIndices: [...(m.executedToolIndices || []), index] }
-            : m,
-        ),
-      );
+      return null;
+    }
+
+    return null;
+  };
+
+  // Legacy handler for manual execution (single tool)
+  const handleExecuteTool = async (action: any, msgId: string, index: number) => {
+    const result = executeToolOnly(action, msgId, index);
+    if (result) {
+      handleSend({ isHidden: true, customInput: result });
     }
   };
 
-  // Agent Mode: Auto-execute tools
+  // Agent Mode: Auto-execute ALL tools sequentially, then send combined result
   useEffect(() => {
-    if (!isLoading && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.role === 'assistant' && lastMsg.parsed) {
-        // Find first tool block that isn't in executedToolIndices
-        const pendingToolIndex = lastMsg.parsed.contentBlocks.findIndex(
-          (block, idx) => block.type === 'tool' && !lastMsg.executedToolIndices?.includes(idx),
-        );
+    if (isLoading) return;
 
-        if (pendingToolIndex !== -1) {
-          const toolBlock = lastMsg.parsed.contentBlocks[pendingToolIndex];
-          if (toolBlock.type === 'tool') {
-            // Execute it after a small delay
-            const timer = setTimeout(() => {
-              handleExecuteTool(toolBlock.action, lastMsg.id, pendingToolIndex);
-            }, 800);
-            return () => clearTimeout(timer);
-          }
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg?.role === 'assistant') {
+      // Use helper to get parsed msg regardless of state preservation
+      const parsedMsg = lastMsg.parsed || parseAIResponse(lastMsg.content);
+      if (!parsedMsg) return;
+
+      const toolBlocks = parsedMsg.contentBlocks
+        .map((block: ContentBlock, idx: number) => ({ block, idx }))
+        .filter(({ block }: { block: ContentBlock }) => block.type === 'tool');
+
+      const pendingTools = toolBlocks.filter(
+        ({ idx }: { idx: number }) => !lastMsg.executedToolIndices?.includes(idx),
+      );
+
+      // Reset results collector if new message started
+      if (toolResultsRef.current.msgId !== lastMsg.id) {
+        toolResultsRef.current = { msgId: lastMsg.id, results: [] };
+      }
+
+      if (pendingTools.length > 0) {
+        const nextTool = pendingTools[0];
+        const isLastPendingTool = pendingTools.length === 1;
+
+        if (nextTool.block.type === 'tool') {
+          const action = nextTool.block.action;
+          const timer = setTimeout(() => {
+            // Re-check loading state before execution
+            if (isLoading) return;
+
+            const result = executeToolOnly(action, lastMsg.id, nextTool.idx);
+            if (result) {
+              toolResultsRef.current.results.push(result);
+            }
+
+            if (isLastPendingTool && toolResultsRef.current.results.length > 0) {
+              const combinedResults = toolResultsRef.current.results.join('\n\n---\n\n');
+              toolResultsRef.current = { msgId: '', results: [] }; // Reset
+              handleSend({ isHidden: true, customInput: combinedResults });
+            }
+          }, 350); // Slightly longer delay for stability
+          return () => clearTimeout(timer);
         }
       }
     }
     return undefined;
-  }, [messages, isLoading, inspectorContext]); // Added inspectorContext to dependencies
+  }, [messages, isLoading, inspectorContext]);
 
   return (
     <div className="relative flex flex-col h-full bg-background border-l border-border transition-all duration-300">
@@ -351,7 +337,7 @@ export function ChatPanel({
         title={title}
         provider={provider}
         onBack={onBack}
-        onNewChat={() => {}}
+        onNewChat={onBack}
         onSettings={() => {}}
       />
 
@@ -361,6 +347,7 @@ export function ChatPanel({
         onExecuteTool={handleExecuteTool}
         onPreviewTool={async () => null} // Placeholder
         inspectorFilter={inspectorContext.filter}
+        requests={inspectorContext.requests}
       />
 
       {/* Bottom Section: Toolbars + Input */}
@@ -381,6 +368,11 @@ export function ChatPanel({
           setSearchEnabled={setSearchEnabled}
           streamEnabled={streamEnabled}
           setStreamEnabled={setStreamEnabled}
+          disabled={
+            !localProviderConfig?.model ||
+            (localProviderConfig?.type === ProviderType.ELARA_FREE &&
+              !(localProviderConfig as any).accountId)
+          }
           supportsThinking={
             !!(
               (localProviderConfig?.model &&

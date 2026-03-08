@@ -2,6 +2,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+import { listGenymotionVMs } from './emulator-launcher';
 
 const execAsync = promisify(exec);
 
@@ -97,10 +98,14 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
             if (ipMatch) {
               vboxVMs.set(name, ipMatch[1]);
             }
-          } catch {}
+          } catch {
+            // Ignore errors
+          }
         }
       }
-    } catch {}
+    } catch {
+      // Ignore errors
+    }
 
     // Strategy 2: Process Scanning (QEMU/KVM for Genymotion)
     let runningVMNames: Set<string> = new Set(vboxVMs.keys());
@@ -285,7 +290,6 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
   }
 
   try {
-    const { listGenymotionVMs } = await import('./emulator-launcher');
     const allVMs = await listGenymotionVMs();
 
     for (const vmName of allVMs) {
@@ -310,7 +314,9 @@ export async function detectAndroidDevices(): Promise<MobileEmulator[]> {
         });
       }
     }
-  } catch (error) {}
+  } catch (error) {
+    // Ignore errors
+  }
 
   const deduplicatedEmulators: MobileEmulator[] = [];
   const processedSerials = new Set<string>();

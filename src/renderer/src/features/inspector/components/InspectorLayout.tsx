@@ -52,7 +52,7 @@ const CountdownTimer = React.memo(({ nextSaveTime }: { nextSaveTime: number | nu
   const secs = diff % 60;
 
   return (
-    <span className="text-[10px] text-muted-foreground px-1.5 border-l border-border/50 tabular-nums">
+    <span className="text-[10px] text-text-secondary px-1.5 border-l border-divider/50 tabular-nums">
       {mins}:{secs.toString().padStart(2, '0')}
     </span>
   );
@@ -478,17 +478,17 @@ export function InspectorLayout({
   const [composerRequest, setComposerRequest] = useState<NetworkRequest | null>(null);
 
   return (
-    <div className="h-full w-full bg-background text-foreground flex flex-col overflow-hidden">
+    <div className="h-full w-full bg-background text-text-primary flex flex-col overflow-hidden">
       {/* Enhanced Toolbar */}
-      <div className="h-10 border-b border-border flex items-center px-3 bg-muted/40 gap-3">
+      <div className="h-10 border-b border-divider flex items-center px-3 bg-secondary/40 gap-3">
         {/* Left Section */}
         <button
           onClick={onBack}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 px-2 py-1 rounded text-xs border border-transparent hover:border-border transition-all"
+          className="text-text-secondary hover:text-text-primary hover:bg-secondary/50 px-2 py-1 rounded text-xs border border-transparent hover:border-divider transition-all"
         >
           &larr; Back
         </button>
-        <div className="h-4 w-px bg-border/50" />
+        <div className="h-4 w-px bg-divider/50" />
 
         {/* Current URL & App Info */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -498,7 +498,7 @@ export function InspectorLayout({
                 Composer
               </span>
               <span
-                className="text-xs text-muted-foreground truncate max-w-[300px]"
+                className="text-xs text-text-secondary truncate max-w-[300px]"
                 title={`${composerRequest.protocol}://${composerRequest.host}${composerRequest.path}`}
               >
                 {composerRequest.protocol}://{composerRequest.host}
@@ -508,7 +508,7 @@ export function InspectorLayout({
           ) : selectedRequest ? (
             <div className="flex items-center gap-2 min-w-0">
               <span
-                className="text-xs text-muted-foreground truncate max-w-[300px]"
+                className="text-xs text-text-secondary truncate max-w-[300px]"
                 title={`${selectedRequest.protocol}://${selectedRequest.host}${selectedRequest.path}`}
               >
                 {selectedRequest.protocol}://{selectedRequest.host}
@@ -516,9 +516,9 @@ export function InspectorLayout({
               </span>
             </div>
           ) : (
-            <span className="text-xs text-muted-foreground italic">No request selected</span>
+            <span className="text-xs text-text-secondary italic">No request selected</span>
           )}
-          <div className="h-4 w-px bg-border/50 mx-1" />
+          <div className="h-4 w-px bg-divider/50 mx-1" />
           <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
             {appName}
           </span>
@@ -529,8 +529,8 @@ export function InspectorLayout({
                 className={cn(
                   'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-all',
                   isPaused
-                    ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/20'
-                    : 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20',
+                    ? 'bg-warning/10 text-warning border-warning/30 hover:bg-warning/20'
+                    : 'bg-success/10 text-success border-success/30 hover:bg-success/20',
                 )}
                 title={isPaused ? 'Resume Tracking' : 'Pause Tracking'}
               >
@@ -547,7 +547,7 @@ export function InspectorLayout({
           {/* Auto-save & Profile Status */}
           <div className="flex items-center gap-2 ml-2">
             {/* Auto-save Config */}
-            <div className="flex items-center rounded-md border border-border/50 p-0.5 bg-background/50">
+            <div className="flex items-center rounded-md border border-divider/50 p-0.5 bg-background/50">
               <button
                 onClick={() => {
                   // Cycle modes: 0 -> 1 -> 5 -> 10 -> 0
@@ -560,8 +560,8 @@ export function InspectorLayout({
                 className={cn(
                   'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors',
                   autoSaveInterval > 0
-                    ? 'text-blue-400 bg-blue-500/10'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'text-primary bg-primary/10'
+                    : 'text-text-secondary hover:text-text-primary',
                 )}
                 title="Toggle Auto-save Interval (Off, 1m, 5m, 10m)"
               >
@@ -573,8 +573,8 @@ export function InspectorLayout({
 
             {/* Last Saved Profile Badge */}
             {lastSavedTime && (
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              <div className="flex items-center gap-1 text-[10px] text-text-secondary animate-in fade-in slide-in-from-left-2 duration-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Saved {formatDistanceToNow(lastSavedTime, { addSuffix: true })}
               </div>
             )}
@@ -582,27 +582,27 @@ export function InspectorLayout({
         </div>
 
         {/* Center - Toolbar Menu */}
-        <div className="flex items-center gap-1 border-x border-border/50 px-2 min-w-fit">
+        <div className="flex items-center gap-1 border-x border-divider/50 px-2 min-w-fit">
           {/* View Switcher */}
           <button
             onClick={() => handleSetIntercept(!isIntercepting)}
             className={cn(
               'p-1.5 rounded text-xs font-medium transition-all',
               isIntercepting
-                ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? 'bg-error/20 text-error hover:bg-error/30'
+                : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
             )}
             title={isIntercepting ? 'Stop Intercepting' : 'Start Intercepting'}
           >
             <div
               className={cn(
                 'w-4 h-4 rounded-full border-2',
-                isIntercepting ? 'border-red-500 bg-red-500' : 'border-muted-foreground',
+                isIntercepting ? 'border-error bg-error' : 'border-divider',
               )}
             />
           </button>
           <button
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all border border-transparent hover:border-border"
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-text-secondary hover:bg-secondary hover:text-text-primary transition-all border border-transparent hover:border-divider"
             title="Clear All Requests"
             onClick={() => {
               if (confirm('Clear all requests?')) {
@@ -622,7 +622,7 @@ export function InspectorLayout({
           </button>
 
           <button
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all border border-transparent hover:border-border"
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-text-secondary hover:bg-secondary hover:text-text-primary transition-all border border-transparent hover:border-divider"
             title="Save Profile"
             onClick={() => setIsSaveProfileModalOpen(true)}
           >
@@ -638,7 +638,7 @@ export function InspectorLayout({
           </button>
 
           <button
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all border border-transparent hover:border-border"
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium text-text-secondary hover:bg-secondary hover:text-text-primary transition-all border border-transparent hover:border-divider"
             title="Download all HTTPS requests as JSON"
             onClick={handleDownloadHttps}
           >
@@ -646,7 +646,7 @@ export function InspectorLayout({
             Download
           </button>
 
-          <div className="w-px h-4 bg-border/50 mx-1" />
+          <div className="w-px h-4 bg-divider/50 mx-1" />
 
           <button
             onClick={() => {
@@ -708,8 +708,8 @@ export function InspectorLayout({
             className={cn(
               'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all border relative',
               isControlFlowMode
-                ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20'
-                : 'text-muted-foreground border-transparent hover:bg-muted hover:text-foreground hover:border-border',
+                ? 'bg-success/10 text-success border-success/30 hover:bg-success/20'
+                : 'text-text-secondary border-transparent hover:bg-secondary hover:text-text-primary hover:border-divider',
             )}
             title="Control Flow Panel"
           >
@@ -720,7 +720,7 @@ export function InspectorLayout({
 
         {/* Right Section - Metrics */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-xs whitespace-nowrap">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 text-primary text-xs whitespace-nowrap">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -737,24 +737,24 @@ export function InspectorLayout({
         </div>
 
         {platform === 'android' && (
-          <div className="flex items-center gap-2 border-l border-border/50 pl-2">
-            <span className="text-xs text-muted-foreground">Frida:</span>
+          <div className="flex items-center gap-2 border-l border-divider/50 pl-2">
+            <span className="text-xs text-text-secondary">Frida:</span>
             {fridaStatus === 'running' ? (
               <>
-                <span className="text-xs text-green-500 font-medium flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                <span className="text-xs text-success font-medium flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
                   Running
                 </span>
                 <button
                   onClick={onInjectBypass}
-                  className="px-2 py-1 rounded text-xs bg-purple-600/10 text-purple-500 hover:bg-purple-600/20 border border-purple-500/30 transition-colors"
+                  className="px-2 py-1 rounded text-xs bg-indigo-600/10 text-indigo-500 hover:bg-indigo-600/20 border border-indigo-500/30 transition-colors"
                   title="Inject Universal SSL Pinning Bypass"
                 >
                   SSL Bypass
                 </button>
                 <button
                   onClick={onInstallCert}
-                  className="px-2 py-1 rounded text-xs bg-orange-600/10 text-orange-500 hover:bg-orange-600/20 border border-orange-500/30 transition-colors"
+                  className="px-2 py-1 rounded text-xs bg-warning/10 text-warning hover:bg-warning/20 border border-warning/30 transition-colors"
                   title="Install Proxy CA Certificate (Requires Root)"
                 >
                   Install Cert
@@ -763,7 +763,7 @@ export function InspectorLayout({
             ) : fridaStatus === 'installed' ? (
               <button
                 onClick={onStartFrida}
-                className="px-2 py-1 rounded text-xs bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 border border-blue-500/30 transition-colors"
+                className="px-2 py-1 rounded text-xs bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors"
                 title="Start Frida Server"
               >
                 Start
@@ -771,7 +771,7 @@ export function InspectorLayout({
             ) : (
               <button
                 onClick={onInstallFrida}
-                className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80 border border-border transition-colors"
+                className="px-2 py-1 rounded text-xs bg-secondary hover:bg-secondary/80 border border-divider transition-colors"
                 title="Install Frida Server on Device"
               >
                 Install
@@ -786,11 +786,11 @@ export function InspectorLayout({
           <ResizableSplit direction="vertical" initialSize={50} minSize={20} maxSize={80}>
             <div className="h-full flex flex-col">
               {filteredRequests.length === 0 && requests.length > 0 && (
-                <div className="p-4 bg-yellow-500/10 text-yellow-500 text-xs text-center border-b border-yellow-500/20">
+                <div className="p-4 bg-warning/10 text-warning text-xs text-center border-b border-warning/20">
                   All {requests.length} requests are hidden by filters.
                   <button
                     onClick={() => setFilter({ ...initialFilterState })}
-                    className="ml-2 underline hover:text-yellow-400"
+                    className="ml-2 underline hover:text-warning"
                   >
                     Reset Filters
                   </button>

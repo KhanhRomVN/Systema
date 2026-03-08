@@ -79,7 +79,7 @@ function RequestActions({
             `${request.method} ${request.protocol}://${request.host}${request.path}`,
           );
         }}
-        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
+        className="p-1 hover:bg-secondary rounded text-text-secondary hover:text-text-primary"
         title="Copy Request URL"
       >
         <Copy className="h-3.5 w-3.5" />
@@ -88,7 +88,7 @@ function RequestActions({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground outline-none"
+            className="p-1 hover:bg-secondary rounded text-text-secondary hover:text-text-primary outline-none"
             title="More Actions"
           >
             <MoreVertical className="h-3.5 w-3.5" />
@@ -128,7 +128,7 @@ function RequestActions({
                 e.stopPropagation();
                 onAddToFlow(request);
               }}
-              className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+              className="text-success focus:text-success focus:bg-success/10"
             >
               <Network className="mr-2 h-3.5 w-3.5" />
               <span>Add to Flow</span>
@@ -141,7 +141,7 @@ function RequestActions({
                 e.stopPropagation();
                 onCreateFlow(request);
               }}
-              className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+              className="text-success focus:text-success focus:bg-success/10"
             >
               <Network className="mr-2 h-3.5 w-3.5" />
               <span>Create Flow with Request</span>
@@ -154,7 +154,7 @@ function RequestActions({
                 e.stopPropagation();
                 onEditAndReplay(request);
               }}
-              className="text-blue-500 focus:text-blue-500 focus:bg-blue-500/10"
+              className="text-primary focus:text-primary focus:bg-primary/10"
             >
               <Pencil className="mr-2 h-3.5 w-3.5" />
               <span>Edit & Replay</span>
@@ -168,10 +168,7 @@ function RequestActions({
             }}
           >
             <Star
-              className={cn(
-                'mr-2 h-3.5 w-3.5',
-                isHighlighted ? 'fill-yellow-500 text-yellow-500' : '',
-              )}
+              className={cn('mr-2 h-3.5 w-3.5', isHighlighted ? 'fill-warning text-warning' : '')}
             />
             <span>{isHighlighted ? 'Unhighlight' : 'Highlight'}</span>
           </DropdownMenuItem>
@@ -183,7 +180,7 @@ function RequestActions({
               e.stopPropagation();
               onDelete?.(request.id);
             }}
-            className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+            className="text-error focus:text-error focus:bg-error/10"
           >
             <Trash2 className="mr-2 h-3.5 w-3.5" />
             <span>Delete</span>
@@ -273,7 +270,7 @@ export function NetworkTracker({
             </button>
           );
         },
-        cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('id')}</span>,
+        cell: ({ row }) => <span className="text-text-secondary">{row.getValue('id')}</span>,
         // Hiding detailed ID column to save space, but keeping it in data model
         size: 0,
         enableHiding: true,
@@ -284,11 +281,11 @@ export function NetworkTracker({
         size: 80,
         cell: ({ row }) => {
           const method = row.getValue('method') as string;
-          let colorClass = 'text-foreground';
-          if (method === 'GET') colorClass = 'text-blue-400';
-          if (method === 'POST') colorClass = 'text-green-400';
-          if (method === 'PUT') colorClass = 'text-orange-400';
-          if (method === 'DELETE') colorClass = 'text-red-400';
+          let colorClass = 'text-text-primary';
+          if (method === 'GET') colorClass = 'text-primary';
+          if (method === 'POST') colorClass = 'text-success';
+          if (method === 'PUT') colorClass = 'text-warning';
+          if (method === 'DELETE') colorClass = 'text-error';
           return <span className={cn('font-bold', colorClass)}>{method}</span>;
         },
       },
@@ -325,13 +322,13 @@ export function NetworkTracker({
           if (isPending) {
             return (
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <span className="text-orange-500 font-bold animate-pulse text-[10px]">PAUSED</span>
+                <span className="text-warning font-bold animate-pulse text-[10px]">PAUSED</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onForward?.(id);
                   }}
-                  className="px-2 py-0.5 bg-green-500/20 text-green-500 hover:bg-green-500/30 rounded text-[10px] border border-green-500/50"
+                  className="px-2 py-0.5 bg-success/20 text-success hover:bg-success/30 rounded text-[10px] border border-success/50"
                   title="Forward Request"
                 >
                   Fwd
@@ -341,7 +338,7 @@ export function NetworkTracker({
                     e.stopPropagation();
                     onDrop?.(id);
                   }}
-                  className="px-2 py-0.5 bg-red-500/20 text-red-500 hover:bg-red-500/30 rounded text-[10px] border border-red-500/50"
+                  className="px-2 py-0.5 bg-error/20 text-error hover:bg-error/30 rounded text-[10px] border border-error/50"
                   title="Drop Request"
                 >
                   Drop
@@ -350,10 +347,10 @@ export function NetworkTracker({
             );
           }
 
-          let colorClass = 'text-foreground';
-          if (status >= 200 && status < 300) colorClass = 'text-green-400';
-          else if (status >= 300 && status < 400) colorClass = 'text-yellow-400';
-          else if (status >= 400) colorClass = 'text-red-400';
+          let colorClass = 'text-text-primary';
+          if (status >= 200 && status < 300) colorClass = 'text-success';
+          else if (status >= 300 && status < 400) colorClass = 'text-warning';
+          else if (status >= 400) colorClass = 'text-error';
           return <span className={colorClass}>{status || 'Pending'}</span>;
         },
       },
@@ -366,13 +363,13 @@ export function NetworkTracker({
         accessorKey: 'size',
         header: 'Size',
         size: 80,
-        cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('size')}</span>,
+        cell: ({ row }) => <span className="text-text-secondary">{row.getValue('size')}</span>,
       },
       {
         accessorKey: 'time',
         header: 'Time',
         size: 80,
-        cell: ({ row }) => <span className="text-muted-foreground">{row.getValue('time')}</span>,
+        cell: ({ row }) => <span className="text-text-secondary">{row.getValue('time')}</span>,
       },
       {
         id: 'actions',
@@ -400,13 +397,13 @@ export function NetworkTracker({
         size: 100,
         cell: ({ row }) => {
           if (!selectedRequest || selectedRequest.id === row.original.id) {
-            return <span className="text-muted-foreground">-</span>;
+            return <span className="text-text-secondary">-</span>;
           }
           const similarity = calculateSimilarity(selectedRequest, row.original);
-          let colorClass = 'text-muted-foreground';
-          if (similarity >= 80) colorClass = 'text-green-400 font-bold';
-          else if (similarity >= 50) colorClass = 'text-yellow-400';
-          else if (similarity >= 30) colorClass = 'text-orange-400';
+          let colorClass = 'text-text-secondary';
+          if (similarity >= 80) colorClass = 'text-success font-bold';
+          else if (similarity >= 50) colorClass = 'text-warning';
+          else if (similarity >= 30) colorClass = 'text-warning/80';
 
           return <span className={colorClass}>{similarity}%</span>;
         },
@@ -532,10 +529,10 @@ export function NetworkTracker({
   });
 
   return (
-    <div className="h-full w-full flex flex-col bg-background/50 text-sm overflow-hidden">
+    <div className="h-full w-full flex flex-col bg-table-bodyBg text-sm overflow-hidden">
       {/* Filter Bar */}
-      <div className="h-10 flex items-center px-2 border-b border-border/40 gap-2 shrink-0">
-        <Search className="w-4 h-4 text-muted-foreground" />
+      <div className="h-10 flex items-center px-2 border-b border-divider/40 gap-2 shrink-0">
+        <Search className="w-4 h-4 text-text-secondary" />
         <input
           placeholder="Filter requests..."
           className="bg-transparent border-none outline-none text-xs flex-1"
@@ -548,8 +545,8 @@ export function NetworkTracker({
             className={cn(
               'p-1.5 rounded transition-colors',
               matchCase
-                ? 'bg-blue-500/20 text-blue-500 hover:bg-blue-500/30'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
             )}
             title="Match Case"
           >
@@ -560,8 +557,8 @@ export function NetworkTracker({
             className={cn(
               'p-1.5 rounded transition-colors',
               matchWholeWord
-                ? 'bg-purple-500/20 text-purple-500 hover:bg-purple-500/30'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? 'bg-indigo-500/20 text-indigo-500 hover:bg-indigo-500/30'
+                : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
             )}
             title="Match Whole Word"
           >
@@ -572,8 +569,8 @@ export function NetworkTracker({
             className={cn(
               'p-1.5 rounded transition-colors',
               useRegex
-                ? 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? 'bg-success/20 text-success hover:bg-success/30'
+                : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
             )}
             title="Use Regular Expression"
           >
@@ -584,7 +581,7 @@ export function NetworkTracker({
 
       <div ref={tableContainerRef} className="flex-1 flex flex-col overflow-auto relative">
         {/* Header - Moved inside scroll container for horizontal scrolling */}
-        <div className="flex bg-muted/50 text-xs font-medium text-muted-foreground border-b border-border/20 sticky top-0 z-10 w-full min-w-max">
+        <div className="flex bg-table-headerBg text-xs font-medium text-text-secondary border-b border-divider/20 sticky top-0 z-10 w-full min-w-max">
           {table.getHeaderGroups().map((headerGroup) => (
             <div key={headerGroup.id} className="flex w-full">
               {headerGroup.headers.map((header) => {
@@ -648,16 +645,16 @@ export function NetworkTracker({
                       e.dataTransfer.effectAllowed = 'move';
                     }}
                     className={cn(
-                      'flex items-center border-b border-border/20 transition-colors cursor-pointer text-xs absolute left-0 top-0',
+                      'flex items-center border-b border-divider/20 transition-colors cursor-pointer text-xs absolute left-0 top-0',
                       isPending
-                        ? 'bg-orange-500/10 hover:bg-orange-500/20'
+                        ? 'bg-warning/10 hover:bg-warning/20'
                         : isIntercepted
-                          ? 'bg-red-500/10 hover:bg-red-500/20'
+                          ? 'bg-error/10 hover:bg-error/20'
                           : isHighlighted
-                            ? 'bg-blue-500/10 hover:bg-blue-500/20 border-l-2 border-l-blue-500' // Highlight style
-                            : 'hover:bg-muted/50',
+                            ? 'bg-primary/10 hover:bg-primary/20 border-l-2 border-l-primary' // Highlight style
+                            : 'hover:bg-table-hoverItemBodyBg',
                       row.original.id === selectedId &&
-                        'bg-accent text-accent-foreground hover:bg-accent',
+                        'bg-table-focusItemBodyBg text-text-primary hover:bg-table-focusItemBodyBg',
                     )}
                     style={{
                       height: `${virtualRow.size}px`,
@@ -719,7 +716,7 @@ export function NetworkTracker({
                       onClick={() => {
                         onAddToFlow(row.original);
                       }}
-                      className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+                      className="text-success focus:text-success focus:bg-success/10"
                     >
                       <Network className="mr-2 h-3.5 w-3.5" />
                       <span>Add to Flow</span>
@@ -731,7 +728,7 @@ export function NetworkTracker({
                       onClick={() => {
                         onCreateFlow(row.original);
                       }}
-                      className="text-green-500 focus:text-green-500 focus:bg-green-500/10"
+                      className="text-success focus:text-success focus:bg-success/10"
                     >
                       <Network className="mr-2 h-3.5 w-3.5" />
                       <span>Create Flow with Request</span>
@@ -743,7 +740,7 @@ export function NetworkTracker({
                       onClick={() => {
                         onEditAndReplay(row.original);
                       }}
-                      className="text-blue-500 focus:text-blue-500 focus:bg-blue-500/10"
+                      className="text-primary focus:text-primary focus:bg-primary/10"
                     >
                       <Pencil className="mr-2 h-3.5 w-3.5" />
                       <span>Edit & Replay</span>
@@ -758,7 +755,7 @@ export function NetworkTracker({
                     <Star
                       className={cn(
                         'mr-2 h-3.5 w-3.5',
-                        isHighlighted ? 'fill-yellow-500 text-yellow-500' : '',
+                        isHighlighted ? 'fill-warning text-warning' : '',
                       )}
                     />
                     <span>{isHighlighted ? 'Unhighlight' : 'Highlight'}</span>
@@ -770,7 +767,7 @@ export function NetworkTracker({
                     onClick={() => {
                       onDelete?.(row.original.id);
                     }}
-                    className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                    className="text-error focus:text-error focus:bg-error/10"
                   >
                     <Trash2 className="mr-2 h-3.5 w-3.5" />
                     <span>Delete</span>
@@ -781,7 +778,7 @@ export function NetworkTracker({
           })}
 
           {rows.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground w-full">
+            <div className="absolute inset-0 flex items-center justify-center text-text-secondary w-full">
               No requests found
             </div>
           )}

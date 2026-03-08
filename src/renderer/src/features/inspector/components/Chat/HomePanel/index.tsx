@@ -1,4 +1,4 @@
-import { Plus, ChevronRight, Brain, ChevronDown, Globe, Sparkles } from 'lucide-react';
+import { Plus, Brain, ChevronDown, Globe, Settings } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 // TabList removed
@@ -33,7 +33,6 @@ import { AccountAvatar } from './components/AccountAvatar';
 interface HomePanelProps {
   onSelectSession: (session: ChatSession) => void;
   onOpenSettings: () => void;
-  onOpenProviderSelection: () => void;
   currentProviderConfig: ProviderConfig | null;
   onUpdateProviderConfig: (config: ProviderConfig) => void;
 }
@@ -176,7 +175,6 @@ function CustomSelect({
 export function HomePanel({
   onSelectSession,
   onOpenSettings,
-  onOpenProviderSelection,
   currentProviderConfig,
   onUpdateProviderConfig,
 }: HomePanelProps) {
@@ -427,7 +425,7 @@ export function HomePanel({
     const newId = Math.random().toString(36).substr(2, 9);
     const newSession: ChatSession = {
       id: newId,
-      title: 'New Analysis Session',
+      title: 'New Chat',
       timestamp: Date.now(),
       messageCount: 0,
       preview: 'Start analyzing network traffic...',
@@ -496,6 +494,18 @@ export function HomePanel({
   const handleSend = () => {
     if (!inputText.trim() && attachments.length === 0) return;
     if (isUploadingAttachment) return;
+
+    // Validation: Require model and accountId (for Elara)
+    const isConfigValid =
+      currentProviderConfig?.model &&
+      (currentProviderConfig.type !== ProviderType.ELARA_FREE ||
+        (currentProviderConfig as ElaraFreeConfig).accountId);
+
+    if (!isConfigValid) {
+      console.warn('[HomePanel] Cannot send: Missing configuration');
+      return;
+    }
+
     handleNewChat(true);
   };
 
@@ -532,27 +542,11 @@ export function HomePanel({
           <span className="text-xs font-semibold text-muted-foreground">New Chat</span>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => handleNewChat(false)}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
-              title="New Chat"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onOpenProviderSelection}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
-              title="Select Provider"
-            >
-              <Sparkles className="w-4 h-4" />
-            </button>
-            <button
               onClick={onOpenSettings}
               className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
               title="Settings"
             >
-              <div className="border border-current rounded w-4 h-4 flex items-center justify-center">
-                <ChevronRight className="w-3 h-3" />
-              </div>
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -638,6 +632,11 @@ export function HomePanel({
           setSearchEnabled={setSearchEnabled}
           streamEnabled={streamEnabled}
           setStreamEnabled={setStreamEnabled}
+          disabled={
+            !currentProviderConfig?.model ||
+            (currentProviderConfig?.type === ProviderType.ELARA_FREE &&
+              !(currentProviderConfig as ElaraFreeConfig).accountId)
+          }
           supportsUpload={
             selectedSubProvider
               ? (subProviders.find((p) => p.id === selectedSubProvider)?.is_upload ?? false)

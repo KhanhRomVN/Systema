@@ -11,8 +11,7 @@ import { CryptoTab } from './CryptoTab';
 import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, KeyRound } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 import { DiffView, DiffTab } from './DiffView';
-import { ProviderSelectionPanel } from './ProviderSelectionPanel';
-import { ProviderConfig } from '../types/provider-types';
+import { ProviderConfig, ProviderType } from '../types/provider-types';
 import { ProviderStorage } from '../../../services/provider-storage';
 
 import { WasmPanel } from './WasmPanel';
@@ -73,15 +72,24 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   // Missing state variables
   const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [showProviderSelection, setShowProviderSelection] = useState(false);
 
   const [collectionCount, setCollectionCount] = useState(0);
 
   // Load saved provider config on mount
   useEffect(() => {
     const savedConfig = ProviderStorage.loadConfig();
-    if (savedConfig) {
+    if (savedConfig && savedConfig.type === ProviderType.ELARA_FREE) {
       setProviderConfig(savedConfig);
+    } else {
+      // Default to Elara if no config or invalid config
+      const defaultConfig: ProviderConfig = {
+        type: ProviderType.ELARA_FREE,
+        name: 'Elara (Free)',
+        model: '',
+        baseURL: 'http://localhost:11434',
+      } as ProviderConfig;
+      setProviderConfig(defaultConfig);
+      ProviderStorage.saveConfig(defaultConfig);
     }
   }, []);
 
@@ -145,18 +153,14 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     }
 
     if (showSettings) {
-      return <SettingsPanel onClose={() => setShowSettings(false)} />;
-    }
-
-    if (showProviderSelection) {
       return (
-        <ProviderSelectionPanel
-          onProviderConfigured={(config) => {
-            setProviderConfig(config);
-            ProviderStorage.saveConfig(config);
-            setShowProviderSelection(false);
+        <SettingsPanel
+          onClose={() => setShowSettings(false)}
+          currentProviderConfig={providerConfig}
+          onUpdateProviderConfig={(newConfig) => {
+            setProviderConfig(newConfig);
+            ProviderStorage.saveConfig(newConfig);
           }}
-          onBack={() => setShowProviderSelection(false)}
         />
       );
     }
@@ -189,7 +193,6 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           setActiveSession(session);
         }}
         onOpenSettings={() => setShowSettings(true)}
-        onOpenProviderSelection={() => setShowProviderSelection(true)}
         currentProviderConfig={providerConfig}
         onUpdateProviderConfig={(newConfig) => {
           setProviderConfig(newConfig);

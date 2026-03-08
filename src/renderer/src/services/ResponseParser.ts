@@ -34,6 +34,7 @@ export type ContentBlock =
   | { type: 'code'; content: string; language?: string }
   | { type: 'html'; content: string }
   | { type: 'table'; content: string } // New for Systema
+  | { type: 'temp'; content: string }
   | { type: 'tool'; action: ToolAction };
 
 export interface ParsedResponse {
@@ -168,13 +169,14 @@ const parseToolAction = (toolName: string, innerContent: string, rawXml: string)
       params.requestId = extractParamValue(innerContent, 'requestId');
       break;
 
-    case 'get_values':
+    case 'get_values': {
       params.field = extractParamValue(innerContent, 'field');
       const ignore = extractParamValue(innerContent, 'ignore_filters');
       params.ignoreFilters = ignore === 'true';
       break;
+    }
 
-    case 'ask_followup_question':
+    case 'ask_followup_question': {
       params.question = extractParamValue(innerContent, 'question');
       const optionsStr = extractParamValue(innerContent, 'options');
       if (optionsStr) {
@@ -185,6 +187,7 @@ const parseToolAction = (toolName: string, innerContent: string, rawXml: string)
         }
       }
       break;
+    }
 
     case 'attempt_completion':
       params.result = extractParamValue(innerContent, 'result');
@@ -310,7 +313,6 @@ export const parseAIResponse = (content: string): ParsedResponse => {
     'export_har',
     'generate_table',
     'ask_followup_question',
-    'ask_followup_question',
     'attempt_completion',
     'read_file',
     'write_file',
@@ -318,6 +320,7 @@ export const parseAIResponse = (content: string): ParsedResponse => {
     'delete_file',
     'run_command',
     'text',
+    'temp',
     'code',
     'table', // New explicit table tag support if agent uses it directly or via generate_table
   ];
@@ -362,6 +365,13 @@ export const parseAIResponse = (content: string): ParsedResponse => {
         if (innerContent.trim()) {
           result.contentBlocks.push({
             type: 'text',
+            content: innerContent.trim(),
+          });
+        }
+      } else if (toolName === 'temp') {
+        if (innerContent.trim()) {
+          result.contentBlocks.push({
+            type: 'temp',
             content: innerContent.trim(),
           });
         }

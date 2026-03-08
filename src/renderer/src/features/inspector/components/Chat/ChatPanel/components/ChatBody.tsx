@@ -11,15 +11,15 @@ import { getFileIconPath } from '../../../../../../shared/utils/fileIconMapper';
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
-  content: string; // Keep raw for fallback
-  parsed?: ParsedResponse; // New parsed structure
-  fullPrompt?: string; // 🆕 Full Prompt debug data
+  content: string;
+  parsed?: ParsedResponse;
+  fullPrompt?: string;
   timestamp: number;
   timestampStr?: string;
-  executedToolIndices?: number[]; // Track executed tools
+  executedToolIndices?: number[];
   isStreaming?: boolean;
   reasoning?: string;
-  isHidden?: boolean; // 🆕 Hidden from UI (for bg tools)
+  isHidden?: boolean;
   attachments?: {
     name: string;
     type: string;
@@ -33,8 +33,170 @@ interface ChatBodyProps {
   isProcessing?: boolean;
   onExecuteTool?: (action: any, msgId: string, index: number) => void;
   onPreviewTool?: (action: any) => Promise<string | null>;
-  inspectorFilter?: any; // To display current filter state
+  inspectorFilter?: any;
 }
+
+interface RenderBlockProps {
+  block: ContentBlock;
+  msgId: string;
+  index: number;
+  isExecuted: boolean;
+  isEnabled: boolean;
+  onExecuteTool?: (action: any, msgId: string, index: number) => void;
+  onPreviewTool?: (action: any) => Promise<string | null>;
+}
+
+// Separate component for tool blocks to avoid hooks after early returns
+const ToolBlock = ({
+  block,
+  msgId,
+  index,
+  isExecuted,
+  isEnabled,
+  onExecuteTool,
+  onPreviewTool,
+}: RenderBlockProps) => {
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { action } = block;
+
+  const handlePreview = async () => {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
+
+    if (previewData) {
+      setShowPreview(true);
+      return;
+    }
+
+    if (onPreviewTool) {
+      setIsLoadingPreview(true);
+      try {
+        const result = await onPreviewTool(action);
+        if (result) {
+          setPreviewData(result);
+          setShowPreview(true);
+        }
+      } catch (e) {
+        console.error('Preview failed', e);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }
+  };
+
+  const isReset = action.type === 'get_active_filters';
+
+  // Auto-trigger preview for reset action
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (isReset && !previewData && onPreviewTool) {
+      handlePreview();
+    }
+  }, [action.type, isReset, previewData, onPreviewTool]);
+
+  // Special Case: attempt_completion treated as final text message
+  if (action.type === 'attempt_completion') {
+    return (
+      <div className="my-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-foreground/90">
+        <div className="font-semibold text-green-500 flex items-center gap-2 mb-1">
+          <CheckCircle2 className="w-4 h-4" />
+          Task Completed
+        </div>
+        <div className="whitespace-pre-wrap">{action.params.result}</div>
+      </div>
+    );
+  }
+
+  const handleRun = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isExecuted && isEnabled && onExecuteTool) {
+      onExecuteTool(action, msgId, index);
+    } else {
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  // Status Determination
+  let statusColor = 'bg-muted-foreground/30';
+  if (isLoadingPreview) statusColor = 'bg-yellow-500 animate-pulse';
+  if (isExecuted) statusColor = 'bg-green-500';
+
+  return (
+    <div className="my-0.5 overflow-hidden">
+      <div
+        className="flex items-center gap-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity select-none group"
+        onClick={handleRun}
+      >
+        <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shadow-sm shrink-0`} />
+
+        <div className="flex-1 font-mono text-xs text-foreground/60 truncate group-hover:text-foreground transition-colors">
+          {action.type === 'get_filter'
+            ? 'Get filter https detail'
+            : action.type === 'list_https'
+              ? 'List HTTPS Requests'
+              : action.type === 'get_https_details'
+                ? 'Get HTTPS Details'
+                : action.type === 'edit_filter'
+                  ? 'Edit Filter'
+                  : action.type === 'delete_https'
+                    ? 'Delete HTTPS Request'
+                    : action.type === 'list_requests'
+                      ? 'List Requests'
+                      : action.type === 'get_request_details'
+                        ? 'Get Request Details'
+                        : action.type}
+        </div>
+
+        {action.type === 'list_requests' && onPreviewTool && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePreview();
+            }}
+            disabled={isLoadingPreview}
+            className={`p-1 rounded hover:bg-muted/50 transition-colors ${showPreview ? 'text-primary' : 'text-muted-foreground'}`}
+            title="Preview List"
+          >
+            {isLoadingPreview ? (
+              <span className="w-3 h-3 block rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+            ) : showPreview ? (
+              <EyeOff className="w-3.5 h-3.5" />
+            ) : (
+              <Eye className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+      </div>
+
+      {(isExpanded || showPreview) && (
+        <div className="bg-black/10 py-1.5 px-1 rounded">
+          <div className="border-l border-primary/20 pl-3 ml-0.5">
+            {!showPreview && (
+              <div className="text-[10px] font-mono whitespace-pre-wrap text-muted-foreground overflow-x-auto">
+                {JSON.stringify(action.params, null, 2)}
+              </div>
+            )}
+
+            {(showPreview || isReset) && (
+              <div className="text-[10px] font-mono overflow-auto max-h-[300px] whitespace-pre-wrap text-foreground/80">
+                {isReset && !previewData ? (
+                  <span className="text-muted-foreground italic">Fetching filters...</span>
+                ) : (
+                  previewData || 'No output available.'
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const RenderBlock = ({
   block,
@@ -44,19 +206,7 @@ const RenderBlock = ({
   isEnabled,
   onExecuteTool,
   onPreviewTool,
-}: {
-  block: ContentBlock;
-  msgId: string;
-  index: number;
-  isExecuted: boolean;
-  isEnabled: boolean;
-  onExecuteTool?: (action: any, msgId: string, index: number) => void;
-  onPreviewTool?: (action: any) => Promise<string | null>;
-}) => {
-  const [showPreview, setShowPreview] = React.useState(false);
-  const [previewData, setPreviewData] = React.useState<string | null>(null);
-  const [isLoadingPreview, setIsLoadingPreview] = React.useState(false);
-
+}: RenderBlockProps) => {
   if (block.type === 'text') {
     return <div className="whitespace-pre-wrap">{block.content}</div>;
   }
@@ -75,160 +225,23 @@ const RenderBlock = ({
     );
   }
   if (block.type === 'tool') {
-    const [isExpanded, setIsExpanded] = React.useState(false); // Default collapsed
-    const { action } = block;
-
-    // Special Case: attempt_completion treated as final text message
-    if (action.type === 'attempt_completion') {
-      return (
-        <div className="my-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-foreground/90">
-          <div className="font-semibold text-green-500 flex items-center gap-2 mb-1">
-            <CheckCircle2 className="w-4 h-4" />
-            Task Completed
-          </div>
-          <div className="whitespace-pre-wrap">{action.params.result}</div>
-        </div>
-      );
-    }
-
-    const handleRun = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!isExecuted && isEnabled && onExecuteTool) {
-        onExecuteTool(action, msgId, index);
-      } else {
-        setIsExpanded(!isExpanded);
-      }
-    };
-
-    const handlePreview = async () => {
-      if (showPreview) {
-        setShowPreview(false);
-        return;
-      }
-
-      if (previewData) {
-        setShowPreview(true);
-        return;
-      }
-
-      if (onPreviewTool) {
-        setIsLoadingPreview(true);
-        try {
-          const result = await onPreviewTool(action);
-          if (result) {
-            setPreviewData(result);
-            setShowPreview(true);
-          }
-        } catch (e) {
-          console.error('Preview failed', e);
-        } finally {
-          setIsLoadingPreview(false);
-        }
-      }
-    };
-
-    const isReset = action.type === 'get_active_filters';
-
-    useEffect(() => {
-      if (isReset && !previewData && onPreviewTool) {
-        handlePreview(); // Auto-trigger preview
-      }
-    }, [action.type]);
-
-    // Status Determination
-    let statusColor = 'bg-muted-foreground/30'; // Gray (Pending)
-    if (isLoadingPreview) statusColor = 'bg-yellow-500 animate-pulse'; // Yellow (Running/Fetching)
-    if (isExecuted) statusColor = 'bg-green-500'; // Green (Success)
-    // if (isError) statusColor = 'bg-red-500'; // Red (Error) - needs error state pass down if possible
-
     return (
-      <div className="my-0.5 overflow-hidden">
-        {/* Header - Click to Run/Toggle */}
-        <div
-          className="flex items-center gap-2 py-1.5 cursor-pointer hover:opacity-80 transition-opacity select-none group"
-          onClick={handleRun}
-        >
-          {/* Status Dot */}
-          <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shadow-sm shrink-0`} />
-
-          {/* Title */}
-          <div className="flex-1 font-mono text-xs text-foreground/60 truncate group-hover:text-foreground transition-colors">
-            {/* Friendly Name Mappings */}
-            {action.type === 'get_filter'
-              ? 'Get filter https detail'
-              : action.type === 'list_https'
-                ? 'List HTTPS Requests'
-                : action.type === 'get_https_details'
-                  ? 'Get HTTPS Details'
-                  : action.type === 'edit_filter'
-                    ? 'Edit Filter'
-                    : action.type === 'delete_https'
-                      ? 'Delete HTTPS Request'
-                      : action.type === 'list_requests'
-                        ? 'List Requests'
-                        : action.type === 'get_request_details'
-                          ? 'Get Request Details'
-                          : action.type}
-          </div>
-
-          {/* Preview Button (Only for list_requests) - Inline */}
-          {action.type === 'list_requests' && onPreviewTool && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePreview();
-              }}
-              disabled={isLoadingPreview}
-              className={`p-1 rounded hover:bg-muted/50 transition-colors ${showPreview ? 'text-primary' : 'text-muted-foreground'}`}
-              title="Preview List"
-            >
-              {isLoadingPreview ? (
-                <span className="w-3 h-3 block rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-              ) : showPreview ? (
-                <EyeOff className="w-3.5 h-3.5" />
-              ) : (
-                <Eye className="w-3.5 h-3.5" />
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* Expanded Body */}
-        {(isExpanded || showPreview) && (
-          <div className="bg-black/10 py-1.5 px-1 rounded">
-            <div className="border-l border-primary/20 pl-3 ml-0.5">
-              {/* Params */}
-              {!showPreview && (
-                <div className="text-[10px] font-mono whitespace-pre-wrap text-muted-foreground overflow-x-auto">
-                  {JSON.stringify(action.params, null, 2)}
-                </div>
-              )}
-
-              {/* Preview Area */}
-              {(showPreview || isReset) && (
-                <div className="text-[10px] font-mono overflow-auto max-h-[300px] whitespace-pre-wrap text-foreground/80">
-                  {isReset && !previewData ? (
-                    <span className="text-muted-foreground italic">Fetching filters...</span>
-                  ) : (
-                    previewData || 'No output available.'
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      <ToolBlock
+        block={block}
+        msgId={msgId}
+        index={index}
+        isExecuted={isExecuted}
+        isEnabled={isEnabled}
+        onExecuteTool={onExecuteTool}
+        onPreviewTool={onPreviewTool}
+      />
     );
   }
   if (block.type === 'table') {
-    // Explicit table parser or passed data structure
-    // Since we updated ResponseParser, `block` might have `data: { headers, rows }`
-    // We need to extend the type definition in this file or cast it.
     const tableBlock = block as any;
     const { headers, rows } = tableBlock.data || { headers: [], rows: [] };
 
     if (!headers.length && !rows.length) {
-      // Fallback for raw content
       return (
         <div className="my-2 overflow-x-auto border border-border rounded-lg bg-background/50">
           <pre className="text-xs p-2 whitespace-pre text-foreground/80 font-mono">
@@ -298,13 +311,10 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
       {messages.map((msg) => {
         const isUser = msg.role === 'user';
         if (msg.role === 'system') return null;
-        if (msg.isHidden) return null; // 🆕 Filter hidden messages
+        if (msg.isHidden) return null;
         if (isUser) requestCount++;
 
-        // Calculate tool execution state for this message
         let pendingToolFound = false;
-
-        // Ensure we have parsed content (fallback for old messages)
         const parsedMsg = msg.parsed || parseAIResponse(msg.content);
 
         return (
@@ -312,7 +322,6 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
             key={msg.id}
             className={`flex flex-col w-full animate-in fade-in duration-300 ${isUser ? 'items-end' : 'items-start'}`}
           >
-            {/* Request Divider for User Messages */}
             {isUser && (
               <div className="flex flex-col gap-1 mt-6 mb-3 select-none animate-in slide-in-from-left-2 fade-in duration-300">
                 <div className="flex items-center gap-3">
@@ -338,12 +347,11 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
             <div
               className={`flex flex-col gap-1 w-full max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}
             >
-              {/* Message Content */}
               <div
                 className={`text-sm leading-relaxed rounded-lg px-3 py-2 ${
                   isUser
                     ? 'bg-primary text-primary-foreground font-medium rounded-br-none'
-                    : 'bg-transparent text-foreground/80 font-normal px-0 py-0' // Assistant messages transparent
+                    : 'bg-transparent text-foreground/80 font-normal px-0 py-0'
                 }`}
               >
                 {parsedMsg ? (
@@ -377,7 +385,6 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
                 ) : null}
               </div>
 
-              {/* Message Attachments */}
               {msg.attachments && msg.attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2 mb-1">
                   {msg.attachments.map((att, idx) => (
@@ -419,7 +426,6 @@ export function ChatBody({ messages, isProcessing, onExecuteTool, onPreviewTool 
         );
       })}
 
-      {/* Preview Modal */}
       {previewFile && <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />}
 
       {isProcessing && (

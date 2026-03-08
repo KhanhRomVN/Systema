@@ -390,14 +390,21 @@ function generateBodyAnalysis(request: NetworkRequest): BodyAnalysis {
     if (request.requestBody && request.requestHeaders['content-type']?.includes('json')) {
       reqFormatted = JSON.parse(request.requestBody);
     }
-  } catch {}
+  } catch {
+    // Ignore errors
+  }
 
   let resFormatted = undefined;
   try {
     if (request.responseBody && request.responseHeaders['content-type']?.includes('json')) {
       resFormatted = JSON.parse(request.responseBody);
     }
-  } catch {}
+  } catch {
+    // Ignore errors
+  }
+
+  // Get request compression from custom header or content-encoding
+  const reqCompression = request.requestHeaders['content-encoding'] || 'none';
 
   return {
     request: {
@@ -405,12 +412,16 @@ function generateBodyAnalysis(request: NetworkRequest): BodyAnalysis {
       size: request.requestBody?.length + ' B' || '0 B',
       raw: request.requestBody || '',
       formatted: reqFormatted,
+      isBinary: false, // Request body binary tracking not fully implemented yet
+      compression: reqCompression,
     },
     response: {
       contentType: request.responseHeaders['content-type'] || '',
       size: request.size,
       raw: request.responseBody || '',
       formatted: resFormatted,
+      isBinary: request.isBinary,
+      compression: request.responseHeaders['content-encoding'] || 'none',
     },
   };
 }

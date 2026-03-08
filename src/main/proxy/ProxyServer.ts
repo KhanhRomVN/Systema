@@ -4,12 +4,15 @@ import { INJECT_SCRIPT } from './injection';
 import * as zlib from 'zlib'; // Ensure zlib is imported for decompression
 import { cacheHeaders } from './headerCache';
 import { mediaCache } from './mediaCache';
+import * as path from 'path';
+import * as fs from 'fs';
+import { Proxy } from 'http-mitm-proxy';
+import { decompress } from '@mongodb-js/zstd';
 
 export class ProxyServer extends EventEmitter {
   private proxy: any;
   private isRunning: boolean = false;
   private window: BrowserWindow | null = null;
-  private zstd: any = null;
   private isIntercepting: boolean = false;
   // Map of requestId -> callback to resume request
   private pendingRequests: Map<string, () => void> = new Map();
@@ -18,21 +21,11 @@ export class ProxyServer extends EventEmitter {
     super();
     try {
       // Fix: Destructure Proxy and use new keyword
-      const { Proxy } = require('http-mitm-proxy');
       this.proxy = new Proxy();
-
-      // Initialize zstd
-      try {
-        const { ZstdInit } = require('@oneidentity/zstd-js');
-        ZstdInit()
-          .then(({ ZstdSimple }: any) => {
-            this.zstd = ZstdSimple;
-          })
-          .catch(() => {});
-      } catch (e) {}
-
       this.proxy.use(Proxy.gunzip);
-    } catch (e) {}
+    } catch (e) {
+      // Ignore errors
+    }
   }
 
   public setWindow(window: BrowserWindow) {
@@ -97,6 +90,14 @@ export class ProxyServer extends EventEmitter {
         return;
       }
       console.error('[ProxyServer Error]', error);
+      if (ctxOrErr && ctxOrErr.clientToProxyRequest) {
+        console.error(`[ProxyServer Error] URL: ${ctxOrErr.clientToProxyRequest.url}`);
+      }
+    });
+
+    this.proxy.onConnect((req: any, socket: any, head: any, callback: any) => {
+      console.log(`[ProxyServer Connect] ${req.url} (Host: ${req.headers.host})`);
+      return callback();
     });
 
     this.proxy.onRequest((ctx: any, callback: any) => {
@@ -108,9 +109,6 @@ export class ProxyServer extends EventEmitter {
 
       // Setup Page Logic
       if (!ctx.isSSL && req.url && (req.url === '/ssl' || req.url.startsWith('/ssl/'))) {
-        const path = require('path');
-        const fs = require('fs');
-
         // CA Path (Default location for http-mitm-proxy)
         const caPath = path.join(process.cwd(), '.http-mitm-proxy', 'certs', 'ca.pem');
 
@@ -365,7 +363,9 @@ export class ProxyServer extends EventEmitter {
           initiator = Buffer.from(initiatorStackBase64 as string, 'base64').toString('utf8');
           // Remove the header so the real server doesn't see it (though usually harmless)
           delete req.headers['x-systema-initiator'];
-        } catch (e) {}
+        } catch (e) {
+          // Ignore errors
+        }
       }
 
       cacheHeaders(requestId, req.headers);
@@ -388,13 +388,96 @@ export class ProxyServer extends EventEmitter {
           return callback(null, chunk);
         });
 
-        ctx.onRequestEnd((ctx: any, callback: any) => {
+        ctx.onRequestEnd(async (ctx: any, callback: any) => {
           try {
-            const body = Buffer.concat(requestChunks).toString('utf8');
+            const buffer = Buffer.concat(requestChunks);
+            const encodingHeader = req.headers['content-encoding'];
+            const contentEncoding = (
+              Array.isArray(encodingHeader) ? encodingHeader[0] : encodingHeader || ''
+            ).toLowerCase();
+
+            let body = '';
+            let decompressionFailed = false;
+
+            // Decompress request body if needed (same as response)
+            if (contentEncoding === 'gzip') {
+              try {
+                body = zlib.gunzipSync(buffer).toString('utf8');
+              } catch (e) {
+                console.error('[Proxy] Failed to decompress gzip request:', e);
+                decompressionFailed = true;
+              }
+            } else if (contentEncoding === 'br') {
+              try {
+                body = zlib.brotliDecompressSync(buffer).toString('utf8');
+              } catch (e) {
+                console.error('[Proxy] Failed to decompress brotli request:', e);
+                decompressionFailed = true;
+              }
+            } else if (contentEncoding === 'deflate') {
+              try {
+                body = zlib.inflateSync(buffer).toString('utf8');
+              } catch (e) {
+                console.error('[Proxy] Failed to decompress deflate request:', e);
+                decompressionFailed = true;
+              }
+            } else if (contentEncoding === 'zstd') {
+              // Use @mongodb-js/zstd for decompression
+              const firstBytes = buffer.slice(0, 16).toString('hex');
+              console.log('[Proxy] ZSTD request debug:', {
+                encoding: contentEncoding,
+                size: buffer.length,
+                firstBytes,
+                contentType: req.headers['content-type']
+              });
+
+              try {
+                const decompressed = await decompress(buffer);
+                body = Buffer.from(decompressed).toString('utf8');
+                console.log('[Proxy] Successfully decompressed zstd request:', body.length, 'bytes');
+                console.log('[Proxy] Decompressed content preview:', body.slice(0, 200));
+              } catch (e) {
+                console.error('[Proxy] ZSTD decompress failed:', e);
+                decompressionFailed = true;
+              }
+            }
+
+            // Fallback: try to decode as UTF-8 if decompression failed
+            if (decompressionFailed) {
+              // Try UTF-8 first
+              try {
+                body = buffer.toString('utf8');
+                // Check if it looks like valid text
+                if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/.test(body)) {
+                  // Contains control characters, likely binary
+                  // Show first 64 bytes as hex for debugging
+                  const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                  body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}\n\nContent-Type: ${req.headers['content-type'] || 'unknown'}`;
+                }
+              } catch {
+                const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}`;
+              }
+            } else if (!body) {
+              // No compression, try UTF-8
+              try {
+                body = buffer.toString('utf8');
+                // Check if it looks like valid text
+                if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/.test(body)) {
+                  const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                  body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}`;
+                }
+              } catch {
+                const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}`;
+              }
+            }
+
             if (body) {
               this.sendToRenderer('proxy:request-body', {
                 id: requestId,
                 body,
+                contentEncoding: contentEncoding || 'none',
               });
             }
           } catch (err) {
@@ -502,7 +585,6 @@ export class ProxyServer extends EventEmitter {
           const contentEncoding = (
             Array.isArray(encodingHeader) ? encodingHeader[0] : encodingHeader || ''
           ).toLowerCase();
-          const zlib = require('zlib');
 
           let isBinaryResponse = false;
           let body = '';

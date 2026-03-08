@@ -135,6 +135,7 @@ export default function InspectorPage() {
       } catch (e) {
         console.error('Failed to list packages', e);
       } finally {
+        // Ignore errors
       }
     }
 
@@ -203,6 +204,10 @@ export default function InspectorPage() {
           const updatedReq = {
             ...req,
             requestBody: data.body,
+            requestHeaders: {
+              ...req.requestHeaders,
+              'content-encoding': data.contentEncoding || req.requestHeaders['content-encoding'],
+            },
           };
           const analysis = generateRequestAnalysis(updatedReq);
           return { ...updatedReq, analysis };
@@ -309,12 +314,22 @@ export default function InspectorPage() {
     window.api.on('proxy:response', handleResponse);
     window.api.on('proxy:response-body', handleResponseBody);
 
+    // CDP Listeners (Unified handlers)
+    window.api.on('cdp:request', handleRequest);
+    window.api.on('cdp:response', handleResponse);
+    window.api.on('cdp:response-body', handleResponseBody);
+
     return () => {
       console.log('[Inspector] 🔌 Detaching event listeners');
       window.api.off('proxy:request', handleRequest);
       window.api.off('proxy:request-body', handleRequestBody);
       window.api.off('proxy:response', handleResponse);
       window.api.off('proxy:response-body', handleResponseBody);
+
+      window.api.off('cdp:request', handleRequest);
+      window.api.off('cdp:response', handleResponse);
+      window.api.off('cdp:response-body', handleResponseBody);
+
       window.api.invoke('app:terminate').catch(console.error);
     };
   }, [isScanning, handleRequest, handleRequestBody, handleResponse, handleResponseBody]);
@@ -323,7 +338,7 @@ export default function InspectorPage() {
     appName: string,
     _proxyUrl: string,
     customUrl?: string,
-    mode?: 'browser' | 'electron',
+    mode?: 'browser' | 'electron' | 'native',
   ) => {
     try {
       // Request dynamic session from backend

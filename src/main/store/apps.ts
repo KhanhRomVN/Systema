@@ -9,7 +9,7 @@ export interface UserApp {
   url?: string; // For web apps
   executablePath?: string; // For PC apps (future)
   mode: 'browser' | 'electron' | 'native';
-  platform: 'web' | 'pc' | 'android';
+  platform: 'web' | 'pc' | 'android' | 'cli';
   icon?: string;
   category?: string;
   tags?: string[];

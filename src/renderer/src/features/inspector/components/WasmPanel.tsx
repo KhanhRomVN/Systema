@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { NetworkRequest } from '../types';
-import { X, FileCode, CheckCircle2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { X, FileCode, CheckCircle2, AlertTriangle, ShieldAlert, Download } from 'lucide-react';
 import { cn } from '../../../shared/lib/utils';
 import { WasmViewer } from './WasmViewer';
 import { detectWasmModules, WasmItem } from '../utils/detectors';
@@ -62,7 +62,7 @@ export function WasmPanel({ requests, onClose }: WasmPanelProps) {
                   : 'Click to disassemble'
               }
               className={cn(
-                'border border-border rounded-lg bg-card p-3 flex flex-col gap-3 hover:border-purple-500/50 transition-colors shadow-sm group',
+                'border border-border rounded-lg bg-card p-3 flex flex-col gap-3 hover:border-purple-500/50 transition-colors shadow-sm group relative',
                 item.detectionMethod !== 'JS Heuristic'
                   ? 'cursor-pointer hover:bg-muted/50'
                   : 'cursor-default opacity-80',
@@ -78,6 +78,42 @@ export function WasmPanel({ requests, onClose }: WasmPanelProps) {
                     <span className="text-sm font-medium truncate" title={item.filename}>
                       {item.filename}
                     </span>
+                    {item.detectionMethod !== 'JS Heuristic' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const req = requests.find((r) => r.id === item.id);
+                          if (req && req.responseBody) {
+                            try {
+                              // Convert base64 to blob
+                              const byteCharacters = atob(req.responseBody);
+                              const byteNumbers = new Array(byteCharacters.length);
+                              for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                              }
+                              const byteArray = new Uint8Array(byteNumbers);
+                              const blob = new Blob([byteArray], { type: 'application/wasm' });
+
+                              // Create download link
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = item.filename;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            } catch (error) {
+                              console.error('Failed to download WASM:', error);
+                            }
+                          }
+                        }}
+                        className="p-1.5 hover:bg-purple-500/20 text-muted-foreground hover:text-purple-500 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                        title="Download .wasm file"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground truncate" title={item.url}>
                     {item.url}

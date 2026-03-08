@@ -34,11 +34,6 @@ export function ChatHeader({
           <span className="text-sm font-semibold text-foreground truncate">
             {title || 'New Chat'}
           </span>
-          {provider && (
-            <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-              {provider}
-            </span>
-          )}
         </div>
         <span className="text-[10px] text-muted-foreground truncate font-mono">
           ID: {sessionId}

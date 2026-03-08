@@ -159,9 +159,11 @@ export interface BodyAnalysis {
     contentType: string;
     size: string;
     encoding?: string;
+    compression?: string;
     raw: string;
     formatted?: any;
     preview?: string;
+    isBinary?: boolean;
   };
   response: {
     contentType: string;
@@ -172,6 +174,7 @@ export interface BodyAnalysis {
     raw: string;
     formatted?: any;
     preview?: string;
+    isBinary?: boolean;
     structure?: {
       type: string;
       depth: number;

@@ -1,12 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserApp, AppPlatform, AppMode, MobileEmulator } from '../../types/apps'; // Updated import path
 import { AddAppModal } from './components/AddAppModal';
+import { AddPcAppModal } from './components/AddPcAppModal';
 import { SessionDataModal } from './components/SessionDataModal';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Zap, Database } from 'lucide-react';
+import {
+  Plus,
+  Globe,
+  Monitor,
+  Smartphone,
+  Search,
+  Trash2,
+  Zap,
+  Database,
+  Terminal,
+  Palette,
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { SavedProfiles } from './components/SavedProfiles';
 import { InspectorProfile, deleteProfilesByAppId } from '../inspector/utils/profiles';
+import { AddCliModal } from './components/AddCliModal';
+import ThemeDrawer from '../../core/theme/components/ThemeDrawer';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -17,7 +31,7 @@ interface DashboardProps {
     appName: string,
     proxyUrl: string,
     customUrl?: string,
-    mode?: 'browser' | 'electron',
+    mode?: 'browser' | 'electron' | 'native',
   ) => void;
   onLoadProfile?: (profile: InspectorProfile) => void;
 }
@@ -38,7 +52,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
   const [apps, setApps] = useState<UserApp[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPcAddModal, setShowPcAddModal] = useState(false);
+  const [showMobileAddModal, setShowMobileAddModal] = useState(false);
+  const [showCliAddModal, setShowCliAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isInstallingCert, setIsInstallingCert] = useState(false);
+  const [showThemeDrawer, setShowThemeDrawer] = useState(false);
+
+  const handleInstallCert = async () => {
+    setIsInstallingCert(true);
+    try {
+      await window.api.invoke('cert:install-system-ca');
+      alert(
+        'Successfully installed System CA. You may need to restart your browser or application for changes to take effect.',
+      );
+    } catch (e: any) {
+      console.error('Failed to install CA:', e);
+      alert(`Installation failed: ${e.message}`);
+    } finally {
+      setIsInstallingCert(false);
+    }
+  };
 
   // Device State
   const [connectedDevices, setConnectedDevices] = useState<MobileEmulator[]>([]);
@@ -177,7 +210,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
 
   const selectedApp = apps.find((app) => app.id === activeAppId);
 
-  const handleLaunch = (mode?: 'browser' | 'electron') => {
+  const handleLaunch = (mode?: 'browser' | 'electron' | 'native') => {
     if (!selectedApp) return;
     onSelect(selectedApp.id, 'http://127.0.0.1:8081', selectedApp.url, mode);
   };
@@ -248,46 +281,58 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
   };
 
   return (
-    <div className="flex h-full w-full bg-gray-950 text-white overflow-hidden font-sans">
+    <div className="flex h-full w-full bg-background text-text-primary overflow-hidden font-sans">
       {/* Sidebar */}
-      <div className="w-96 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
+      <div className="w-[400px] flex-shrink-0 bg-sidebar-background border-r border-divider flex flex-col">
         {/* Header/Tabs */}
-        <div className="p-4 border-b border-gray-800 space-y-4">
+        <div className="p-4 border-b border-divider space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
               Systema
             </h2>
-            <div className="text-xs text-gray-500 px-2 py-1 rounded bg-gray-800">v0.1.0</div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowThemeDrawer(true)}
+                className="p-2 text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover rounded-lg transition-all duration-200 group flex-shrink-0"
+                title="Theme Settings"
+              >
+                <Palette className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              </button>
+              <div className="text-xs text-text-secondary px-2 py-1 rounded bg-sidebar-itemHover flex-shrink-0">
+                v0.1.0
+              </div>
+            </div>
           </div>
 
-          <div className="flex p-1 bg-gray-800 rounded-lg">
-            {(['web', 'pc', 'android'] as AppPlatform[]).map((tab) => (
+          <div className="flex p-1 bg-sidebar-itemHover rounded-lg">
+            {(['web', 'pc', 'android', 'cli'] as AppPlatform[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
                   'flex-1 flex items-center justify-center py-2 rounded-md text-sm font-medium transition-all duration-200',
                   activeTab === tab
-                    ? 'bg-gray-700 text-white shadow-sm'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50',
+                    ? 'bg-sidebar-itemFocus text-text-primary shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover/50',
                 )}
               >
                 {tab === 'web' && <Globe className="w-4 h-4 mr-1.5" />}
                 {tab === 'pc' && <Monitor className="w-4 h-4 mr-1.5" />}
                 {tab === 'android' && <Smartphone className="w-4 h-4 mr-1.5" />}
+                {tab === 'cli' && <Terminal className="w-4 h-4 mr-1.5" />}
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
 
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
             <input
               type="text"
               placeholder="Search apps..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-950 border border-gray-800 pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors"
+              className="w-full bg-background border border-divider pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-colors"
             />
           </div>
         </div>
@@ -296,7 +341,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
           {activeTab === 'web' && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-gray-700 text-gray-400 hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 transition-all duration-200 group"
+              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-divider text-text-secondary hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all duration-200 group"
             >
               <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium">Add Website</span>
@@ -304,22 +349,48 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
           )}
 
           {activeTab === 'pc' && (
-            <button
-              onClick={() => setShowPcAddModal(true)}
-              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-gray-700 text-gray-400 hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 transition-all duration-200 group"
-            >
-              <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span className="text-sm font-medium">Add Application</span>
-            </button>
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={() => setShowPcAddModal(true)}
+                className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-divider text-text-secondary hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all duration-200 group"
+              >
+                <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="text-sm font-medium">Add Application</span>
+              </button>
+
+              <button
+                onClick={handleInstallCert}
+                disabled={isInstallingCert}
+                className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-divider bg-sidebar-itemHover/30 text-text-secondary hover:border-emerald-500/50 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all duration-200 group"
+                title="Automated installation of System CA for HTTPS tracking"
+              >
+                {isInstallingCert ? (
+                  <Zap className="w-4 h-4 animate-spin text-emerald-500" />
+                ) : (
+                  <Zap className="w-4 h-4 group-hover:scale-110 transition-transform text-emerald-500" />
+                )}
+                <span className="text-sm font-medium">Setup Proxy CA (HTTPS)</span>
+              </button>
+            </div>
           )}
 
           {activeTab === 'android' && (
             <button
-              onClick={() => setShowPcAddModal(true)}
-              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-gray-700 text-gray-400 hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 transition-all duration-200 group"
+              onClick={() => setShowMobileAddModal(true)}
+              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-divider text-text-secondary hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all duration-200 group"
             >
               <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span className="text-sm font-medium">Add Mobile App or Device</span>
+            </button>
+          )}
+
+          {activeTab === 'cli' && (
+            <button
+              onClick={() => setShowCliAddModal(true)}
+              className="w-full flex items-center justify-center space-x-2 p-3 rounded-lg border border-dashed border-divider text-text-secondary hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all duration-200 group"
+            >
+              <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium">Add CLI Command</span>
             </button>
           )}
 
@@ -349,13 +420,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                 className={cn(
                   'group flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border border-transparent relative',
                   activeAppId === app.id
-                    ? 'bg-gray-800 border-gray-700 shadow-lg'
-                    : 'hover:bg-gray-800/50',
+                    ? 'bg-sidebar-itemHover border-divider shadow-cardShadow'
+                    : 'hover:bg-sidebar-itemHover/50',
                 )}
               >
                 <div
                   className={cn(
-                    'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-inner overflow-hidden relative bg-gray-600 text-white',
+                    'w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-inner overflow-hidden relative bg-secondary text-text-primary',
                   )}
                 >
                   {faviconUrl ? (
@@ -396,7 +467,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium truncate text-gray-200">{app.name}</div>
+                    <div className="font-medium truncate text-text-primary">{app.name}</div>
                     {/* Allow deleting custom apps (simpler - assume anything not seeded is custom for now, 
                         BUT better to check existence in default list if we cared, 
                         or user can delete anything they want since it's just local config now) */}
@@ -408,14 +479,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                     </button>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <div className="text-xs text-gray-500 truncate">
+                    <div className="text-xs text-text-secondary truncate">
                       {app.mode === 'browser'
                         ? 'Real Browser'
                         : app.mode === 'electron'
                           ? 'Electron Window'
                           : app.platform === 'android'
                             ? 'Mobile App'
-                            : 'Native App'}
+                            : app.platform === 'cli'
+                              ? 'CLI Command'
+                              : 'Native App'}
                     </div>
 
                     {/* Device Badge */}
@@ -453,14 +526,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative bg-gradient-to-br from-gray-900 to-gray-950 overflow-y-auto">
+      <div className="flex-1 flex flex-col relative bg-gradient-to-br from-background to-secondary/20 overflow-y-auto">
         {selectedApp ? (
           <div className="flex-1 flex flex-col items-center justify-start p-12 animate-in fade-in duration-500 pt-20">
             <div className="max-w-4xl w-full text-center">
               <div className="relative inline-block mb-8 group">
                 <div
                   className={cn(
-                    'w-32 h-32 rounded-3xl flex items-center justify-center text-5xl font-bold shadow-2xl transition-transform duration-300 group-hover:scale-105 overflow-hidden bg-gray-800 text-white',
+                    'w-32 h-32 rounded-3xl flex items-center justify-center text-5xl font-bold shadow-2xl transition-transform duration-300 group-hover:scale-105 overflow-hidden bg-secondary text-text-primary',
                   )}
                 >
                   {getFaviconUrl(selectedApp.url) ? (
@@ -494,14 +567,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                     selectedApp.name.slice(0, 2).toUpperCase()
                   )}
                 </div>
-                <div className="absolute -bottom-2 -right-2 bg-gray-800 text-gray-400 p-2 rounded-full border border-gray-700 shadow-xl">
+                <div className="absolute -bottom-2 -right-2 bg-sidebar-itemHover text-text-secondary p-2 rounded-full border border-divider shadow-xl">
                   {selectedApp.platform === 'web' && <Globe className="w-5 h-5" />}
                   {selectedApp.platform === 'pc' && <Monitor className="w-5 h-5" />}
                   {selectedApp.platform === 'android' && <Smartphone className="w-5 h-5" />}
+                  {selectedApp.platform === 'cli' && <Terminal className="w-5 h-5" />}
                 </div>
               </div>
 
-              <h1 className="text-4xl font-bold mb-4 text-white tracking-tight">
+              <h1 className="text-4xl font-bold mb-4 text-text-primary tracking-tight">
                 {selectedApp.name}
               </h1>
 
@@ -510,18 +584,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                   {selectedApp.platform === 'android' ? (
                     <button
                       onClick={handleAndroidConnect}
-                      className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-emerald-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600 hover:bg-emerald-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+                      className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-button-text transition-all duration-200 bg-emerald-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600 hover:bg-emerald-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
                     >
                       Connect & Inspect
                       <Smartphone className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
+                    </button>
+                  ) : selectedApp.platform === 'cli' ? (
+                    <button
+                      onClick={() => handleLaunch('native')} // We'll use this to trigger terminal launch
+                      className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-button-text transition-all duration-200 bg-primary font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:bg-primary/90 hover:scale-105 hover:shadow-[0_0_20px_rgba(54,134,255,0.5)]"
+                    >
+                      Open in Terminal
+                      <Terminal className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
                     </button>
                   ) : (
                     <>
                       <button
                         onClick={() => handleLaunch('browser')}
                         className={cn(
-                          'group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 hover:scale-105',
-                          'bg-blue-600 hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]',
+                          'group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-button-text transition-all duration-200 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:scale-105',
+                          'bg-primary hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(54,134,255,0.5)]',
                         )}
                       >
                         Launch Browser
@@ -529,57 +611,55 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
                       </button>
                       <button
                         onClick={() => handleLaunch('electron')}
-                        className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-white transition-all duration-200 bg-indigo-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:bg-indigo-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(79,70,229,0.5)]"
+                        className="group relative inline-flex items-center justify-center px-6 py-4 text-lg font-bold text-button-text transition-all duration-200 bg-indigo-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:bg-indigo-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(79,70,229,0.5)]"
                       >
                         Launch App
                         <Monitor className="w-5 h-5 ml-2 transition-transform group-hover:scale-110" />
                       </button>
-
-                      {sessionInfo && sessionInfo.cookieCount > 0 && (
-                        <div className="flex items-center space-x-2 ml-4 animate-in slide-in-from-left-2 duration-300">
-                          <button
-                            onClick={handleClearSession}
-                            disabled={isClearingSession}
-                            title="Clear Session Data (Logout)"
-                            className="p-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-300 transition-all group"
-                          >
-                            <Trash2
-                              className={cn('w-6 h-6', isClearingSession && 'animate-pulse')}
-                            />
-                          </button>
-
-                          <button
-                            onClick={() => setShowSessionModal(true)}
-                            title="View Session Data"
-                            className="p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-300 transition-all group"
-                          >
-                            <Database className="w-6 h-6" />
-                          </button>
-
-                          <div className="flex flex-col items-start px-3 py-1 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                            <span className="text-[10px] uppercase font-bold text-gray-500">
-                              Stored Profile
-                            </span>
-                            <span className="text-xs font-medium text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                              Active Session
-                            </span>
-                          </div>
-                        </div>
-                      )}
                     </>
+                  )}
+
+                  {sessionInfo && sessionInfo.cookieCount > 0 && selectedApp.platform === 'web' && (
+                    <div className="flex items-center space-x-2 ml-4 animate-in slide-in-from-left-2 duration-300">
+                      <button
+                        onClick={handleClearSession}
+                        disabled={isClearingSession}
+                        title="Clear Session Data (Logout)"
+                        className="p-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-300 transition-all group"
+                      >
+                        <Trash2 className={cn('w-6 h-6', isClearingSession && 'animate-pulse')} />
+                      </button>
+
+                      <button
+                        onClick={() => setShowSessionModal(true)}
+                        title="View Session Data"
+                        className="p-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-300 transition-all group"
+                      >
+                        <Database className="w-6 h-6" />
+                      </button>
+
+                      <div className="flex flex-col items-start px-3 py-1 bg-secondary rounded-lg border border-divider">
+                        <span className="text-[10px] uppercase font-bold text-text-secondary">
+                          Stored Profile
+                        </span>
+                        <span className="text-xs font-medium text-emerald-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          Active Session
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
 
                 {selectedApp.url && (
-                  <div className="text-sm text-gray-600 font-mono bg-gray-900/50 px-3 py-1 rounded">
+                  <div className="text-sm text-text-secondary font-mono bg-sidebar-itemHover/50 px-3 py-1 rounded">
                     {selectedApp.url}
                   </div>
                 )}
               </div>
 
               {/* Profiles Section */}
-              <div className="mt-16 border-t border-gray-800/50 pt-8 w-full text-left">
+              <div className="mt-16 border-t border-divider pt-8 w-full text-left">
                 <SavedProfiles
                   appName={selectedApp.name}
                   appId={selectedApp.id}
@@ -589,7 +669,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
+          <div className="flex-1 flex flex-col items-center justify-center text-text-secondary">
             <Search className="w-16 h-16 mb-4 opacity-20" />
             <p>Select an application to start</p>
           </div>
@@ -599,36 +679,36 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
       {/* Add Website Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-gray-800">
-              <h3 className="text-xl font-bold">Add Custom Website</h3>
-              <p className="text-sm text-gray-400 mt-1">Configure a new website to track.</p>
+          <div className="bg-dialog-background border border-divider rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-divider">
+              <h3 className="text-xl font-bold text-text-primary">Add Custom Website</h3>
+              <p className="text-sm text-text-secondary mt-1">Configure a new website to track.</p>
             </div>
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">Name</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Name</label>
                 <input
                   type="text"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   placeholder="e.g. My Dashboard"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                  className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1.5">URL</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">URL</label>
                 <div className="relative">
                   <input
                     type="text"
                     value={newItemUrl}
                     onChange={(e) => setNewItemUrl(e.target.value)}
                     placeholder="https://example.com"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-3 pr-10 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all font-mono text-sm"
+                    className="w-full bg-input-background border border-input-border-default rounded-lg pl-3 pr-10 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all font-mono text-sm"
                   />
                   {getFaviconUrl(newItemUrl) && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded overflow-hidden bg-gray-700">
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded overflow-hidden bg-secondary">
                       <img
                         src={getFaviconUrl(newItemUrl)!}
                         alt="icon"
@@ -640,17 +720,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-800 flex justify-end space-x-3 bg-gray-900/50">
+            <div className="p-6 border-t border-divider flex justify-end space-x-3 bg-sidebar-itemHover/50">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddCustomApp}
                 disabled={!newItemName || !newItemUrl}
-                className="px-6 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-900/20"
+                className="px-6 py-2 rounded-lg text-sm font-bold text-button-text bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
               >
                 Add Website
               </button>
@@ -659,11 +739,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
         </div>
       )}
 
-      <AddAppModal
+      <AddPcAppModal
         isOpen={showPcAddModal}
         onClose={() => setShowPcAddModal(false)}
         onAdd={handleAddPcApp}
+      />
+
+      <AddAppModal
+        isOpen={showMobileAddModal}
+        onClose={() => setShowMobileAddModal(false)}
+        onAdd={handleAddPcApp}
         existingApps={apps.filter((app) => app.platform === 'android')}
+      />
+
+      <AddCliModal
+        isOpen={showCliAddModal}
+        onClose={() => setShowCliAddModal(false)}
+        onAdd={handleAddPcApp}
       />
 
       {selectedApp && (
@@ -674,6 +766,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onSelect, onLoadProfile }) => {
           data={sessionInfo as any}
         />
       )}
+
+      <ThemeDrawer isOpen={showThemeDrawer} onClose={() => setShowThemeDrawer(false)} />
     </div>
   );
 };

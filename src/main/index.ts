@@ -1,5 +1,8 @@
 import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
+import { exec as execAsync } from 'child_process';
+import { promisify } from 'util';
+const exec = promisify(execAsync);
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -24,9 +27,11 @@ import {
   closeAllGenericWebWindows,
   GenericWebWindowOptions,
 } from './features/generic-web';
+import { cdpManager } from './features/cdpManager';
+import { findAvailablePort } from './utils/net';
 import { userAppStore, UserApp } from './store/apps';
 import { scanInstalledApps } from './utils/app-scanner';
-import { spawn, ChildProcess, exec, execSync } from 'child_process';
+import { spawn, ChildProcess, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dns from 'dns';
@@ -51,6 +56,8 @@ import {
   injectCustomScript,
   listRunningProcesses,
   isFridaServerInstalled,
+  injectLocalSSLBypass,
+  ensurePtraceScope,
 } from './utils/frida-manager';
 import {
   configureEmulatorProxy,
@@ -87,11 +94,17 @@ try {
   if (dns.setDefaultResultOrder) {
     dns.setDefaultResultOrder('ipv4first');
   }
-} catch (e) {}
+} catch (e) {
+  // Ignore errors
+}
 
 // Ignore all certificate errors globally (fixes Proxy CA issues)
 app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('allow-insecure-localhost', 'true');
+
+// Fix GPU errors on some Linux distributions
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
 
 // Global certificate error handler
 app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
@@ -134,6 +147,7 @@ app.whenReady().then(async () => {
     if (isMainWindow) {
       proxyManager.setMainWindow(window);
       wsManager.setWindow(window);
+      cdpManager.setMainWindow(window);
     }
   });
 
@@ -491,10 +505,32 @@ app.whenReady().then(async () => {
       appName: string,
       proxyUrl: string,
       customUrl?: string,
-      forceMode?: 'browser' | 'electron',
+      forceMode?: 'browser' | 'electron' | 'native',
     ) => {
       if (appName === 'vscode') {
         activeProxyUrl = proxyUrl;
+        const debugPort = await findAvailablePort(9222);
+
+        // Inject proxy settings for VSCode Extension Host (Node.js)
+        const env = { ...process.env };
+        if (proxyUrl) {
+          env.http_proxy = proxyUrl;
+          env.https_proxy = proxyUrl;
+          env.HTTP_PROXY = proxyUrl;
+          env.HTTPS_PROXY = proxyUrl;
+          env.all_proxy = proxyUrl;
+          env.ALL_PROXY = proxyUrl;
+          env.no_proxy = '';
+          env.NO_PROXY = '';
+
+          // CRITICAL: Force Node.js (Extension Host) to accept self-signed certificates
+          env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+          console.log(`[Launch] VSCode Proxy Env Injected: ${proxyUrl}`);
+        }
+
+        console.log(`[Launch] VSCode Debug Port: ${debugPort}`);
+
         // Using 'code' command assuming it's in PATH
         const child = spawn(
           'code',
@@ -503,12 +539,14 @@ app.whenReady().then(async () => {
             '--new-window',
             '--proxy-server=' + proxyUrl,
             '--ignore-certificate-errors',
+            `--remote-debugging-port=${debugPort}`,
             '.',
           ],
           {
             detached: true,
             stdio: 'ignore',
             shell: true, // For Windows/Linux compatibility with command resolution
+            env, // Pass the modified environment
           },
         );
         activeChildProcess = child;
@@ -523,6 +561,16 @@ app.whenReady().then(async () => {
         });
 
         child.unref();
+
+        // Connect CDP after short delay to let VSCode start
+        setTimeout(async () => {
+          try {
+            await cdpManager.connect(debugPort);
+          } catch (e) {
+            console.error('[Launch] Failed to connect CDP:', e);
+          }
+        }, 3000);
+
         return true;
       }
 
@@ -535,12 +583,30 @@ app.whenReady().then(async () => {
         delete env.ELECTRON_EXEC_PATH;
         delete env.ATOM_SHELL_INTERNAL_RUN_AS_NODE; // often used by Electron
 
+        // Inject proxy settings for Node.js Extension Host
+        if (proxyUrl) {
+          env.http_proxy = proxyUrl;
+          env.https_proxy = proxyUrl;
+          env.HTTP_PROXY = proxyUrl;
+          env.HTTPS_PROXY = proxyUrl;
+          env.all_proxy = proxyUrl;
+          env.ALL_PROXY = proxyUrl;
+          env.no_proxy = 'localhost,127.0.0.1';
+          env.NO_PROXY = 'localhost,127.0.0.1';
+
+          // CRITICAL: Force Node.js to accept the self-signed proxy certificate
+          env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+          console.log(`[Launch] Antigravity Proxy: ${proxyUrl}`);
+        }
+
         const args = [
           '--wait',
           '--new-window',
           '--verbose', // Add verbose flag for better debugging
           '--proxy-server=' + proxyUrl,
           '--ignore-certificate-errors',
+          '--disable-http2',
           '.',
         ];
 
@@ -552,6 +618,17 @@ app.whenReady().then(async () => {
           env, // Use the sanitized environment
         });
         activeChildProcess = child;
+
+        console.log(`[Launch] Antigravity PID: ${child.pid}`);
+
+        // Inject SSL Bypass if PID exists
+        if (child.pid) {
+          // Add small delay to let process initialize
+          setTimeout(() => {
+            console.log('[Launch] Injecting Deep SSL Bypass...');
+            injectLocalSSLBypass(child.pid!, (msg) => console.log(`[SSL Bypass] ${msg}`));
+          }, 2000);
+        }
 
         if (child.stdout) {
           child.stdout.on('data', () => {});
@@ -689,12 +766,139 @@ app.whenReady().then(async () => {
           userApp.mode === 'native' &&
           userApp.executablePath
         ) {
-          // Launch Native App
-          const child = spawn(userApp.executablePath, [], {
+          // Launch Native App with Proxy Environment Variables
+          const env = { ...process.env };
+
+          // Inject proxy settings for native apps
+          if (proxyUrl) {
+            env.http_proxy = proxyUrl;
+            env.https_proxy = proxyUrl;
+            env.HTTP_PROXY = proxyUrl;
+            env.HTTPS_PROXY = proxyUrl;
+            env.all_proxy = proxyUrl;
+            env.ALL_PROXY = proxyUrl;
+            // Allow localhost to go through proxy (Systema handles avoiding loops)
+            env.no_proxy = '';
+            env.NO_PROXY = '';
+
+            // CRITICAL: Force Node.js to accept the self-signed proxy certificate
+            env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+            console.log(`[Launch] Native App: ${userApp.name}`);
+            console.log(`[Launch] Exec: ${userApp.executablePath}`);
+            console.log(
+              `[Launch] Proxy Env: http_proxy=${env.http_proxy}, https_proxy=${env.https_proxy}, NODE_TLS_REJECT_UNAUTHORIZED=${env.NODE_TLS_REJECT_UNAUTHORIZED}`,
+            );
+          }
+
+          // CDP Support for Native Apps
+          const debugPort = await findAvailablePort(9222);
+          const args: string[] = [];
+
+          // Only append CDP arg if it's likely an Electron/Chrome app
+          // For shell scripts, we hope they forward "$@" or we rely on env vars if possible (but CDP requires flag)
+          // We will append it to args passed to spawn
+          args.push(`--remote-debugging-port=${debugPort}`);
+
+          console.log(`[Launch] Native App CDP Port: ${debugPort}`);
+
+          // Record existing PIDs to avoid injecting into the IDE/current instances
+          let initialPids: string[] = [];
+          if (userApp.name.toLowerCase().includes('antigravity')) {
+            try {
+              initialPids = execSync('pgrep -f antigravity')
+                .toString()
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean);
+            } catch (e) {
+              // No processes running yet
+            }
+          }
+
+          const child = spawn(userApp.executablePath, args, {
             detached: true,
-            stdio: 'ignore',
+            stdio: 'ignore', // Capture stdio if debugging needed, but usually ignore for detached
+            env, // Inject modified environment
           });
           child.unref();
+
+          // Connect CDP
+          setTimeout(async () => {
+            try {
+              await cdpManager.connect(debugPort);
+            } catch (e) {
+              console.error('[Launch] Failed to connect CDP for Native App:', e);
+            }
+          }, 5000); // 5s delay for native app startup
+
+          // Inject SSL Bypass for Antigravity (Generic Native Launcher)
+          if (userApp.name.toLowerCase().includes('antigravity')) {
+            const injectedPids = new Set<string>();
+            const startTime = Date.now();
+            const POLL_DURATION = 60000; // Poll for 60 seconds to catch delayed extension host
+            const POLL_INTERVAL = 1000;
+
+            const pollAndInject = async () => {
+              if (Date.now() - startTime > POLL_DURATION) {
+                console.log('[Launch] Finished polling for new Antigravity processes.');
+                return;
+              }
+
+              try {
+                // Ensure we have permission to attach
+                await ensurePtraceScope((msg) => console.log(`[Launch] ${msg}`));
+
+                // Find all current antigravity pids using pgrep -f to catch variations
+                let currentPids: string[] = [];
+                try {
+                  const { stdout } = await exec('pgrep -f antigravity');
+                  currentPids = stdout.trim().split(/\s+/).filter(Boolean);
+                } catch (e) {
+                  // Ignore errors
+                }
+
+                // Filter out the PIDs that were already running (IDE instances) AND already injected
+                const newPids = currentPids.filter(
+                  (pid) => !initialPids.includes(pid) && !injectedPids.has(pid),
+                );
+
+                if (newPids.length > 0) {
+                  for (const pid of newPids) {
+                    const pidNum = parseInt(pid, 10);
+                    try {
+                      const { stdout: comm } = await exec(`ps -p ${pidNum} -o comm=`);
+                      const procName = comm.trim().toLowerCase();
+
+                      if (
+                        procName.includes('antigravi') ||
+                        procName.includes('electron') ||
+                        procName.includes('chrome')
+                      ) {
+                        console.log(
+                          `[Launch] New PID detected: ${pidNum} (${procName}). Attempting injection...`,
+                        );
+                        injectedPids.add(pid);
+                        injectLocalSSLBypass(pidNum, (msg: string) => {
+                          console.log(`[SSL Bypass ${pidNum}] ${msg}`);
+                        });
+                      }
+                    } catch (e) {
+                      // Ignore errors
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('[Launch] Polling error:', e);
+              }
+
+              setTimeout(pollAndInject, POLL_INTERVAL);
+            };
+
+            console.log('[Launch] Starting persistent PID polling (15s)...');
+            setTimeout(pollAndInject, 500);
+          }
+
           return true;
         } else if (userApp.platform === 'android') {
           // Launch Mobile App
@@ -782,6 +986,62 @@ app.whenReady().then(async () => {
 
           // Launch the app
           return await launchApp(serial, userApp.packageName);
+        } else if (userApp.platform === 'cli' && userApp.executablePath) {
+          // Launch CLI Command in a Terminal Emulator (Linux)
+          const env = { ...process.env };
+
+          if (proxyUrl) {
+            env.http_proxy = proxyUrl;
+            env.https_proxy = proxyUrl;
+            env.HTTP_PROXY = proxyUrl;
+            env.HTTPS_PROXY = proxyUrl;
+            env.all_proxy = proxyUrl;
+            env.ALL_PROXY = proxyUrl;
+            env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+          }
+
+          // Try to find a terminal emulator
+          const terminals = ['gnome-terminal', 'konsole', 'xterm', 'kitty', 'alacritty'];
+          let terminal = '';
+          for (const t of terminals) {
+            try {
+              execSync(`which ${t}`);
+              terminal = t;
+              break;
+            } catch {
+              continue;
+            }
+          }
+
+          if (terminal) {
+            let cmd = '';
+            if (terminal === 'gnome-terminal') {
+              cmd = `gnome-terminal -- sh -c "${userApp.executablePath}; exec bash"`;
+            } else if (terminal === 'konsole') {
+              cmd = `konsole -e sh -c "${userApp.executablePath}; exec bash"`;
+            } else {
+              // xterm and others
+              cmd = `${terminal} -e "sh -c '${userApp.executablePath}; exec bash'"`;
+            }
+
+            console.log(`[Launch] Spawning Terminal: ${cmd}`);
+            spawn(cmd, [], {
+              detached: true,
+              shell: true,
+              env,
+            });
+            return true;
+          } else {
+            // Fallback to background spawn if no terminal found
+            const child = spawn(userApp.executablePath, [], {
+              detached: true,
+              stdio: 'ignore',
+              shell: true,
+              env,
+            });
+            child.unref();
+            return true;
+          }
         }
       }
 
@@ -898,15 +1158,54 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('fs:list-dir', async (_, dirPath: string) => {
     try {
-      if (!fs.existsSync(dirPath)) throw new Error(`Directory not found: ${dirPath}`);
-      const items = fs.readdirSync(dirPath, { withFileTypes: true });
-      return items.map((item) => ({
-        name: item.name,
-        isDirectory: item.isDirectory(),
-        path: path.join(dirPath, item.name),
-      }));
+      const files = fs.readdirSync(dirPath);
+      return files.map((file) => {
+        const fullPath = path.join(dirPath, file);
+        const stats = fs.statSync(fullPath);
+        return {
+          name: file,
+          path: fullPath,
+          isDirectory: stats.isDirectory(),
+          size: stats.size,
+          mtime: stats.mtimeMs,
+        };
+      });
     } catch (e: any) {
       throw new Error(`Failed to list directory: ${e.message}`);
+    }
+  });
+
+  // Certificate Installation IPC
+  ipcMain.handle('cert:install-system-ca', async () => {
+    try {
+      const caPath = path.join(process.cwd(), '.http-mitm-proxy', 'certs', 'ca.pem');
+      const destPath = '/usr/local/share/ca-certificates/systema.crt';
+
+      if (!fs.existsSync(caPath)) {
+        throw new Error('CA certificate not found. Please start the proxy first.');
+      }
+
+      // Detect if pkexec or sudo is available (Linux)
+      // We'll use a complex command to copy and update
+      const command = `pkexec sh -c "cp '${caPath}' '${destPath}' && update-ca-certificates"`;
+
+      console.log(`[Cert] Executing installation: ${command}`);
+
+      return new Promise((resolve, reject) => {
+        execAsync(command, (error, stdout, stderr) => {
+          if (error) {
+            console.error('[Cert] Installation failed:', error);
+            console.error('[Cert] stderr:', stderr);
+            reject(new Error(`Installation failed: ${stderr || error.message}`));
+            return;
+          }
+          console.log('[Cert] Installation successful:', stdout);
+          resolve(true);
+        });
+      });
+    } catch (e: any) {
+      console.error('[Cert] Error installing CA:', e);
+      throw e;
     }
   });
 
@@ -927,7 +1226,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('shell:exec', async (_, command: string, cwd?: string) => {
     return new Promise((resolve) => {
-      exec(command, { cwd: cwd || process.cwd() }, (error, stdout, stderr) => {
+      execAsync(command, { cwd: cwd || process.cwd() }, (error, stdout, stderr) => {
         if (error) {
           resolve({ success: false, error: error.message, stderr, stdout });
         } else {
