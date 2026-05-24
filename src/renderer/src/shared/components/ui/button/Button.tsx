@@ -1,5 +1,5 @@
 import React from 'react';
-import { LucideIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { ButtonProps } from './Button.types';
 import {
   getButtonSizeStyles,

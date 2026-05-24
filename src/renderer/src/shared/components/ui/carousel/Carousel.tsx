@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CarouselProps, CarouselContextValue } from './Carousel.types';
 import { cn } from '../../../../shared/utils/cn';
 
-import { getNextIndex, getPrevIndex, getTransformValue } from './Carousel.utils';
+import { getTransformValue } from './Carousel.utils';
 import CarouselItem from './CarouselItem';
 
 import { CarouselContext } from './CarouselContext';
@@ -23,7 +23,7 @@ const Carousel: React.FC<CarouselProps> = ({
   // Transition
   effect = 'slide',
   speed = 500,
-  parallax = false,
+  _parallax = false,
 
   // Navigation
   showArrows = true,

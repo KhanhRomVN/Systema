@@ -1,6 +1,6 @@
 // Provider Storage Service for persisting provider configurations
 
-import { ProviderConfig } from '../features/inspector/types/provider-types';
+import { ProviderConfig } from '../types/provider-types';
 
 const STORAGE_KEY_PREFIX = 'systema_provider_';
 const LAST_USED_KEY = `${STORAGE_KEY_PREFIX}last_used`;

@@ -37,7 +37,7 @@
     "url": "https://github.com/KhanhRomVN/Systema/issues"
   },
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev --noSandbox --remoteDebuggingPort=9222",
     "build": "npm run typecheck && electron-vite build && electron-builder --win --linux",
     "build:all": "npm run build",
     "preview": "electron-vite preview",
@@ -70,11 +70,13 @@
     "@tanstack/react-query": "^5.0.0",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.18",
+    "@types/dagre": "0.7.54",
     "@types/qrcode": "^1.5.6",
     "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "crypto-js": "^4.2.0",
+    "dagre": "0.8.5",
     "date-fns": "^4.1.0",
     "diff": "^8.0.3",
     "electron-updater": "^6.1.7",

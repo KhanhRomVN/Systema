@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AccordionProps, AccordionContextValue } from './Accordion.types';
 import { cn } from '../../../../shared/utils/cn';
 
-import { AccordionContext, AccordionListContext } from './AccordionContext';
+import { AccordionContext } from './AccordionContext';
 
 const Accordion: React.FC<AccordionProps> = ({
   children,

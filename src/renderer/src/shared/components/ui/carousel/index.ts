@@ -1,4 +1,5 @@
-export { default as Carousel, CarouselContext } from './Carousel';
+export { default as Carousel } from './Carousel';
+export { CarouselContext } from './CarouselContext';
 export { default as CarouselItem } from './CarouselItem';
 
 export type {

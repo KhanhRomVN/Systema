@@ -46,7 +46,6 @@ const CodeBlockHeader: React.FC = () => {
 
   const isDark = theme?.includes('dark');
   const textColor = isDark ? '#ffffff' : '#000000';
-  const borderColor = isDark ? 'rgba(128, 128, 128, 0.2)' : '#e5e7eb';
 
   return (
     <div

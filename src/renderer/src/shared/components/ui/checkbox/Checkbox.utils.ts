@@ -1,4 +1,4 @@
-import { CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { CheckboxSize, CheckboxState, CheckboxLabelPosition } from './Checkbox.types';
 
 /**
@@ -6,7 +6,7 @@ import { CheckboxSize, CheckboxState, CheckboxLabelPosition } from './Checkbox.t
  */
 export const getCheckboxSizeStyles = (
   size: CheckboxSize,
-  hasLabel: boolean,
+  _hasLabel: boolean,
 ): {
   checkbox: CSSProperties;
   label: CSSProperties;

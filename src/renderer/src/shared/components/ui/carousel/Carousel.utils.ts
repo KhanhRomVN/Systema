@@ -27,7 +27,7 @@ export const getTransformValue = (
   effect: CarouselEffect,
   currentIndex: number,
   slidesPerView: number,
-  spaceBetween: number,
+  _spaceBetween: number,
   centered: boolean,
 ): string => {
   switch (effect) {
@@ -80,7 +80,7 @@ export const getZIndex = (
 export const getCoverflowTransform = (
   itemIndex: number,
   currentIndex: number,
-  slidesPerView: number,
+  _slidesPerView: number,
 ): string => {
   const diff = itemIndex - currentIndex;
 

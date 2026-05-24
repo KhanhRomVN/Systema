@@ -1,6 +1,6 @@
 import { RouteObject } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import InspectorPage from '../../features/inspector/InspectorPage';
+import InspectorPage from '../../components/common/main/InspectorPage';
 
 export const routes: RouteObject[] = [
   {

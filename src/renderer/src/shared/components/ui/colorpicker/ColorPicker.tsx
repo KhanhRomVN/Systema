@@ -2,7 +2,6 @@ import React from 'react';
 import { ColorPickerProps } from './ColorPicker.types';
 import { DEFAULT_COLORS, getGridStyle, getColorBoxStyle, isLightColor } from './ColorPicker.utils';
 import { Check } from 'lucide-react';
-import { cn } from '../../../../shared/utils/cn';
 
 const ColorPicker: React.FC<ColorPickerProps> = ({
   value,

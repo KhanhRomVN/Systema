@@ -4,7 +4,7 @@ import {
   ProviderType,
   ProviderConfig,
   ModelInfo,
-} from '../features/inspector/types/provider-types';
+} from '../types/provider-types';
 
 export class ProviderAPIError extends Error {
   constructor(

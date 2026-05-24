@@ -24,15 +24,11 @@ const COLORS = [
 
 const NeonCursor = () => {
   const [particles, setParticles] = useState<Particle[]>([]);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const lastPosRef = useRef({ x: 0, y: 0 });
   const animationFrameRef = useRef<number>();
 
   useEffect(() => {
-    let particleId = 0;
-
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
 
       // Calculate velocity
       const dx = e.clientX - lastPosRef.current.x;

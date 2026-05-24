@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Proxy } from 'http-mitm-proxy';
 import { decompress } from '@mongodb-js/zstd';
+import * as net from 'net';
 
 export class ProxyServer extends EventEmitter {
   private proxy: any;
@@ -16,6 +17,7 @@ export class ProxyServer extends EventEmitter {
   private isIntercepting: boolean = false;
   // Map of requestId -> callback to resume request
   private pendingRequests: Map<string, () => void> = new Map();
+  zstd: any;
 
   constructor() {
     super();
@@ -96,7 +98,69 @@ export class ProxyServer extends EventEmitter {
     });
 
     this.proxy.onConnect((req: any, socket: any, head: any, callback: any) => {
-      console.log(`[ProxyServer Connect] ${req.url} (Host: ${req.headers.host})`);
+      const hostUrl = req.url || '';
+      console.log(`[ProxyServer Connect] ${hostUrl} (Host: ${req.headers.host})`);
+
+      if (!hostUrl) {
+        return callback();
+      }
+
+      const host = hostUrl.split(':')[0];
+      const port = parseInt(hostUrl.split(':')[1]) || 443;
+
+      // Danh sách các domain bỏ qua giải mã SSL (bypassed domains)
+      const bypassList = [
+        'cloudflare.com',
+        'challenges.cloudflare.com',
+        'ai.cloudflare.com',
+        'hcaptcha.com',
+        'recaptcha.net',
+        'google.com/recaptcha',
+        'turnstile.cloudflare.com',
+        'openai.com',
+        'chatgpt.com',
+        'google-analytics.com'
+      ];
+
+      const shouldBypass = bypassList.some((domain) => host.endsWith(domain) || host.includes(domain));
+
+      if (shouldBypass) {
+        console.log(`[ProxyServer Connect] Bypassing SSL decryption (tunneling) for: ${hostUrl}`);
+        
+        const conn = net.connect(
+          {
+            port,
+            host,
+            allowHalfOpen: true,
+          },
+          () => {
+            conn.on('finish', () => {
+              socket.destroy();
+            });
+            socket.on('close', () => {
+              conn.end();
+            });
+            socket.write('HTTP/1.1 200 OK\r\n\r\n', 'utf-8', () => {
+              conn.pipe(socket);
+              socket.pipe(conn);
+            });
+          }
+        );
+
+        conn.on('error', (err: any) => {
+          if (err.code !== 'ECONNRESET') {
+            console.error(`[ProxyServer Connect Tunnel Error] Host: ${hostUrl}`, err);
+          }
+        });
+        socket.on('error', (err: any) => {
+          if (err.code !== 'ECONNRESET') {
+            console.error(`[ProxyServer Connect Client Socket Error] Host: ${hostUrl}`, err);
+          }
+        });
+
+        return; // Don't call callback(), we handle it via net tunnel
+      }
+
       return callback();
     });
 

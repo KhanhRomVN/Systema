@@ -1,4 +1,3 @@
-import { ReactNode } from 'react';
 
 /**
  * Kích thước avatar (pixel)

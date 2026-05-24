@@ -1,0 +1,59 @@
+
+> Systema@1.0.1 typecheck:web
+> tsc --noEmit -p tsconfig.web.json --composite false
+
+src/renderer/src/components/Network/Details/TracePanel.tsx(448,9): error TS6133: 'onSetCompare1' is declared but its value is never read.
+src/renderer/src/components/Network/Details/TracePanel.tsx(449,9): error TS6133: 'onSetCompare2' is declared but its value is never read.
+src/renderer/src/components/Network/NetworkFilter.tsx(195,9): error TS6133: 'allPaths' is declared but its value is never read.
+src/renderer/src/components/Network/NetworkFilter.tsx(223,9): error TS6133: 'sizeLimit' is declared but its value is never read.
+src/renderer/src/components/Network/NetworkFilter.tsx(224,9): error TS6133: 'timeLimit' is declared but its value is never read.
+src/renderer/src/components/Network/NetworkFilter.tsx(587,10): error TS6133: 'RangeSliderSection' is declared but its value is never read.
+src/renderer/src/components/drawer/TargetSelectorDrawer.tsx(1,38): error TS6133: 'useRef' is declared but its value is never read.
+src/renderer/src/components/drawer/TargetSelectorDrawer.tsx(14,3): error TS6133: 'Zap' is declared but its value is never read.
+src/renderer/src/components/drawer/TargetSelectorDrawer.tsx(15,3): error TS6133: 'Play' is declared but its value is never read.
+src/renderer/src/components/drawer/TargetSelectorDrawer.tsx(18,3): error TS6133: 'Clock' is declared but its value is never read.
+src/renderer/src/components/drawer/TargetSelectorDrawer.tsx(77,10): error TS6133: 'connectedDevices' is declared but its value is never read.
+src/renderer/src/components/drawer/TargetSelectorDrawer.tsx(210,13): error TS6133: 'isRunning' is declared but its value is never read.
+src/renderer/src/components/main/Topbar.tsx(80,3): error TS6133: 'emulatorSerial' is declared but its value is never read.
+src/renderer/src/components/modal/AddCliModal.tsx(4,1): error TS6133: 'clsx' is declared but its value is never read.
+src/renderer/src/components/modal/AddCliModal.tsx(5,1): error TS6133: 'twMerge' is declared but its value is never read.
+src/renderer/src/shared/components/ui/CursorTrail.tsx(27,10): error TS6133: 'mousePos' is declared but its value is never read.
+src/renderer/src/shared/components/ui/CursorTrail.tsx(32,9): error TS6133: 'particleId' is declared but its value is never read.
+src/renderer/src/shared/components/ui/accordion/Accordion.tsx(5,28): error TS6133: 'AccordionListContext' is declared but its value is never read.
+src/renderer/src/shared/components/ui/accordion/index.ts(1,32): error TS2614: Module '"./Accordion"' has no exported member 'AccordionContext'. Did you mean to use 'import AccordionContext from "./Accordion"' instead?
+src/renderer/src/shared/components/ui/accordion/index.ts(1,50): error TS2614: Module '"./Accordion"' has no exported member 'AccordionListContext'. Did you mean to use 'import AccordionListContext from "./Accordion"' instead?
+src/renderer/src/shared/components/ui/avatar/Avatar.tsx(39,9): error TS6133: 'dotIconSize' is declared but its value is never read.
+src/renderer/src/shared/components/ui/avatar/Avatar.types.ts(1,1): error TS6133: 'ReactNode' is declared but its value is never read.
+src/renderer/src/shared/components/ui/avatar/Avatar.utils.ts(47,3): error TS6133: 'avatarSize' is declared but its value is never read.
+src/renderer/src/shared/components/ui/button/Button.tsx(2,10): error TS6133: 'LucideIcon' is declared but its value is never read.
+src/renderer/src/shared/components/ui/carousel/Carousel.tsx(6,10): error TS6133: 'getNextIndex' is declared but its value is never read.
+src/renderer/src/shared/components/ui/carousel/Carousel.tsx(6,24): error TS6133: 'getPrevIndex' is declared but its value is never read.
+src/renderer/src/shared/components/ui/carousel/Carousel.tsx(26,3): error TS6133: 'parallax' is declared but its value is never read.
+src/renderer/src/shared/components/ui/carousel/Carousel.utils.ts(30,3): error TS6133: 'spaceBetween' is declared but its value is never read.
+src/renderer/src/shared/components/ui/carousel/Carousel.utils.ts(83,3): error TS6133: 'slidesPerView' is declared but its value is never read.
+src/renderer/src/shared/components/ui/carousel/index.ts(1,31): error TS2614: Module '"./Carousel"' has no exported member 'CarouselContext'. Did you mean to use 'import CarouselContext from "./Carousel"' instead?
+src/renderer/src/shared/components/ui/checkbox/Checkbox.utils.ts(9,3): error TS6133: 'hasLabel' is declared but its value is never read.
+src/renderer/src/shared/components/ui/codeblock/CodeBlock.tsx(13,27): error TS2307: Cannot find module '@monaco-editor/react' or its corresponding type declarations.
+src/renderer/src/shared/components/ui/codeblock/CodeBlockBody.tsx(2,43): error TS2307: Cannot find module '@monaco-editor/react' or its corresponding type declarations.
+src/renderer/src/shared/components/ui/codeblock/CodeBlockHeader.tsx(49,9): error TS6133: 'borderColor' is declared but its value is never read.
+src/renderer/src/shared/components/ui/colorpicker/ColorPicker.tsx(5,1): error TS6133: 'cn' is declared but its value is never read.
+src/renderer/src/shared/components/ui/combobox/ComboboxItem.tsx(4,52): error TS6133: 'children' is declared but its value is never read.
+src/renderer/src/shared/components/ui/datetimepicker/DateTimePicker.tsx(2,27): error TS6133: 'X' is declared but its value is never read.
+src/renderer/src/shared/components/ui/datetimepicker/DateTimePicker.tsx(34,6): error TS6133: 'props' is declared but its value is never read.
+src/renderer/src/shared/components/ui/datetimepicker/DateTimePicker.tsx(39,10): error TS6133: 'isOpen' is declared but its value is never read.
+src/renderer/src/shared/components/ui/datetimepicker/DateTimePicker.tsx(51,9): error TS6133: 'getDisplayFormat' is declared but its value is never read.
+src/renderer/src/shared/components/ui/datetimepicker/DateTimePicker.tsx(132,9): error TS6133: 'timeSlots' is declared but its value is never read.
+src/renderer/src/shared/components/ui/datetimepicker/DateTimePicker.tsx(134,9): error TS6133: 'defaultIcon' is declared but its value is never read.
+src/renderer/src/shared/components/ui/datetimepicker/DateTimePicker.utils.ts(3,3): error TS6133: 'DateTimePickerVariant' is declared but its value is never read.
+src/renderer/src/shared/components/ui/dropdown/Dropdown.utils.ts(42,9): error TS6133: 'offset' is declared but its value is never read.
+src/renderer/src/shared/components/ui/input-otp/InputOTP.tsx(6,3): error TS6133: 'validateInputOTPProps' is declared but its value is never read.
+src/renderer/src/shared/components/ui/input/Input.tsx(49,10): error TS6133: 'isFocused' is declared but its value is never read.
+src/renderer/src/shared/components/ui/pagination/Pagination.tsx(1,17): error TS6133: 'useState' is declared but its value is never read.
+src/renderer/src/shared/components/ui/pagination/Pagination.tsx(6,3): error TS6133: 'generatePageItems' is declared but its value is never read.
+src/renderer/src/shared/components/ui/tab/index.ts(1,26): error TS2614: Module '"./Tab"' has no exported member 'TabContext'. Did you mean to use 'import TabContext from "./Tab"' instead?
+src/renderer/src/shared/components/ui/table/Table.utils.ts(2,1): error TS6133: 'CSSProperties' is declared but its value is never read.
+src/renderer/src/shared/components/ui/textarea/Textarea.tsx(122,9): error TS6133: 'characterCount' is declared but its value is never read.
+src/renderer/src/shared/components/ui/textarea/Textarea.tsx(123,9): error TS6133: 'showCharCount' is declared but its value is never read.
+src/renderer/src/shared/components/ui/tooltip.tsx(2,35): error TS2307: Cannot find module '@radix-ui/react-tooltip' or its corresponding type declarations.
+src/renderer/src/shared/components/ui/tree/Tree.tsx(13,3): error TS6133: 'showLines' is declared but its value is never read.
+src/renderer/src/shared/components/ui/tree/Tree.tsx(76,26): error TS6133: 'e' is declared but its value is never read.

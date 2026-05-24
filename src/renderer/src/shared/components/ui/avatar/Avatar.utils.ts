@@ -1,5 +1,5 @@
-import { CSSProperties } from 'react';
-import { AvatarSize, AvatarShape } from './Avatar.types';
+import type { CSSProperties } from 'react';
+import type { AvatarSize, AvatarShape } from './Avatar.types';
 
 /**
  * Get avatar size styles based on size and shape

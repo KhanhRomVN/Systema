@@ -36,7 +36,6 @@ const Avatar: React.FC<AvatarProps> = ({
   // Lấy dot styles
   const dotSize = getDotSize(size);
   const dotPosition = getDotPosition(size, dotSize);
-  const dotIconSize = getDotIconSize(dotSize);
 
   // Lấy fallback background color
   const fallbackBackground = getFallbackBackground(name);
