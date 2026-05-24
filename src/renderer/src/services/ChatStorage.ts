@@ -1,4 +1,4 @@
-import { Message } from '../components/Sidebar/Agent/ChatPanel/components/ChatBody';
+import { Message } from '../features/Tool/components/Sidebar/Agent/ChatPanel/components/ChatBody';
 const STORAGE_KEY_PREFIX = 'systema-chat-';
 
 export const ChatStorage = {

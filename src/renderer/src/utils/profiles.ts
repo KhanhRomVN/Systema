@@ -1,4 +1,4 @@
-import { InspectorFilter } from '../components/RequestDetails/Filter';
+import { InspectorFilter } from '../features/Tool/components/RequestDetails/Filter';
 import { NetworkRequest } from '../types/inspector';
 
 export interface InspectorProfile {
