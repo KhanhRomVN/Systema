@@ -336,6 +336,7 @@ export function ChatPanel({
         sessionId={sessionId}
         title={title}
         provider={provider}
+        model={localProviderConfig?.model}
         onBack={onBack}
         onNewChat={onBack}
         onSettings={() => {}}

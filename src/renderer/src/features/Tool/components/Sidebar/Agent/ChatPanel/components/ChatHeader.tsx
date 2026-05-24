@@ -1,59 +1,91 @@
-import { ChevronLeft, Plus, Settings } from 'lucide-react';
+import { ChevronLeft, Plus, MessageSquare } from 'lucide-react';
 
 interface ChatHeaderProps {
   sessionId: string;
   title?: string;
   provider?: string;
+  model?: string;
+  accountEmail?: string;
+  tokenCount?: number;
   onBack: () => void;
   onNewChat: () => void;
   onSettings: () => void;
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return String(n);
+}
+
 export function ChatHeader({
   sessionId,
   title,
+  provider,
+  model,
+  accountEmail,
+  tokenCount,
   onBack,
   onNewChat,
-  onSettings,
 }: ChatHeaderProps) {
+  const providerId = provider || 'elara';
+  const faviconDomain =
+    providerId.includes('openai') ? 'openai.com' :
+    providerId.includes('anthropic') ? 'anthropic.com' :
+    providerId.includes('google') ? 'google.com' :
+    providerId.includes('deepseek') ? 'deepseek.com' :
+    'deepseek.com';
+
   return (
-    <div className="h-12 flex items-center px-4 border-b border-border bg-table-bodyBg sticky top-0 z-20 shrink-0 gap-3">
-      <button
-        onClick={onBack}
-        className="flex items-center justify-center h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-        title="Back to sessions"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
+    <div className="border-b border-border bg-table-bodyBg shrink-0">
+      {/* Top row: back + title + actions */}
+      <div className="h-10 flex items-center px-3 gap-2">
+        <button
+          onClick={onBack}
+          className="flex items-center justify-center h-7 w-7 -ml-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors shrink-0"
+          title="Back"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
 
-      <div className="h-5 w-px bg-border/50" />
+        <div className="h-4 w-px bg-border/50 shrink-0" />
 
-      <div className="flex flex-col flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-foreground truncate">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <MessageSquare className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+          <span className="text-xs font-semibold text-foreground truncate">
             {title || 'Agentic AI'}
           </span>
         </div>
-        <span className="text-[10px] text-muted-foreground truncate font-mono">
-          ID: {sessionId}
-        </span>
-      </div>
 
-      <div className="flex items-center gap-1">
         <button
           onClick={onNewChat}
-          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-          title="New Conversation"
+          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors shrink-0"
+          title="New Chat"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
         </button>
-        <button
-          onClick={onSettings}
-          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-          title="Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+      </div>
+
+      {/* Bottom row: model info + token count */}
+      <div className="px-3 pb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground overflow-hidden">
+          <img
+            src={`https://www.google.com/s2/favicons?domain=${faviconDomain}&sz=64`}
+            alt="provider"
+            className="w-3.5 h-3.5 rounded-sm shrink-0"
+          />
+          <span className="font-medium truncate">
+            {providerId}/{model || 'chat'}
+          </span>
+          {accountEmail && (
+            <span className="italic opacity-60 truncate max-w-[120px]" title={accountEmail}>
+              &lt;{accountEmail}&gt;
+            </span>
+          )}
+        </div>
+        <div className="text-[10px] text-muted-foreground/60 shrink-0 font-mono">
+          {tokenCount ? formatTokens(tokenCount) : sessionId.slice(0, 6)}
+        </div>
       </div>
     </div>
   );

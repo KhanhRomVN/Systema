@@ -84,7 +84,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
         type: ProviderType.ELARA_FREE,
         name: 'Elara (Free)',
         model: '',
-        baseURL: 'http://localhost:11434',
+        baseURL: 'http://localhost:8888',
       } as ProviderConfig;
       setProviderConfig(defaultConfig);
       ProviderStorage.saveConfig(defaultConfig);

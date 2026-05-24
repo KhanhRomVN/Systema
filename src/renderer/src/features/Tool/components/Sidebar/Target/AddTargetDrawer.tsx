@@ -198,12 +198,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My API Server"
-                  className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary" />
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">URL</label>
                 <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com"
-                  className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary" />
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary" />
               </div>
             </div>
           )}
@@ -214,12 +214,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Node API"
-                  className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary" />
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">COMMAND</label>
                 <textarea value={command} onChange={e => setCommand(e.target.value)} placeholder="e.g. npm run start" rows={3}
-                  className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary resize-none" />
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary resize-none" />
                 <p className="text-[10px] text-text-secondary mt-1.5 italic">Proxy env vars will be auto-injected.</p>
               </div>
             </div>
@@ -232,7 +232,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
                   <input type="text" placeholder="Search apps..." value={pcSearch} onChange={e => setPcSearch(e.target.value)}
-                    className="w-full bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary/50" />
+                    className="w-full bg-table-headerBg border border-input-border-default rounded-lg pl-8 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary/50" />
                 </div>
                 <button onClick={loadPcApps} className="p-2 bg-secondary hover:bg-sidebar-itemHover border border-divider rounded-lg">
                   <RefreshCw className={cn('w-4 h-4 text-text-secondary', pcLoading && 'animate-spin')} />
@@ -278,7 +278,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                     <div className="relative flex-1">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
                       <input type="text" placeholder="Search devices..." value={androidSearch} onChange={e => setAndroidSearch(e.target.value)}
-                        className="w-full bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary/50" />
+                        className="w-full bg-table-headerBg border border-input-border-default rounded-lg pl-8 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary/50" />
                     </div>
                     <button onClick={() => setAndroidView('connect')} className="p-2 bg-secondary hover:bg-sidebar-itemHover border border-divider rounded-lg" title="Wireless ADB">
                       <Wifi className="w-4 h-4 text-text-secondary" />
@@ -340,12 +340,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-text-secondary mb-1.5">DEVICE IP</label>
                     <input type="text" value={wirelessIp} onChange={e => setWirelessIp(e.target.value)} placeholder="192.168.1.x"
-                      className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary" />
+                      className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-text-secondary mb-1.5">PORT</label>
                     <input type="text" value={wirelessPort} onChange={e => setWirelessPort(e.target.value)} placeholder="5555"
-                      className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary" />
+                      className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary" />
                   </div>
                   {connectStatus.type && (
                     <div className={cn('rounded-lg p-3 flex items-start gap-2 text-sm',

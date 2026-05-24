@@ -1,4 +1,8 @@
-import { Brain, ChevronDown, Globe, Settings } from 'lucide-react';
+import { Brain, Settings, History } from 'lucide-react';
+import { HistoryPanel, addToHistory, loadHistory } from '../HistoryPanel/index';
+import { WelcomeUI } from './components/WelcomeUI';
+import { QuickSwitchDrawer } from './components/QuickSwitchDrawer';
+import { useHealthCheck } from '../hooks/useHealthCheck';
 import { useState, useEffect, useRef } from 'react';
 
 // TabList removed
@@ -28,7 +32,6 @@ import {
 } from '../../../../../../types/provider-types';
 import { cn } from '../../../../../../shared/lib/utils';
 import { ChatInputArea, PendingAttachment } from '../ChatPanel/components/ChatInputArea';
-import { AccountAvatar } from './components/AccountAvatar';
 
 interface HomePanelProps {
   onSelectSession: (session: ChatSession) => void;
@@ -53,124 +56,10 @@ interface SubProvider {
   is_enabled?: boolean;
   is_upload?: boolean;
   is_search?: boolean;
+  total_accounts?: number;
 }
 
-// Custom Select Component for displaying Icons
-function CustomSelect({
-  value,
-  onChange,
-  options,
-  onOpen,
-  placeholder = 'Select...',
-  disabled = false,
-  className,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: {
-    value: string;
-    label: string;
-    iconUrl?: string;
-    iconNode?: React.ReactNode;
-    disabled?: boolean;
-  }[];
-  onOpen?: () => void;
-  placeholder?: string;
-  disabled?: boolean;
-  className?: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const selectedOption = options.find((opt) => opt.value === value);
-
-  return (
-    <div ref={containerRef} className={cn('relative inline-block text-[11px]', className)}>
-      <button
-        type="button"
-        onClick={() => {
-          if (!disabled) {
-            const nextState = !isOpen;
-            setIsOpen(nextState);
-            if (nextState && onOpen) {
-              onOpen();
-            }
-          }
-        }}
-        disabled={disabled}
-        className={cn(
-          'h-8 w-full flex items-center justify-between gap-2 bg-background border border-border rounded px-2.5 outline-none focus:border-primary cursor-pointer transition-colors hover:bg-muted/50 truncate',
-          disabled && 'opacity-50 cursor-not-allowed',
-        )}
-      >
-        <span className="flex items-center gap-2 truncate flex-1">
-          {selectedOption?.iconNode ? (
-            selectedOption.iconNode
-          ) : selectedOption?.iconUrl ? (
-            <img
-              src={selectedOption.iconUrl}
-              alt=""
-              className="w-4 h-4 object-contain rounded-sm"
-              onError={(e) => (e.currentTarget.style.display = 'none')}
-            />
-          ) : selectedOption && selectedOption.iconUrl !== undefined ? (
-            <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-          ) : null}
-          <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
-        </span>
-        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-50 shrink-0" />
-      </button>
-
-      {isOpen && (
-        <div className="absolute bottom-full left-0 mb-1 w-full min-w-[160px] max-h-60 overflow-y-auto bg-popover border border-border rounded-md shadow-md z-50 animate-in fade-in zoom-in-95 duration-100 slide-in-from-bottom-2">
-          <div className="p-1">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => {
-                  if (!option.disabled) {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }
-                }}
-                disabled={option.disabled}
-                className={cn(
-                  'w-full flex items-center gap-2 px-2 py-2 rounded-sm text-left transition-colors',
-                  option.disabled
-                    ? 'opacity-50 cursor-not-allowed bg-muted/20'
-                    : 'hover:bg-muted/50 cursor-pointer',
-                  option.value === value && !option.disabled && 'bg-muted font-medium',
-                )}
-              >
-                {option.iconNode ? (
-                  option.iconNode
-                ) : option.iconUrl ? (
-                  <img src={option.iconUrl} alt="" className="w-4 h-4 object-contain rounded-sm" />
-                ) : option.iconUrl !== undefined ? (
-                  <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                ) : null}
-                <span className="truncate flex-1">{option.label}</span>
-                {option.disabled && (
-                  <span className="text-[10px] border border-border px-1 rounded">Disabled</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// Custom Select Component removed — replaced by inline drawer in HomePanel
 
 export function HomePanel({
   onSelectSession,
@@ -178,6 +67,12 @@ export function HomePanel({
   currentProviderConfig,
   onUpdateProviderConfig,
 }: HomePanelProps) {
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [showModelDrawer, setShowModelDrawer] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const baseURL = (currentProviderConfig as ElaraFreeConfig)?.baseURL || 'http://localhost:8888';
+  const { isConnected } = useHealthCheck(baseURL);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [subProviders, setSubProviders] = useState<SubProvider[]>([]);
@@ -204,7 +99,7 @@ export function HomePanel({
         type: ProviderType.ELARA_FREE,
         name: 'Elara (Free)',
         model: '',
-        baseURL: 'http://localhost:11434',
+        baseURL: 'http://localhost:8888',
       } as ProviderConfig;
       onUpdateProviderConfig(defaultConfig);
     }
@@ -214,7 +109,7 @@ export function HomePanel({
   const fetchSubProviders = () => {
     if (currentProviderConfig?.type === ProviderType.ELARA_FREE) {
       const config = currentProviderConfig as ElaraFreeConfig;
-      const baseURL = config.baseURL || 'http://localhost:11434';
+      const baseURL = config.baseURL || 'http://localhost:8888';
 
       console.log('[HomePanel] Fetching providers from:', baseURL);
 
@@ -230,6 +125,7 @@ export function HomePanel({
               is_enabled: p.is_enabled,
               is_upload: p.is_upload,
               is_search: p.is_search,
+              total_accounts: p.total_accounts,
             }));
             setSubProviders(subs);
           }
@@ -259,7 +155,7 @@ export function HomePanel({
 
       if (itemsToUpload.length === 0) return;
 
-      const baseURL = config.baseURL || 'http://localhost:11434';
+      const baseURL = config.baseURL || 'http://localhost:8888';
       const uploadUrl = `${baseURL}/v1/chat/accounts/${config.accountId}/uploads`;
 
       // Mark as uploading
@@ -320,7 +216,7 @@ export function HomePanel({
   useEffect(() => {
     if (currentProviderConfig?.type === ProviderType.ELARA_FREE && selectedSubProvider) {
       const config = currentProviderConfig as ElaraFreeConfig;
-      const baseURL = config.baseURL || 'http://localhost:11434';
+      const baseURL = config.baseURL || 'http://localhost:8888';
 
       setIsLoadingModels(true);
 
@@ -440,6 +336,7 @@ export function HomePanel({
       initialThinkingEnabled: thinkingEnabled,
     };
     onSelectSession(newSession);
+    addToHistory(newSession);
 
     // Clear only after passing
     if (shouldSend) {
@@ -509,113 +406,48 @@ export function HomePanel({
     handleNewChat(true);
   };
 
-  // Dropdown Options
-  const subProviderOptions = subProviders.map((sp) => ({
-    value: sp.id,
-    label: sp.name,
-    iconUrl: sp.website
-      ? `https://www.google.com/s2/favicons?domain=${sp.website}&sz=64`
-      : undefined,
-    disabled: sp.is_enabled === false,
-  }));
-
-  const modelOptions = models.map((m) => ({
-    value: m.id,
-    label: m.name,
-  }));
-
-  const accountOptions = [
-    { value: '', label: 'No Account', iconNode: undefined },
-    ...accounts.map((a) => ({
-      value: a.id,
-      label: a.email || a.id,
-      iconNode: (
-        <AccountAvatar email={a.email} provider={a.provider_id} className="w-4 h-4 text-[8px]" />
-      ),
-    })),
-  ];
-
   return (
-    <div className="flex flex-col h-full bg-table-bodyBg border-l border-border relative">
-      <div className="flex flex-col border-b border-border bg-table-bodyBg shrink-0">
-        <div className="h-10 flex items-center justify-between px-3">
-          <span className="text-xs font-semibold text-muted-foreground">Agentic AI</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onOpenSettings}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded transition-colors"
-              title="Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+    <div ref={containerRef} className="flex flex-col h-full bg-table-bodyBg border-l border-border relative">
+      {/* Head Panel */}
+      <div className="px-4 pt-4 pb-3 border-b border-border shrink-0 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center bg-violet-500/15 border border-violet-500/25">
+            <Brain className="w-4 h-4 text-violet-400" />
           </div>
+          <div>
+            <h2 className="text-sm font-bold text-foreground">Agentic AI</h2>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">AI-powered traffic analysis</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setIsHistoryOpen(true)}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+            title="History"
+          >
+            <History className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onOpenSettings}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col items-center justify-center text-muted-foreground p-8">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-16 h-16 bg-muted/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Brain className="w-8 h-8 opacity-50" />
-          </div>
-          <h3 className="font-semibold text-lg text-foreground">Start a New Chat</h3>
-          <p className="text-xs text-muted-foreground/80 leading-relaxed">
-            Configure your AI provider below and start a new session to analyze your network
-            traffic.
-          </p>
-        </div>
-      </div>
+      {/* History Panel overlay */}
+      <HistoryPanel
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onLoadSession={(session) => { onSelectSession(session); setIsHistoryOpen(false); }}
+      />
 
-      <div className="border-t border-border bg-table-bodyBg shrink-0">
-        {/* Configuration Toolbar */}
-        <div className="p-3 border-b border-border bg-table-bodyBg flex flex-wrap gap-2">
-          {/* Elara SubProvider Select (Replaces Main Provider) */}
-          {currentProviderConfig?.type === ProviderType.ELARA_FREE ? (
-            <CustomSelect
-              className="w-fit min-w-[130px] max-w-[160px]"
-              options={subProviderOptions}
-              value={selectedSubProvider}
-              onChange={(val) => setSelectedSubProvider(val)}
-              onOpen={() => {
-                if (subProviders.length === 0) {
-                  fetchSubProviders();
-                }
-              }}
-              placeholder="Select Provider"
-            />
-          ) : (
-            <div className="text-[10px] bg-red-500/10 text-red-500 px-2 rounded border border-red-500/20">
-              Invalid Provider
-            </div>
-          )}
+      <WelcomeUI />
 
-          {/* Model & Account Select (Conditional) */}
-          {selectedSubProvider && (
-            <>
-              {/* Account Select (Center) */}
-              {currentProviderConfig?.type === ProviderType.ELARA_FREE && (
-                <CustomSelect
-                  className="w-fit max-w-[200px]"
-                  options={accountOptions}
-                  value={(currentProviderConfig as ElaraFreeConfig).accountId || ''}
-                  onChange={(val) => handleAccountChange(val)}
-                  placeholder="Select Account"
-                />
-              )}
-
-              {/* Model Select */}
-              <CustomSelect
-                className="w-fit max-w-[170px]"
-                options={modelOptions}
-                value={currentProviderConfig?.model || ''}
-                onChange={(val) => handleModelChange(val)}
-                placeholder="Model"
-                disabled={isLoadingModels}
-              />
-            </>
-          )}
-        </div>
-
-        {/* Chat Input Area */}
+      <div className="bg-table-bodyBg shrink-0">
+        {/* Chat Input Area with docked model badge */}
         <ChatInputArea
           input={inputText}
           setInput={setInputText}
@@ -655,6 +487,49 @@ export function HomePanel({
               (selectedSubProvider && selectedSubProvider.includes('deepseek'))
             )
           }
+          isConnected={isConnected}
+          modelBadge={{
+            label: selectedSubProvider && currentProviderConfig?.model
+              ? `${selectedSubProvider}/${currentProviderConfig.model}`
+              : 'Select Model',
+            faviconUrl: selectedSubProvider
+              ? subProviders.find((p) => p.id === selectedSubProvider)?.website
+                ? `https://www.google.com/s2/favicons?domain=${subProviders.find((p) => p.id === selectedSubProvider)?.website}&sz=64`
+                : undefined
+              : undefined,
+            accountEmail: accounts.find((a) => a.id === (currentProviderConfig as ElaraFreeConfig)?.accountId)?.email,
+            onClick: () => { if (subProviders.length === 0) fetchSubProviders(); setShowModelDrawer(true); },
+          }}
+        />
+
+        <QuickSwitchDrawer
+          isOpen={showModelDrawer}
+          onClose={() => setShowModelDrawer(false)}
+          anchorRef={containerRef}
+          providers={subProviders.map((sp) => ({
+            id: sp.id,
+            name: sp.name,
+            website: sp.website,
+            is_enabled: sp.is_enabled,
+            models: sp.models,
+            is_upload: sp.is_upload,
+            is_search: sp.is_search,
+            total_accounts: sp.total_accounts,
+          }))}
+          baseURL={(currentProviderConfig as ElaraFreeConfig)?.baseURL || 'http://localhost:8888'}
+          onSelect={({ providerId, modelId, accountId, email }) => {
+            setSelectedSubProvider(providerId);
+            onUpdateProviderConfig({
+              ...currentProviderConfig!,
+              model: modelId,
+              ...(currentProviderConfig?.type === ProviderType.ELARA_FREE ? { accountId } : {}),
+            } as ElaraFreeConfig);
+            setAccounts((prev) => {
+              const exists = prev.find((a) => a.id === accountId);
+              if (exists) return prev;
+              return [...prev, { id: accountId, email, name: email, provider_id: providerId }];
+            });
+          }}
         />
       </div>
     </div>

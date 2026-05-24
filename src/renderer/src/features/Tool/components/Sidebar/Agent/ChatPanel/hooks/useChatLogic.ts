@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Message } from '../components/ChatBody';
 import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../../../../../types/provider-types';
-import { DEFAULT_RULE_PROMPT } from '../../../../../../../prompt';
+import { DEFAULT_RULE_PROMPT } from '../../prompt';
 import { parseAIResponse } from '../../../../../../../services/ResponseParser';
+import { ConversationService } from '../../../../../../../services/ConversationService';
 
 // Attachments state
 interface PendingAttachment {
@@ -34,6 +35,19 @@ export function useChatLogic(
     conversationIdRef.current = currentConversationId;
   }, [currentConversationId]);
 
+  const sessionTitleRef = useRef('');
+
+  // Load messages from disk when restoring a session
+  useEffect(() => {
+    if (!initialConversationId) return;
+    ConversationService.get(initialConversationId).then((data) => {
+      if (data?.messages && data.messages.length > 0) {
+        setMessages(data.messages);
+        if (data.metadata?.title) sessionTitleRef.current = data.metadata.title;
+      }
+    });
+  }, [initialConversationId]);
+
   const [input, setInput] = useState(initialInput || '');
   const [isLoading, setIsLoading] = useState(false);
   const [thinkingEnabled, setThinkingEnabled] = useState(initialThinkingEnabled || false);
@@ -58,6 +72,24 @@ export function useChatLogic(
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSent = useRef(false);
+
+  // Save conversation to disk after each completed exchange
+  useEffect(() => {
+    if (isLoading || messages.length === 0 || !conversationIdRef.current) return;
+    const convId = conversationIdRef.current;
+    const title = sessionTitleRef.current ||
+      messages.find((m) => m.role === 'user')?.content?.replace(/\n/g, ' ').trim().substring(0, 100) ||
+      'Conversation';
+    const userCount = messages.filter((m) => m.role === 'user').length;
+    ConversationService.save(convId, messages, {
+      id: convId,
+      title,
+      timestamp: messages[0]?.timestamp || Date.now(),
+      lastModified: Date.now(),
+      messageCount: messages.length,
+      requestCount: userCount,
+    });
+  }, [isLoading, messages]);
 
   // Auto-Send on Mount if initial data exists
   useEffect(() => {
@@ -110,7 +142,7 @@ export function useChatLogic(
 
       if (itemsToUpload.length === 0) return;
 
-      const baseURL = config.baseURL || 'http://localhost:11434';
+      const baseURL = config.baseURL || 'http://localhost:8888';
       const uploadUrl = `${baseURL}/v1/chat/accounts/${config.accountId}/uploads`;
 
       // Mark as uploading
@@ -417,6 +449,7 @@ export function useChatLogic(
 
                 if (data.meta?.conversation_title) {
                   console.log('[ChatDebug] New conversation title:', data.meta.conversation_title);
+                  sessionTitleRef.current = data.meta.conversation_title;
                   onSessionUpdate?.({ title: data.meta.conversation_title });
                 }
               }

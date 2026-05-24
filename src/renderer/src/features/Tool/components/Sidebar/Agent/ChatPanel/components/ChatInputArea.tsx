@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Send, Paperclip, X, Search, Brain, Zap } from 'lucide-react';
+import { Send, Paperclip, X, Search, Brain, Globe, ChevronDown } from 'lucide-react';
 import { cn } from '../../../../../../../shared/lib/utils';
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -38,12 +38,21 @@ interface ChatInputAreaProps {
 
   // Styling
   disabled?: boolean;
+  isConnected?: boolean;
 
   // Conditional Feature Support
   supportsUpload?: boolean;
   supportsSearch?: boolean;
   supportsThinking?: boolean;
   isUploadingAttachment?: boolean;
+
+  // Model badge (HomePanel only — docked to top of input)
+  modelBadge?: {
+    label: string;       // e.g. "deepseek/deepseek-chat"
+    faviconUrl?: string;
+    accountEmail?: string;
+    onClick?: () => void;
+  };
 }
 
 export function ChatInputArea({
@@ -59,13 +68,15 @@ export function ChatInputArea({
   setThinkingEnabled,
   searchEnabled,
   setSearchEnabled,
-  streamEnabled,
-  setStreamEnabled,
+  streamEnabled: _streamEnabled,
+  setStreamEnabled: _setStreamEnabled,
   disabled,
+  isConnected = true,
   supportsUpload = true,
   supportsSearch = true,
   supportsThinking = true,
   isUploadingAttachment = false,
+  modelBadge,
 }: ChatInputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,10 +123,10 @@ export function ChatInputArea({
   };
 
   return (
-    <div className="p-4 bg-background border-t border-border flex flex-col gap-3">
+    <div className={cn('px-3 pb-3 bg-table-bodyBg flex flex-col gap-2', modelBadge ? 'pt-6' : 'pt-0')}>
       {/* Attachments Preview */}
       {attachments.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 px-0.5 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+        <div className="flex gap-2 overflow-x-auto pb-1 px-0.5 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent pt-3">
           {attachments.map((att, idx) => (
             <div
               key={att.id || idx}
@@ -176,13 +187,39 @@ export function ChatInputArea({
 
       <div
         className={cn(
-          'flex flex-col gap-2 relative bg-muted/30 border border-border rounded-xl focus-within:ring-1 focus-within:ring-primary/50 transition-all p-2',
+          'flex flex-col gap-2 relative bg-table-headerBg border rounded-xl transition-all p-2',
+          isConnected
+            ? 'border-border'
+            : 'border-red-500/60',
           isDragging && 'ring-2 ring-primary bg-primary/5',
+          modelBadge && 'rounded-tl-none',
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {/* Model badge — docked to top-left, outside the box */}
+        {modelBadge && (
+          <button
+            onClick={modelBadge.onClick}
+            className={cn(
+              'absolute bottom-full left-2 flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-table-headerBg border border-b-0 rounded-t-lg text-muted-foreground transition-colors cursor-pointer',
+              isConnected ? 'border-border' : 'border-red-500/60',
+            )}
+            style={{ marginBottom: '1px' }}
+          >
+            {modelBadge.faviconUrl ? (
+              <img src={modelBadge.faviconUrl} alt="" className="w-3 h-3 rounded-sm" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            ) : (
+              <Globe className="w-3 h-3" />
+            )}
+            <span>{modelBadge.label}</span>
+            {modelBadge.accountEmail && (
+              <span className="opacity-60 italic font-normal truncate max-w-[100px]">{modelBadge.accountEmail}</span>
+            )}
+            <ChevronDown className="w-3 h-3 opacity-50" />
+          </button>
+        )}
         {isDragging && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl">
             <div className="pointer-events-none flex flex-col items-center">
@@ -211,26 +248,19 @@ export function ChatInputArea({
         />
 
         {/* Action Toolbar */}
-        <div className="flex items-center justify-between px-1 pt-1 border-t border-border/50">
+        <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1">
-            {/* Attachment Button */}
+            {/* Attachment Button — icon only */}
             {supportsUpload && (
               <>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={onFileSelect}
-                  className="hidden"
-                  multiple
-                />
+                <input type="file" ref={fileInputRef} onChange={onFileSelect} className="hidden" multiple />
                 <button
-                  className="h-7 px-2 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50 text-xs gap-1.5"
+                  className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={disabled || isLoading}
                   title="Add Attachment"
                 >
                   <Paperclip className="w-3.5 h-3.5" />
-                  <span>Attach</span>
                 </button>
               </>
             )}
@@ -239,29 +269,11 @@ export function ChatInputArea({
               <div className="h-4 w-px bg-border mx-1" />
             )}
 
-            {/* Feature Toggles */}
-            <button
-              className={cn(
-                'h-7 px-2 flex items-center justify-center rounded-md text-xs gap-1.5 transition-colors disabled:opacity-50',
-                streamEnabled
-                  ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20'
-                  : 'text-muted-foreground hover:bg-muted/50',
-              )}
-              onClick={() => setStreamEnabled(!streamEnabled)}
-              title="Toggle Streaming"
-              disabled={disabled}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Stream</span>
-            </button>
-
             {supportsThinking && (
               <button
                 className={cn(
                   'h-7 px-2 flex items-center justify-center rounded-md text-xs gap-1.5 transition-colors disabled:opacity-50',
-                  thinkingEnabled
-                    ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                    : 'text-muted-foreground hover:bg-muted/50',
+                  thinkingEnabled ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'text-muted-foreground hover:bg-muted/50',
                 )}
                 onClick={() => setThinkingEnabled(!thinkingEnabled)}
                 title="Toggle Thinking Mode"
@@ -276,9 +288,7 @@ export function ChatInputArea({
               <button
                 className={cn(
                   'h-7 px-2 flex items-center justify-center rounded-md text-xs gap-1.5 transition-colors disabled:opacity-50',
-                  searchEnabled
-                    ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                    : 'text-muted-foreground hover:bg-muted/50',
+                  searchEnabled ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'text-muted-foreground hover:bg-muted/50',
                 )}
                 onClick={() => setSearchEnabled(!searchEnabled)}
                 title="Toggle Web Search"
@@ -290,21 +300,19 @@ export function ChatInputArea({
             )}
           </div>
 
-          {/* Send/Stop Button */}
+          {/* Send/Stop Button — no background */}
           {isLoading ? (
             <button
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-destructive hover:bg-destructive/90 text-white transition-colors"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-destructive hover:bg-destructive/10 transition-colors"
               onClick={onStop}
             >
               <div className="w-2.5 h-2.5 bg-current rounded-sm" />
             </button>
           ) : (
             <button
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               onClick={onSend}
-              disabled={
-                disabled || (!input.trim() && attachments.length === 0) || isUploadingAttachment
-              }
+              disabled={disabled || (!input.trim() && attachments.length === 0) || isUploadingAttachment}
             >
               {isUploadingAttachment ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
