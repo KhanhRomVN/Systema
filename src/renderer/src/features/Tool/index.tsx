@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ResizableSplit } from '../../core/components/common/ResizableSplit';
 import { SaveProfileModal } from '../../core/components/common/modal/SaveProfileModal';
 import { SSLBypassModal } from '../../core/components/common/modal/SSLBypassModal';
+import { ConfirmSwitchDrawer } from './components/Sidebar/Target/ConfirmSwitchDrawer';
 import { RequestComposer } from '../../core/components/common/RequestComposer';
 import { NetworkRequest } from '../../types/inspector';
 import { InspectorProfile, createProfile } from '../../utils/profiles';
@@ -238,12 +239,17 @@ export default function InspectorPage() {
       await window.api.invoke('proxy:stop');
       await window.api.invoke('app:terminate');
     } catch (error) { console.error('Error stopping proxy:', error); }
-    setSelectedApp(''); setCurrentAppName(''); setPlatform(undefined); setRequests([]);
+    setSelectedApp(''); setCurrentAppName(''); setPlatform(undefined);
+    // Do NOT clear requests array when stopping
   };
 
-  const handleSelectApp = async (appName: string, _proxyUrl: string, customUrl?: string, mode?: 'browser' | 'electron' | 'native') => {
+  const [pendingAppLaunch, setPendingAppLaunch] = useState<{ appName: string; proxyUrl: string; customUrl?: string; mode?: 'browser' | 'electron' | 'native' } | null>(null);
+  const [isConfirmSwitchOpen, setIsConfirmSwitchOpen] = useState(false);
+  const [isConfirmStopOpen, setIsConfirmStopOpen] = useState(false);
+  const [pendingSwitchData, setPendingSwitchData] = useState<{ appName: string; proxyUrl: string; customUrl?: string; mode?: 'browser' | 'electron' | 'native' } | null>(null);
+
+  const executeLaunchApp = async (appName: string, _proxyUrl: string, customUrl?: string, mode?: 'browser' | 'electron' | 'native') => {
     try {
-      await handleStopSession();
       const port = await window.api.invoke('proxy:create-session', appName);
       const dynamicProxyUrl = `http://127.0.0.1:${port}`;
       const allApps: any[] = await window.api.invoke('apps:get-all');
@@ -256,6 +262,28 @@ export default function InspectorPage() {
       if (launched) { setSelectedApp(appName); setRequests([]); }
       else console.error('[Inspector] ❌ Failed to launch app');
     } catch (error) { console.error('[Inspector] ❌ Error starting proxy or launching app:', error); }
+  };
+
+  const handleSelectApp = async (appName: string, _proxyUrl: string, customUrl?: string, mode?: 'browser' | 'electron' | 'native') => {
+    if (selectedApp) {
+      setPendingSwitchData({ appName, proxyUrl: _proxyUrl, customUrl, mode });
+      setIsConfirmSwitchOpen(true);
+      return;
+    }
+    await executeLaunchApp(appName, _proxyUrl, customUrl, mode);
+  };
+
+  const handleConfirmSwitch = async () => {
+    if (!pendingSwitchData) return;
+    await handleStopSession();
+    await executeLaunchApp(pendingSwitchData.appName, pendingSwitchData.proxyUrl, pendingSwitchData.customUrl, pendingSwitchData.mode);
+    setPendingSwitchData(null);
+    setIsConfirmSwitchOpen(false);
+  };
+
+  const handleConfirmStop = async () => {
+    await handleStopSession();
+    setIsConfirmStopOpen(false);
   };
 
   const handleDeleteRequest = (id: string) => setRequests((prev) => prev.filter((req) => req.id !== id));
@@ -313,6 +341,26 @@ export default function InspectorPage() {
   });
 
   useEffect(() => { if (!isPaused) setDisplayedRequests(requests); }, [requests, isPaused]);
+
+  // Reload filter when currentAppName changes (switch target)
+  useEffect(() => {
+    if (!currentAppName) return;
+    try {
+      const saved = localStorage.getItem(`inspector-filter-state-${currentAppName}`);
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed) {
+        if ('blacklist' in parsed.host) delete (parsed.host as any).blacklist;
+        if ('blacklist' in parsed.path) delete (parsed.path as any).blacklist;
+        const statusKeys = Object.keys(parsed.status || {});
+        if (statusKeys.some((k) => ['success', 'redirect', 'clientError', 'serverError', 'other'].includes(k))) {
+          parsed.status = initialFilterState.status;
+        }
+        setFilter({ ...initialFilterState, ...parsed });
+      } else {
+        setFilter(initialFilterState);
+      }
+    } catch { setFilter(initialFilterState); }
+  }, [currentAppName]);
 
   const handleSetIntercept = (enabled: boolean) => {
     setIsIntercepting(enabled);
@@ -595,6 +643,18 @@ export default function InspectorPage() {
               onSelectApp: handleSelectApp,
               onStopSession: handleStopSession,
               onLoadProfile: handleLoadProfile,
+              isConfirmSwitchOpen,
+              onCloseConfirmSwitch: () => {
+                setIsConfirmSwitchOpen(false);
+                setPendingSwitchData(null);
+              },
+              onConfirmSwitch: handleConfirmSwitch,
+              currentAppName,
+              newAppName: pendingSwitchData?.appName || '',
+              isConfirmStopOpen,
+              onCloseConfirmStop: () => setIsConfirmStopOpen(false),
+              onConfirmStop: handleConfirmStop,
+              onOpenStopConfirm: () => setIsConfirmStopOpen(true),
             } as InspectorContext}
           />
         </ResizableSplit>

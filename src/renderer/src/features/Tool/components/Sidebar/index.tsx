@@ -13,6 +13,7 @@ import { ComparePanel } from './Compare';
 import { WasmPanel } from './Wasm';
 import { MediaPanel } from './Media';
 import { TargetSelector } from './Target';
+import { ConfirmSwitchDrawer } from './Target/ConfirmSwitchDrawer';
 import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, GitBranch, KeyRound, ArrowRightLeft, Image, Cpu, Crosshair } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 import { DiffTab } from './Compare/DiffView';
@@ -46,6 +47,17 @@ export interface InspectorContext {
   onSelectApp?: (appName: string, proxyUrl: string, customUrl?: string, mode?: 'browser' | 'electron' | 'native') => Promise<void>;
   onStopSession?: () => Promise<void>;
   onLoadProfile?: (profile: any) => void;
+  // Confirm switch drawer
+  isConfirmSwitchOpen?: boolean;
+  onCloseConfirmSwitch?: () => void;
+  onConfirmSwitch?: () => void;
+  currentAppName?: string;
+  newAppName?: string;
+  // Confirm stop drawer
+  isConfirmStopOpen?: boolean;
+  onCloseConfirmStop?: () => void;
+  onConfirmStop?: () => void;
+  onOpenStopConfirm?: () => void;
 }
 
 interface ChatContainerProps {
@@ -133,6 +145,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           onStopSession={inspectorContext.onStopSession || (async () => {})}
           onLoadProfile={inspectorContext.onLoadProfile || (() => {})}
           platform={inspectorContext.requests.find(r => r.id === inspectorContext.selectedRequestId)?.protocol as any}
+          onOpenStopConfirm={inspectorContext.onOpenStopConfirm}
         />
       );
     }
@@ -158,6 +171,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
         <TraceTab
           requests={inspectorContext.requests}
           onSelectRequest={inspectorContext.onSelectRequest}
+          appId={inspectorContext.appId || 'global'}
         />
       );
     }
@@ -172,6 +186,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
           currentRequest={selectedRequest}
           onSelectRequest={inspectorContext.onSelectSavedRequest}
           appId={inspectorContext.appId || 'unknown'}
+          requests={inspectorContext.requests}
         />
       );
     }
@@ -288,6 +303,21 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       <div className="flex-1 overflow-hidden relative min-w-0">
         {renderContent()}
       </div>
+
+      <ConfirmSwitchDrawer
+        isOpen={inspectorContext.isConfirmSwitchOpen || false}
+        onClose={inspectorContext.onCloseConfirmSwitch || (() => {})}
+        onConfirm={inspectorContext.onConfirmSwitch || (() => {})}
+        currentAppName={inspectorContext.currentAppName || ''}
+        newAppName={inspectorContext.newAppName || ''}
+      />
+      <ConfirmSwitchDrawer
+        isOpen={inspectorContext.isConfirmStopOpen || false}
+        onClose={inspectorContext.onCloseConfirmStop || (() => {})}
+        onConfirm={inspectorContext.onConfirmStop || (() => {})}
+        currentAppName={inspectorContext.currentAppName || ''}
+        newAppName=""
+      />
     </div>
   );
 }

@@ -580,7 +580,7 @@ export function RequestTable({
 
       <div ref={tableContainerRef} onScroll={handleScroll} className="flex-1 flex flex-col overflow-auto relative">
         {/* Header - Moved inside scroll container for horizontal scrolling */}
-        <div className="flex h-10 bg-table-headerBg text-sm font-semibold text-text-secondary border-b border-divider/20 sticky top-0 z-10 w-full min-w-max">
+        <div className="flex h-10 min-h-10 flex-shrink-0 bg-table-headerBg text-sm font-semibold text-text-secondary border-b border-divider/20 sticky top-0 z-10 w-full min-w-max">
           {table.getHeaderGroups().map((headerGroup) => (
             <div key={headerGroup.id} className="flex w-full h-full">
               {headerGroup.headers.map((header) => {

@@ -197,14 +197,14 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
 
       {/* Requests List */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="p-2 border-b border-border bg-zinc-950/40 flex items-center gap-2">
-          <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+        <div className="p-3 border-b border-border bg-muted/10 flex items-center gap-2">
+          <Search className="w-4 h-4 text-text-secondary shrink-0" />
           <input
             type="text"
             placeholder="Search recent requests..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-transparent border-0 outline-none text-xs text-foreground placeholder-zinc-600"
+            className="w-full bg-transparent border-0 outline-none text-sm text-text-primary placeholder-text-secondary"
           />
         </div>
 
@@ -272,8 +272,16 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
               );
             })
           ) : (
-            <div className="p-8 text-center text-xs text-zinc-600 italic">
-              No requests captured yet
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-xl bg-purple-500/15 flex items-center justify-center mx-auto mb-4 border border-purple-500/25">
+                  <ArrowRightLeft className="w-8 h-8 text-purple-400" />
+                </div>
+                <p className="text-sm text-text-primary font-medium">No Requests Yet</p>
+                <p className="text-xs text-text-secondary mt-1">
+                  Capture HTTPS traffic to compare requests
+                </p>
+              </div>
             </div>
           )}
         </div>

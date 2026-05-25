@@ -4,6 +4,7 @@ import { SourceCodeView } from './SourceCodeView';
 import { NetworkRequest } from '../../../../../types/inspector';
 import { useState } from 'react';
 import { FileCode } from 'lucide-react';
+import { EmptyState } from '../EmptyState';
 
 interface SourcesPanelProps {
   requests: NetworkRequest[];
@@ -30,12 +31,24 @@ export function SourcesPanel({ requests }: SourcesPanelProps) {
             </div>
           </div>
           <div className="flex-1 overflow-hidden">
-            <FileTree
-              requests={requests}
-              onSelectFile={(content, fileName, language) =>
-                setSelectedFile({ content, fileName, language })
-              }
-            />
+            {requests.filter(r => r.type === 'JS' || r.type === 'CSS' || r.path?.match(/\.(js|css|html|json|xml)$/i)).length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6">
+                <div className="w-16 h-16 rounded-xl bg-purple-500/15 flex items-center justify-center mb-4 border border-purple-500/25">
+                  <FileCode className="w-8 h-8 text-purple-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary mb-1">No Source Files</h3>
+                <p className="text-xs text-text-secondary text-center max-w-[200px]">
+                  Navigate to a page with JS, CSS, or HTML assets
+                </p>
+              </div>
+            ) : (
+              <FileTree
+                requests={requests}
+                onSelectFile={(content, fileName, language) =>
+                  setSelectedFile({ content, fileName, language })
+                }
+              />
+            )}
           </div>
         </div>
 

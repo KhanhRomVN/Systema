@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Copy, Trash2, KeyRound } from 'lucide-react';
+import { Copy, Trash2, KeyRound, Search } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
 import CryptoJS from 'crypto-js';
 
@@ -109,6 +109,7 @@ export function CryptoTab() {
   const [encryptionKey, setEncryptionKey] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [methodSearchTerm, setMethodSearchTerm] = useState('');
 
   const selectedMethod = methods.find((m) => m.value === method);
   const requiresKey = selectedMethod?.requiresKey || false;
@@ -161,7 +162,11 @@ export function CryptoTab() {
     };
   }, []);
 
-  const groupedMethods = methods.reduce(
+  const filteredMethods = methods.filter(method =>
+    method.label.toLowerCase().includes(methodSearchTerm.toLowerCase())
+  );
+
+  const groupedMethods = filteredMethods.reduce(
     (acc, method) => {
       if (!acc[method.category]) {
         acc[method.category] = [];
@@ -190,6 +195,20 @@ export function CryptoTab() {
           <Trash2 className="w-3.5 h-3.5" />
           Clear All
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="px-3 py-2 border-b border-divider shrink-0">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
+          <input
+            type="text"
+            placeholder="Search methods..."
+            value={methodSearchTerm}
+            onChange={(e) => setMethodSearchTerm(e.target.value)}
+            className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
+          />
+        </div>
       </div>
 
       {/* Controls */}

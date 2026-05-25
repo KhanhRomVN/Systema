@@ -4,6 +4,7 @@ import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Square, Terminal, His
 import { cn } from '../../../../../shared/lib/utils';
 import { loadProfiles, InspectorProfile, deleteProfilesByAppId } from '../../../../../utils/profiles';
 import { AddTargetDrawer } from './AddTargetDrawer';
+import { ConfirmDeleteDrawer } from './ConfirmDeleteDrawer';
 
 export interface TargetSelectorProps {
   activeAppId: string;
@@ -12,6 +13,8 @@ export interface TargetSelectorProps {
   onStopSession: () => Promise<void>;
   onLoadProfile: (profile: InspectorProfile) => void;
   platform?: 'web' | 'pc' | 'android';
+  // Stop confirmation drawer
+  onOpenStopConfirm?: () => void;
 }
 
 const getFaviconUrl = (url?: string) => {
@@ -30,6 +33,7 @@ const PLATFORM_TABS: { id: AppPlatform; icon: React.ElementType; label: string; 
 export const TargetSelector: React.FC<TargetSelectorProps> = ({
   activeAppId, activeAppName, onSelectApp, onStopSession, onLoadProfile,
   platform: activeSessionPlatform,
+  onOpenStopConfirm,
 }) => {
   const [activeTab, setActiveTab] = useState<AppPlatform>('web');
   const [apps, setApps] = useState<UserApp[]>([]);
@@ -41,6 +45,11 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerPlatform, setDrawerPlatform] = useState<AppPlatform>('web');
   const [editApp, setEditApp] = useState<{ id: string; name: string; url?: string; executablePath?: string } | null>(null);
+  
+  // Delete confirmation drawer
+  const [deleteDrawerOpen, setDeleteDrawerOpen] = useState(false);
+  const [deleteAppId, setDeleteAppId] = useState<string | null>(null);
+  const [deleteAppName, setDeleteAppName] = useState<string>('');
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ appId: string; x: number; y: number } | null>(null);
@@ -85,9 +94,18 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
   };
 
   const handleDeleteApp = async (id: string) => {
-    if (!confirm('Delete this target?')) return;
     try { await window.api.invoke('apps:delete', id); deleteProfilesByAppId(id); fetchApps(); }
     catch (e) { console.error(e); }
+    setContextMenu(null);
+    setDeleteDrawerOpen(false);
+    setDeleteAppId(null);
+    setDeleteAppName('');
+  };
+
+  const openDeleteDrawer = (id: string, name: string) => {
+    setDeleteAppId(id);
+    setDeleteAppName(name);
+    setDeleteDrawerOpen(true);
     setContextMenu(null);
   };
 
@@ -140,28 +158,6 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
         </div>
       </div>
 
-      {/* Active session */}
-      {activeAppId && (
-        <div className="px-3 py-2.5 border-b border-divider bg-emerald-500/5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <div>
-              <div className="text-xs font-semibold text-emerald-400 truncate max-w-[140px]">{activeAppName}</div>
-              <div className="text-[10px] text-text-secondary capitalize">{activeSessionPlatform || 'Unknown'}</div>
-            </div>
-          </div>
-          <button
-            onClick={async () => { if (confirm('Stop the current tracking session?')) await onStopSession(); }}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 rounded-md transition-all active:scale-95"
-          >
-            <Square className="w-3 h-3 fill-current" />Stop
-          </button>
-        </div>
-      )}
-
       {/* Platform tabs */}
       <div className="grid grid-cols-4 gap-1.5 p-2 border-b border-divider shrink-0">
         {PLATFORM_TABS.map(({ id, icon: Icon, label, activeColor }) => {
@@ -187,10 +183,10 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
           <input type="text" placeholder={`Search ${activePlatform.label}...`} value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-xs text-text-primary focus:border-primary/50 outline-none" />
+            className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none" />
         </div>
         <button onClick={openAddDrawer}
-          className="flex items-center justify-center w-10 h-10 bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary rounded-lg border border-divider hover:border-primary/30 transition-all active:scale-95 shrink-0"
+          className="flex items-center justify-center w-11 h-11 bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary rounded-lg border border-divider hover:border-primary/30 transition-all active:scale-95 shrink-0"
           title="Add target">
           <Plus className="w-4 h-4" />
         </button>
@@ -198,14 +194,35 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
 
       {/* App list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-        {filteredApps.map((app) => {
+        {(() => {
+          const sortedApps = [...filteredApps];
+          const activeIndex = sortedApps.findIndex(app => app.id === activeAppId);
+          if (activeIndex !== -1) {
+            const [activeApp] = sortedApps.splice(activeIndex, 1);
+            sortedApps.unshift(activeApp);
+          }
+          return sortedApps;
+        })().map((app) => {
           const favicon = getFaviconUrl(app.url);
+          const isActive = app.id === activeAppId;
           return (
             <div
               key={app.id}
-              onClick={(e) => setContextMenu({ appId: app.id, x: e.clientX, y: e.clientY })}
-              onContextMenu={(e) => { e.preventDefault(); setContextMenu({ appId: app.id, x: e.clientX, y: e.clientY }); }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-table-headerBg hover:bg-sidebar-itemHover/60 cursor-pointer transition-all"
+              onClick={(e) => {
+                if (isActive) return;
+                setContextMenu({ appId: app.id, x: e.clientX, y: e.clientY });
+              }}
+              onContextMenu={(e) => {
+                if (isActive) return;
+                e.preventDefault();
+                setContextMenu({ appId: app.id, x: e.clientX, y: e.clientY });
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+                isActive 
+                  ? "bg-emerald-500/5 border-2 border-emerald-500/30 hover:border-emerald-500/50 hover:scale-[1.01]" 
+                  : "bg-table-headerBg border border-divider/40 hover:bg-sidebar-itemHover/60 hover:border-primary/30 hover:scale-[1.01]"
+              )}
             >
               <div className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
                 {app.platform === 'web' && favicon ? (
@@ -222,6 +239,21 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                   {app.url || (app.platform === 'cli' ? 'CLI Command' : 'Native App')}
                 </div>
               </div>
+              {isActive && (
+                <button
+                  onClick={async (e) => { 
+                    e.stopPropagation(); 
+                    if (onOpenStopConfirm) {
+                      onOpenStopConfirm();
+                    } else {
+                      if (confirm('Stop the current tracking session?')) await onStopSession();
+                    }
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 rounded-lg transition-all active:scale-95 shrink-0"
+                >
+                  <Square className="w-3 h-3 fill-current" /> Stop
+                </button>
+              )}
             </div>
           );
         })}
@@ -287,7 +319,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
               <Pencil className="w-4 h-4 text-text-secondary" />Edit Target
             </button>
-            <button onClick={() => handleDeleteApp(contextMenuApp.id)}
+            <button onClick={() => openDeleteDrawer(contextMenuApp.id, contextMenuApp.name)}
               className="w-full px-4 py-2 text-sm text-left hover:bg-red-500/10 text-red-400 flex items-center gap-2.5">
               <Trash2 className="w-4 h-4" />Delete Target
             </button>
@@ -304,6 +336,14 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
         onEdit={handleEditApp}
         editApp={editApp}
         existingApps={apps.filter(a => a.platform === 'android')}
+      />
+      
+      {/* Delete Confirmation Drawer */}
+      <ConfirmDeleteDrawer
+        isOpen={deleteDrawerOpen}
+        onClose={() => { setDeleteDrawerOpen(false); setDeleteAppId(null); setDeleteAppName(''); }}
+        onConfirm={() => deleteAppId && handleDeleteApp(deleteAppId)}
+        appName={deleteAppName}
       />
     </div>
   );

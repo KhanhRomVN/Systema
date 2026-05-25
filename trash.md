@@ -1,3 +1,1 @@
-1/ xóa hiệu ứng khi hover vào triggerUi mở drawer
-2/ xóa hiệu ứng khi focus vào MessageInput sẽ có border color primary
-3/ cần nhích triggerUI lên tầm 0.5px
+ở panel src/renderer/src/features/Tool/components/Sidebar/Target thì ko cần thêm 1 section như vậy. chỉ cần đưa card đang chạy lên trên cùng danh sach card, thêm hiệu ứng card, thêm button "Stop" với redColor

@@ -26,13 +26,17 @@ interface Trace {
   createdAt: number;
 }
 
-const STORAGE_KEY = 'systema-traces';
-
-function loadTraces(): Trace[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+function getStorageKey(appId: string): string {
+  return `systema-traces-${appId}`;
 }
-function saveTraces(traces: Trace[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(traces));
+
+function loadTraces(appId: string): Trace[] {
+  const key = getStorageKey(appId);
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+function saveTraces(traces: Trace[], appId: string) {
+  const key = getStorageKey(appId);
+  localStorage.setItem(key, JSON.stringify(traces));
 }
 
 // ── Data extraction ───────────────────────────────────────────────────────────
@@ -664,11 +668,13 @@ function DiagramView({
 export function TraceTab({
   requests = [],
   onSelectRequest,
+  appId = 'global',
 }: {
   requests?: NetworkRequest[];
   onSelectRequest?: (id: string) => void;
+  appId?: string;
 }) {
-  const [traces, setTraces] = useState<Trace[]>(loadTraces);
+  const [traces, setTraces] = useState<Trace[]>(() => loadTraces(appId));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [traceName, setTraceName] = useState('');
   const [activeTrace, setActiveTrace] = useState<Trace | null>(null);
@@ -684,7 +690,7 @@ export function TraceTab({
     const newTrace: Trace = { id: crypto.randomUUID(), name, createdAt: Date.now() };
     const updated = [...traces, newTrace];
     setTraces(updated);
-    saveTraces(updated);
+    saveTraces(updated, appId);
     setTraceName('');
     setDrawerOpen(false);
   };
@@ -693,7 +699,7 @@ export function TraceTab({
     e.stopPropagation();
     const updated = traces.filter((t) => t.id !== id);
     setTraces(updated);
-    saveTraces(updated);
+    saveTraces(updated, appId);
     if (activeTrace?.id === id) setActiveTrace(null);
   };
 
@@ -710,6 +716,12 @@ export function TraceTab({
     );
   }
 
+  const [traceSearchTerm, setTraceSearchTerm] = useState('');
+  
+  const filteredTraces = traces.filter(trace =>
+    trace.name.toLowerCase().includes(traceSearchTerm.toLowerCase())
+  );
+
   return (
     <div className="h-full flex flex-col relative overflow-hidden bg-table-bodyBg">
       <div className="px-4 pt-4 pb-3 border-b border-divider shrink-0 flex items-center gap-3">
@@ -720,23 +732,48 @@ export function TraceTab({
           <h2 className="text-base font-bold text-text-primary">Traces</h2>
           <p className="text-xs text-text-secondary mt-0.5">Request flow diagrams</p>
         </div>
+      </div>
+
+      {/* Search and Add Bar */}
+      <div className="px-3 py-2 border-b border-divider flex gap-2 items-center shrink-0">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
+          <input
+            type="text"
+            placeholder="Search traces..."
+            value={traceSearchTerm}
+            onChange={(e) => setTraceSearchTerm(e.target.value)}
+            className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
+          />
+        </div>
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded transition-colors"
+          className="flex items-center justify-center w-11 h-11 bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary rounded-lg border border-divider hover:border-primary/30 transition-all active:scale-95 shrink-0"
+          title="New Trace"
         >
-          <Plus className="w-3.5 h-3.5" />
-          New Trace
+          <Plus className="w-4 h-4" />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {traces.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
-            <GitBranch className="w-8 h-8 opacity-30" />
-            <p className="text-xs">No traces yet. Create one to get started.</p>
+        {filteredTraces.length === 0 && traceSearchTerm ? (
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="w-16 h-16 rounded-xl bg-pink-500/15 flex items-center justify-center mb-4 border border-pink-500/25">
+              <Search className="w-8 h-8 text-pink-400" />
+            </div>
+            <p className="text-sm text-text-primary font-medium">No matching traces</p>
+            <p className="text-xs text-text-secondary mt-1">Try a different search term</p>
+          </div>
+        ) : filteredTraces.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="w-16 h-16 rounded-xl bg-pink-500/15 flex items-center justify-center mb-4 border border-pink-500/25">
+              <GitBranch className="w-8 h-8 text-pink-400" />
+            </div>
+            <p className="text-sm text-text-primary font-medium">No Traces Yet</p>
+            <p className="text-xs text-text-secondary mt-1">Click "New Trace" to create one</p>
           </div>
         ) : (
-          traces.map((trace) => (
+          filteredTraces.map((trace) => (
             <div
               key={trace.id}
               onClick={() => setActiveTrace(trace)}
@@ -763,40 +800,64 @@ export function TraceTab({
       </div>
 
       {drawerOpen && (
-        <div className="absolute inset-0 bg-black/40 z-10" onClick={() => setDrawerOpen(false)} />
-      )}
-      <div className={cn(
-        'absolute bottom-0 left-0 right-0 bg-background border-t border-border z-20 transition-transform duration-200',
-        drawerOpen ? 'translate-y-0' : 'translate-y-full',
-      )}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="text-sm font-medium">New Trace</span>
-          <button onClick={() => setDrawerOpen(false)} className="p-1 rounded hover:bg-muted transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="p-4 space-y-3">
-          <div>
-            <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Trace Name</label>
-            <input
-              ref={inputRef}
-              type="text"
-              value={traceName}
-              onChange={(e) => setTraceName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              placeholder="Enter trace name..."
-              className="w-full px-3 py-2 text-sm bg-muted/30 border border-border rounded outline-none focus:border-primary transition-colors"
-            />
-          </div>
-          <button
-            onClick={handleCreate}
-            disabled={!traceName.trim()}
-            className="w-full py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+        <>
+          <div className="absolute inset-0 bg-black/40 z-40" onClick={() => setDrawerOpen(false)} />
+          <div
+            className="absolute bottom-0 left-0 right-0 z-50 bg-dialog-background border-t border-divider rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
+            style={{ maxHeight: '80%' }}
           >
-            Create Trace
-          </button>
-        </div>
-      </div>
+            {/* Header */}
+            <div className="px-4 pt-4 pb-3 border-b border-divider flex items-center gap-3 shrink-0">
+              <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-pink-500/15 border border-pink-500/25 shrink-0">
+                <GitBranch className="w-4 h-4 text-pink-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-text-primary">New Trace</h3>
+                <p className="text-xs text-text-secondary mt-0.5">Create a request flow diagram</p>
+              </div>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="p-1.5 rounded-lg bg-secondary text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">TRACE NAME</label>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={traceName}
+                  onChange={(e) => setTraceName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  placeholder="Enter trace name..."
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!traceName.trim()}
+                className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
+              >
+                Create Trace
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

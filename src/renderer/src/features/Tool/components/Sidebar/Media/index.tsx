@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { NetworkRequest } from '../../../../../types/inspector';
 import {
-  X,
   Image as ImageIcon,
   FileAudio,
   FileVideo,
@@ -10,6 +9,7 @@ import {
   ExternalLink,
   Filter,
   ChevronDown,
+  Search,
 } from 'lucide-react';
 import { MediaModal } from './MediaModal';
 
@@ -30,7 +30,7 @@ interface MediaItem {
   source: string;
 }
 
-export function MediaPanel({ requests, onClose }: MediaPanelProps) {
+export function MediaPanel({ requests }: MediaPanelProps) {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
@@ -41,6 +41,7 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
     audio: true,
   });
   const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [mediaSearchTerm, setMediaSearchTerm] = useState('');
 
   const [cacheManifest, setCacheManifest] = useState<Record<string, { size?: number }>>({});
 
@@ -153,6 +154,14 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
       return false;
     }
 
+    if (mediaSearchTerm) {
+      const searchLower = mediaSearchTerm.toLowerCase();
+      return (
+        item.filename.toLowerCase().includes(searchLower) ||
+        item.contentType.toLowerCase().includes(searchLower)
+      );
+    }
+
     return true;
   });
 
@@ -166,6 +175,20 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
         <div className="flex-1 min-w-0">
           <h2 className="text-base font-bold text-text-primary">Media Inspector</h2>
           <p className="text-xs text-text-secondary mt-0.5">Images, video and audio in traffic</p>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="px-3 py-2 border-b border-divider shrink-0">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
+          <input
+            type="text"
+            placeholder="Search media files..."
+            value={mediaSearchTerm}
+            onChange={(e) => setMediaSearchTerm(e.target.value)}
+            className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
+          />
         </div>
       </div>
 
@@ -362,13 +385,13 @@ export function MediaPanel({ requests, onClose }: MediaPanelProps) {
           )}
 
           {mediaItems.length === 0 && !isScanning && (
-            <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <ImageIcon className="w-8 h-8 opacity-50" />
+            <div className="col-span-full flex flex-col items-center justify-center py-20">
+              <div className="w-16 h-16 rounded-xl bg-blue-500/15 flex items-center justify-center mb-4 border border-blue-500/25">
+                <ImageIcon className="w-8 h-8 text-blue-400" />
               </div>
-              <p>No media files detected.</p>
-              <p className="text-xs opacity-70 mt-1">
-                Try navigating to a page with images or videos.
+              <p className="text-sm text-text-primary font-medium">No Media Files</p>
+              <p className="text-xs text-text-secondary mt-1">
+                Navigate to a page with images, videos, or audio
               </p>
             </div>
           )}

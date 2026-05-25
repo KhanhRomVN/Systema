@@ -526,10 +526,24 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
 
   if (!emulatorSerial) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground">
-        <div className="text-center">
-          <p className="text-sm">No emulator selected</p>
-          <p className="text-xs mt-1">Launch an Android app to view logs</p>
+      <div className="h-full flex flex-col bg-table-bodyBg">
+        <div className="px-4 pt-4 pb-3 border-b border-divider shrink-0 flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-green-500/15 border border-green-500/25 shrink-0">
+            <Search className="w-4 h-4 text-green-400" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-text-primary">Log Viewer</h2>
+            <p className="text-xs text-text-secondary mt-0.5">Android logcat output</p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-xl bg-green-500/15 flex items-center justify-center mx-auto mb-4 border border-green-500/25">
+              <Search className="w-8 h-8 text-green-400" />
+            </div>
+            <p className="text-sm text-text-primary font-medium">No Emulator Selected</p>
+            <p className="text-xs text-text-secondary mt-1">Launch an Android app to view logs</p>
+          </div>
         </div>
       </div>
     );
@@ -849,9 +863,9 @@ export function LogViewer({ emulatorSerial }: LogViewerProps) {
       )}
 
       {/* Logs - Virtualized */}
-      <div className="flex-1 bg-background/50 relative">
+      <div className="flex-1 bg-table-bodyBg relative">
         {filteredLogs.length === 0 && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center text-muted-foreground bg-background/50 backdrop-blur-[1px]">
+          <div className="absolute inset-0 z-10 flex items-center justify-center text-muted-foreground bg-table-bodyBg">
             {isRunning ? 'Waiting for logs...' : 'No logs available'}
           </div>
         )}
