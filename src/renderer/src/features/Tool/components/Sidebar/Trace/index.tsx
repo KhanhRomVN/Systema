@@ -748,8 +748,14 @@ export function TraceTab({
         </div>
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center justify-center w-11 h-11 bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary rounded-lg border border-divider hover:border-primary/30 transition-all active:scale-95 shrink-0"
-          title="New Trace"
+          disabled={!appId}
+          className={cn(
+            "flex items-center justify-center w-11 h-11 rounded-lg border transition-all active:scale-95 shrink-0",
+            appId
+              ? "bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary border-divider hover:border-primary/30"
+              : "bg-zinc-800/50 text-zinc-600 border-zinc-800/80 cursor-not-allowed opacity-50"
+          )}
+          title={appId ? "New Trace" : "Select a target first"}
         >
           <Plus className="w-4 h-4" />
         </button>

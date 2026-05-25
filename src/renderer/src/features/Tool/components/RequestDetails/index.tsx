@@ -11,6 +11,7 @@ import {
   ScanEye,
   KeyRound,
   GitBranch,
+  Send,
 } from 'lucide-react';
 
 import { HeadersDetails } from './Headers';
@@ -21,6 +22,7 @@ import { DiffTab } from '../Sidebar/Compare/DiffView';
 import { InspectorFilter, NetworkFilter } from './Filter';
 import { ResizableSplit } from '../../../../core/components/common/ResizableSplit';
 import { CodeBlock } from '../../../../core/components/common/CodeBlock';
+import { Composer } from './Composer';
 
 function Badge({ count, className }: { count: number; className?: string }) {
   if (count === 0) return null;
@@ -57,6 +59,8 @@ interface NetworkDetailsProps {
   ) => void;
   onSetCompare1?: (req: NetworkRequest) => void;
   onSetCompare2?: (req: NetworkRequest) => void;
+  appId?: string;
+  initialComposerRequest?: NetworkRequest | null;
 }
 
 function TextSelectionMenu({
@@ -137,6 +141,8 @@ export function RequestDetails({
   onCompareRequests: _onCompareRequests,
   onSetCompare1,
   onSetCompare2,
+  appId,
+  initialComposerRequest,
 }: NetworkDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('headers');
   const [isRawMode, setIsRawMode] = useState(false);
@@ -364,6 +370,20 @@ export function RequestDetails({
         activeAction: 'bg-orange-500/20 text-orange-500',
       },
     },
+    {
+      id: 'composer',
+      label: 'Composer',
+      icon: Send,
+      count: 0,
+      importantCount: 0,
+      colors: {
+        text: 'text-blue-500',
+        border: 'border-blue-500',
+        badge: 'bg-blue-500/20 text-blue-500',
+        hover: 'hover:bg-blue-500/10',
+        activeAction: 'bg-blue-500/20 text-blue-500',
+      },
+    },
   ] as const;
 
   const scrollToNextMatch = () => {
@@ -392,16 +412,17 @@ export function RequestDetails({
   };
 
   const isFullPanel = activeTab === 'trace';
+  const isComposerTab = activeTab === 'composer';
 
   const content = (
     <div className="flex-1 overflow-hidden h-full" onContextMenu={handleContextMenu}>
-      {!request ? (
+      {!request && !isComposerTab ? (
         <div className="h-full flex items-center justify-center text-text-secondary bg-table-bodyBg">
           Select a request to view details
         </div>
       ) : isFullPanel ? (
         <div className="h-full w-full">
-          {activeTab === 'trace' && (
+          {activeTab === 'trace' && request && (
             <TracePanel
               request={request}
               requests={requests}
@@ -411,6 +432,10 @@ export function RequestDetails({
             />
           )}
         </div>
+      ) : isComposerTab ? (
+        <div className="h-full w-full">
+          <Composer appId={appId || 'unknown'} initialRequest={initialComposerRequest} />
+        </div>
       ) : isRawMode ? (
         <CodeBlock
           code={JSON.stringify(getTabContent(activeTab), null, 2)}
@@ -419,18 +444,18 @@ export function RequestDetails({
         />
       ) : (
         <div ref={scrollContainerRef} className="flex-1 overflow-auto h-full p-2 font-mono text-xs">
-          {activeTab === 'headers' && <HeadersDetails request={request} searchTerm={searchTerm} />}
-          {activeTab === 'body' && (
+          {activeTab === 'headers' && request && <HeadersDetails request={request} searchTerm={searchTerm} />}
+          {activeTab === 'body' && request && (
             <BodyDetails ref={bodyDetailsRef} request={request} searchTerm={searchTerm} />
           )}
-          {activeTab === 'network' && <NetworkDetailsSub request={request} />}
+          {activeTab === 'network' && request && <NetworkDetailsSub request={request} />}
         </div>
       )}
     </div>
   );
 
   const currentTabHasMatches =
-    searchTerm && !isRawMode && (matches[activeTab as keyof typeof matches] || 0) > 0;
+    searchTerm && !isRawMode && !isComposerTab && (matches[activeTab as keyof typeof matches] || 0) > 0;
 
   return (
     <div className="h-full">
@@ -455,51 +480,53 @@ export function RequestDetails({
                     {tab.label}
                     <Badge count={tab.count} className={tab.colors.badge} />
 
-                    <div
-                      className={cn(
-                        'ml-2 pl-2 border-l flex items-center gap-1 transition-colors',
-                        'border-current/20',
-                      )}
-                    >
-                      {currentTabHasMatches && (
+                    {tab.id !== 'composer' && (
+                      <div
+                        className={cn(
+                          'ml-2 pl-2 border-l flex items-center gap-1 transition-colors',
+                          'border-current/20',
+                        )}
+                      >
+                        {currentTabHasMatches && (
+                          <button
+                            onClick={scrollToNextMatch}
+                            className={cn(
+                              'p-0.5 rounded transition-colors text-text-secondary',
+                              'hover:text-current',
+                              tab.colors.hover,
+                              'animate-in fade-in zoom-in duration-200',
+                            )}
+                            title="Next Match"
+                          >
+                            <ScanEye className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         <button
-                          onClick={scrollToNextMatch}
+                          onClick={handleCopy}
                           className={cn(
                             'p-0.5 rounded transition-colors text-text-secondary',
                             'hover:text-current',
                             tab.colors.hover,
-                            'animate-in fade-in zoom-in duration-200',
                           )}
-                          title="Next Match"
+                          title="Copy Tab Content"
                         >
-                          <ScanEye className="w-3.5 h-3.5" />
+                          <Copy className="w-3.5 h-3.5" />
                         </button>
-                      )}
-
-                      <button
-                        onClick={handleCopy}
-                        className={cn(
-                          'p-0.5 rounded transition-colors text-text-secondary',
-                          'hover:text-current',
-                          tab.colors.hover,
-                        )}
-                        title="Copy Tab Content"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setIsRawMode(!isRawMode)}
-                        className={cn(
-                          'p-0.5 rounded transition-colors text-text-secondary',
-                          'hover:text-current',
-                          tab.colors.hover,
-                          isRawMode && tab.colors.activeAction,
-                        )}
-                        title="Toggle Raw View"
-                      >
-                        <Flower2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => setIsRawMode(!isRawMode)}
+                          className={cn(
+                            'p-0.5 rounded transition-colors text-text-secondary',
+                            'hover:text-current',
+                            tab.colors.hover,
+                            isRawMode && tab.colors.activeAction,
+                          )}
+                          title="Toggle Raw View"
+                        >
+                          <Flower2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -523,7 +550,9 @@ export function RequestDetails({
                 onClick={onToggleFilter}
                 className={cn(
                   'flex h-full items-center gap-1.5 px-3 text-sm font-semibold border-b-2 border-transparent transition-colors hover:text-text-primary hover:bg-secondary/40 whitespace-nowrap',
-                  isFilterOpen ? 'border-primary text-primary bg-table-bodyBg' : 'text-text-secondary',
+                  isFilterOpen
+                    ? 'border-primary text-primary bg-table-bodyBg'
+                    : 'text-text-secondary',
                 )}
                 title={isFilterOpen ? 'Collapse Filters' : 'Expand Filters'}
               >
@@ -535,7 +564,7 @@ export function RequestDetails({
         </div>
 
         <div className="flex-1 overflow-hidden relative">
-          {isFilterOpen ? (
+          {isFilterOpen && activeTab !== 'composer' ? (
             <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
               {content}
               <NetworkFilter filter={filter} onChange={onFilterChange} requests={requests} />

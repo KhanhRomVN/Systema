@@ -335,7 +335,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
         onAdd={handleAddApp}
         onEdit={handleEditApp}
         editApp={editApp}
-        existingApps={apps.filter(a => a.platform === 'android')}
+        existingApps={apps}
       />
       
       {/* Delete Confirmation Drawer */}

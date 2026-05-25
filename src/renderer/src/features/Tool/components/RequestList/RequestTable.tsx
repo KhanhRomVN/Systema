@@ -57,6 +57,7 @@ interface RequestTableProps {
   appId: string;
   onSetCompare1: (req: NetworkRequest) => void;
   onSetCompare2: (req: NetworkRequest) => void;
+  onAnalyzeRequest?: (req: NetworkRequest) => void;
 }
 
 export function RequestTable({
@@ -73,6 +74,7 @@ export function RequestTable({
   appId,
   onSetCompare1,
   onSetCompare2,
+  onAnalyzeRequest,
 }: RequestTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
@@ -718,9 +720,9 @@ export function RequestTable({
                   </ContextMenuItem>
                   <ContextMenuSeparator />
 
-                  <ContextMenuItem onClick={() => addRequestToDefaultCollection(appId, row.original)}>
+                  <ContextMenuItem onClick={() => onAnalyzeRequest?.(row.original)}>
                     <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
-                    <span>Add to Collection</span>
+                    <span>Analyze Request</span>
                   </ContextMenuItem>
 
                   <ContextMenuItem onClick={() => toggleHighlight(row.original.id)}>

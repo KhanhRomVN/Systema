@@ -1,1 +1,4 @@
-ở panel src/renderer/src/features/Tool/components/Sidebar/Target thì ko cần thêm 1 section như vậy. chỉ cần đưa card đang chạy lên trên cùng danh sach card, thêm hiệu ứng card, thêm button "Stop" với redColor
+1/ 1 node có 4 dot tương ứng cho 4 cạnh của node. các dot sẽ ẩn khi ko focus vào node.
+2/ để có thể nối 2 node thì cần focus vào nodeA (node đầu) và nodeA này sẽ hiển thị 4dot để bạn lauwj chọn và khi bạn hold được edge thì toàn bộ node trong diagram đều sẽ tạm thời đồng loại hiển thị toàn bộ dot để tôi thả. edge được tạo sẽ có 1 mũi  tên trỏ  vào node vừa thả đó
+3/ ko tự thả chính node, thả chính mình
+4/ focus vào node, nếu bạn kéo 1 dot mà dot đó đang có edge thì ko phải là kéo edge đó ra mà là tạo thêm 1 edge mới, tức là 1 dot có thể tạo nhiều edge. muốn xóa edge hay sửa edge sang node khác thì cần click vào edge, sẽ hiển thị 2 dot của 2 node đang liên kết, có thể kéo 2 dot đó ra khoảng trống hoặc vào node khác ngoại trừ 2 node đang nói

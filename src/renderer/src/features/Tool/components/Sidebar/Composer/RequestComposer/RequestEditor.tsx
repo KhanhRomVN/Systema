@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { NetworkRequest } from '../../../../types/inspector';
-import { cn } from '../../../../shared/lib/utils';
+import { NetworkRequest } from '../../../../../../types/inspector';
+import { cn } from '../../../../../../shared/lib/utils';
 import { List, Braces, FileText, Shield } from 'lucide-react';
-import { CodeBlock, CodeBlockRef } from '../CodeBlock';
+import { CodeBlock, CodeBlockRef } from '../../../../../../core/components/common/CodeBlock';
 import { KeyValueTable, KeyValueItem } from './KeyValueTable';
 import { AuthEditor, AuthConfig } from './AuthEditor';
 // import { DocsEditor } from './ComposerEditors/DocsEditor';

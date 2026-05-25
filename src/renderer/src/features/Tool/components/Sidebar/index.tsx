@@ -6,7 +6,9 @@ import { InspectorFilter } from '../RequestDetails/Filter';
 import { NetworkRequest } from '../../../../types/inspector';
 import { SourcesPanel } from './Source';
 import { LogViewer } from './Log';
-import { CollectionsTab } from './Collection';
+import { CollectionsPanel } from './Composer/CollectionsPanel';
+import { ComposerManager } from './Composer/ComposerManager';
+import { DiagramView } from './Composer/DiagramView';
 import { TraceTab } from './Trace';
 import { CryptoTab } from './Crypto';
 import { ComparePanel } from './Compare';
@@ -14,7 +16,8 @@ import { WasmPanel } from './Wasm';
 import { MediaPanel } from './Media';
 import { TargetSelector } from './Target';
 import { ConfirmSwitchDrawer } from './Target/ConfirmSwitchDrawer';
-import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, GitBranch, KeyRound, ArrowRightLeft, Image, Cpu, Crosshair } from 'lucide-react';
+import { Tooltip } from './Tooltip';
+import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, GitBranch, KeyRound, ArrowRightLeft, Image, Cpu, Crosshair, PenTool } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 import { DiffTab } from './Compare/DiffView';
 import { ProviderConfig, ProviderType } from '../../../../types/provider-types';
@@ -43,6 +46,11 @@ export interface InspectorContext {
   ) => void;
   initialDiffTab?: DiffTab;
   initialDiffSearch?: string;
+  analyzingRequest?: NetworkRequest | null;
+  onClearAnalyzing?: () => void;
+  activeSidebarTab?: string;
+  onSetActiveSidebarTab?: (tab: string) => void;
+  onNodeClick?: (request: NetworkRequest) => void;
   // Target selector
   onSelectApp?: (appName: string, proxyUrl: string, customUrl?: string, mode?: 'browser' | 'electron' | 'native') => Promise<void>;
   onStopSession?: () => Promise<void>;
@@ -84,6 +92,15 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       setActiveTab('compare');
     }
   }, [inspectorContext.compareRequest1, inspectorContext.compareRequest2]);
+
+  // Sync active tab from context (for external navigation like Analyze Request)
+  useEffect(() => {
+    if (inspectorContext.activeSidebarTab) {
+      setActiveTab(inspectorContext.activeSidebarTab);
+      // Don't reset the prop here - it should stay true while composer is active
+      // The prop will be set to false when the user navigates away from composer tab
+    }
+  }, [inspectorContext.activeSidebarTab, inspectorContext.onSetActiveSidebarTab]);
 
   // Load saved provider config on mount
   useEffect(() => {
@@ -177,16 +194,24 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     }
 
     if (activeTab === 'collections') {
-      const selectedRequest = inspectorContext.filteredRequests?.find(
-        (r) => r.id === inspectorContext.selectedRequestId,
-      );
-
       return (
-        <CollectionsTab
-          currentRequest={selectedRequest}
+        <ComposerManager
           onSelectRequest={inspectorContext.onSelectSavedRequest}
           appId={inspectorContext.appId || 'unknown'}
           requests={inspectorContext.requests}
+        />
+      );
+    }
+
+    if (activeTab === 'composer') {
+      return (
+        <DiagramView
+          request={inspectorContext.analyzingRequest}
+          onClose={() => {
+            inspectorContext.onClearAnalyzing?.();
+            setActiveTab('chat');
+          }}
+          onNodeClick={inspectorContext.onNodeClick}
         />
       );
     }
@@ -250,16 +275,16 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
   };
 
   const tabs = [
-    { id: 'chat', label: 'Chat', icon: MessageSquare, color: 'blue' },
-    { id: 'target', label: 'Target', icon: Crosshair, color: 'emerald' },
-    { id: 'sources', label: 'Sources', icon: FileCode, color: 'purple' },
-    { id: 'logs', label: 'Log', icon: TerminalSquare, color: 'green' },
-    { id: 'collections', label: 'Collections', icon: BookmarkPlus, color: 'orange' },
-    { id: 'trace', label: 'Trace', icon: GitBranch, color: 'pink' },
-    { id: 'compare', label: 'Compare', icon: ArrowRightLeft, color: 'indigo' },
-    { id: 'crypto', label: 'Crypto', icon: KeyRound, color: 'yellow' },
-    { id: 'media', label: 'Media', icon: Image, color: 'blue' },
-    { id: 'wasm', label: 'WASM', icon: Cpu, color: 'purple' },
+    { id: 'chat', label: 'Chat', icon: MessageSquare, color: 'blue', description: 'AI-powered chat assistant for debugging and analysis' },
+    { id: 'target', label: 'Target', icon: Crosshair, color: 'emerald', description: 'Select and manage target applications' },
+    { id: 'sources', label: 'Sources', icon: FileCode, color: 'purple', description: 'View and analyze source code files' },
+    { id: 'logs', label: 'Log', icon: TerminalSquare, color: 'green', description: 'Real-time log viewer and filter' },
+    { id: 'collections', label: 'Composers Manager', icon: BookmarkPlus, color: 'orange', description: 'Save and organize HTTP requests' },
+    { id: 'trace', label: 'Trace', icon: GitBranch, color: 'pink', description: 'Request trace and call hierarchy' },
+    { id: 'compare', label: 'Compare', icon: ArrowRightLeft, color: 'indigo', description: 'Compare two requests side by side' },
+    { id: 'crypto', label: 'Crypto', icon: KeyRound, color: 'yellow', description: 'Cryptographic tools and analysis' },
+    { id: 'media', label: 'Media', icon: Image, color: 'blue', description: 'Media files and assets viewer' },
+    { id: 'wasm', label: 'WASM', icon: Cpu, color: 'purple', description: 'WebAssembly module analyzer' },
   ] as const;
 
   const colorMap: Record<string, string> = {
@@ -277,26 +302,26 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     <div className="flex h-full bg-background relative overflow-hidden">
       {/* Vertical Tab Bar */}
       <div className="w-12 border-r border-border flex flex-col items-center py-3 gap-1.5 shrink-0 bg-table-headerBg z-10">
-        {tabs.map(({ id, label, icon: Icon, color }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            title={label}
-            className={cn(
-              'relative flex items-center justify-center w-8 h-8 rounded-md transition-all border',
-              activeTab === id
-                ? colorMap[color]
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent',
-            )}
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            {id === 'collections' && collectionCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-              </span>
-            )}
-          </button>
+        {tabs.map(({ id, label, icon: Icon, color, description }) => (
+          <Tooltip key={id} title={label} description={description}>
+            <button
+              onClick={() => setActiveTab(id)}
+              className={cn(
+                'relative flex items-center justify-center w-8 h-8 rounded-md transition-all border',
+                activeTab === id
+                  ? colorMap[color]
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent',
+              )}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {id === 'collections' && collectionCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                </span>
+              )}
+            </button>
+          </Tooltip>
         ))}
       </div>
 

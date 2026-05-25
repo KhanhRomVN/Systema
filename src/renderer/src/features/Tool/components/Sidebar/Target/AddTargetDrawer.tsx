@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppPlatform, AppMode, DiscoveredApp, MobileEmulator } from '../../../../../types/apps';
+import { AppPlatform, AppMode, DiscoveredApp } from '../../../../../types/apps';
 import {
   X,
   Search,
@@ -9,8 +9,6 @@ import {
   Smartphone,
   Wifi,
   Zap,
-  Cloud,
-  Usb,
   AlertCircle,
   Check,
   Terminal,
@@ -34,7 +32,7 @@ interface AddTargetDrawerProps {
     emulatorSerial?: string;
     packageName?: string;
   }) => void;
-  existingApps?: { emulatorSerial?: string }[];
+  existingApps?: { id?: string; name?: string; url?: string; executablePath?: string; emulatorSerial?: string }[];
   // For edit mode
   editApp?: { id: string; name: string; url?: string; executablePath?: string } | null;
   onEdit?: (id: string, data: { name: string; url?: string; executablePath?: string }) => void;
@@ -81,6 +79,215 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
   >({});
 
   const isEdit = !!editApp;
+
+  // Real-time duplicate checking
+  const [duplicateError, setDuplicateError] = useState<{ name?: string; value?: string }>({});
+  const [suggestions, setSuggestions] = useState<Array<{ name: string; url?: string; executablePath?: string }>>([]);
+
+  // Helper to normalize URL (remove trailing slash for comparison)
+  const normalizeUrl = (urlString?: string): string => {
+    if (!urlString) return '';
+    try {
+      const url = new URL(urlString);
+      let normalized = url.hostname + url.pathname;
+      // Remove trailing slash
+      if (normalized.endsWith('/')) {
+        normalized = normalized.slice(0, -1);
+      }
+      return normalized.toLowerCase();
+    } catch {
+      return urlString.toLowerCase().replace(/\/$/, '');
+    }
+  };
+
+  // Helper to extract domain from URL for better matching
+  const extractSearchKeywords = (input: string): string => {
+    try {
+      // If it's a valid URL, extract hostname
+      const url = new URL(input);
+      return url.hostname.replace(/^www\./, '').toLowerCase();
+    } catch {
+      // If not a valid URL, use the input as is
+      return input.toLowerCase();
+    }
+  };
+
+  // Generate suggestions based on current input (for web platform)
+  useEffect(() => {
+    console.log('[Suggestions] useEffect triggered - platform:', platform, 'isEdit:', isEdit, 'existingApps.length:', existingApps.length);
+    
+    if (platform !== 'web' || isEdit) {
+      console.log('[Suggestions] Not web platform or edit mode, clearing suggestions');
+      setSuggestions([]);
+      return;
+    }
+
+    // Use name as primary search term, or extract keywords from URL if name is empty
+    let searchTerm = (name || '').toLowerCase();
+    let searchKeywords: string[] = [];
+    
+    console.log('[Suggestions] Current name:', name, 'url:', url);
+    
+    if (searchTerm) {
+      searchKeywords = [searchTerm];
+      console.log('[Suggestions] Using name as search term:', searchTerm);
+    } else if (url) {
+      // Extract domain from URL for smarter suggestions
+      const domain = extractSearchKeywords(url);
+      searchKeywords = [domain];
+      console.log('[Suggestions] Extracted domain from URL:', domain, 'original URL:', url);
+    } else {
+      console.log('[Suggestions] No name or URL to search');
+    }
+    
+    if (searchKeywords.length === 0 || !searchKeywords[0]) {
+      console.log('[Suggestions] No valid search term, clearing suggestions');
+      setSuggestions([]);
+      return;
+    }
+
+    console.log('[Suggestions] Searching with keywords:', searchKeywords);
+
+    // Find matching apps (by name or URL) - EXACT MATCH with normalized URLs
+    const matches = existingApps
+      .filter(app => {
+        // Normalize URLs for comparison
+        const normalizedInputUrl = normalizeUrl(url);
+        const normalizedAppUrl = normalizeUrl(app.url);
+        
+        // Check for EXACT match with name (including duplicate case)
+        if (name) {
+          const exactNameMatch = app.name?.toLowerCase() === name.toLowerCase();
+          if (exactNameMatch) {
+            console.log('[Suggestions] Exact name match found (including duplicate):', app.name);
+            return true;
+          }
+        }
+        
+        // Check for EXACT match with URL (normalized) - include duplicate URLs
+        if (url) {
+          const exactUrlMatch = normalizedInputUrl === normalizedAppUrl;
+          if (exactUrlMatch) {
+            console.log('[Suggestions] Exact URL match found (including duplicate):', { input: normalizedInputUrl, app: normalizedAppUrl });
+            return true;
+          }
+          
+          // Also check domain match if keywords are extracted from URL
+          for (const keyword of searchKeywords) {
+            const appUrl = (app.url || '').toLowerCase();
+            if (appUrl.includes(keyword) && keyword.length > 3) {
+              console.log('[Suggestions] Domain match found:', { keyword, appUrl });
+              return true;
+            }
+          }
+        }
+        
+        return false;
+      })
+      .slice(0, 2) // Max 2 suggestions
+      .map(app => ({
+        name: app.name || '',
+        url: app.url,
+        executablePath: app.executablePath,
+      }));
+
+    console.log('[Suggestions] Matches found (exact match):', matches.length, matches);
+    setSuggestions(matches);
+  }, [platform, name, url, existingApps, isEdit]);
+
+  useEffect(() => {
+    // Filter out the current app if in edit mode to avoid self-duplicate
+    const appsToCheck = isEdit && editApp 
+      ? existingApps.filter(app => app.id !== editApp.id)
+      : existingApps;
+    
+    // Simplified duplicate check logs
+    if (platform === 'web' && (name || url)) {
+      console.log('[Duplicate Check] Checking web platform - Name:', name, 'URL:', url);
+    }
+
+    let error: { name?: string; value?: string } = {};
+
+    if (platform === 'web') {
+      if (name) {
+        const existingByName = appsToCheck.find(
+          (app) => app.name?.toLowerCase() === name.toLowerCase()
+        );
+        if (existingByName) {
+          error.name = `Name "${existingByName.name}" already exists`;
+          console.log('[Duplicate Check] Name duplicate:', existingByName.name);
+        }
+      }
+      if (url) {
+        const existingByUrl = appsToCheck.find(
+          (app) => app.url?.toLowerCase() === url.toLowerCase()
+        );
+        if (existingByUrl) {
+          error.value = `URL "${existingByUrl.url}" already exists`;
+          console.log('[Duplicate Check] URL duplicate:', existingByUrl.url);
+        }
+      }
+    } else if (platform === 'cli') {
+      if (name && command) {
+        const existingByName = existingApps.find(
+          (app) => app.name?.toLowerCase() === name.toLowerCase()
+        );
+        const existingByCommand = existingApps.find(
+          (app) => app.executablePath?.toLowerCase() === command.toLowerCase()
+        );
+        if (existingByName) {
+          error.name = `Name "${existingByName.name}" already exists`;
+          console.log('[Duplicate Check] CLI name duplicate found:', existingByName.name);
+        }
+        if (existingByCommand) {
+          error.value = `Command "${existingByCommand.executablePath}" already exists`;
+          console.log('[Duplicate Check] CLI command duplicate found:', existingByCommand.executablePath);
+        }
+      }
+    } else if (platform === 'pc') {
+      if (selectedPcApp) {
+        const existingByName = appsToCheck.find(
+          (app) => app.name?.toLowerCase() === selectedPcApp.name.toLowerCase()
+        );
+        const existingByPath = appsToCheck.find(
+          (app) => app.executablePath?.toLowerCase() === selectedPcApp.exec.toLowerCase()
+        );
+        if (existingByName) {
+          error.name = `Name "${existingByName.name}" already exists`;
+          console.log('[Duplicate Check] PC app duplicate found:', existingByName.name);
+        }
+        if (existingByPath) {
+          error.value = `Path "${existingByPath.executablePath}" already exists`;
+          console.log('[Duplicate Check] PC path duplicate found:', existingByPath.executablePath);
+        }
+      }
+    } else if (platform === 'android') {
+      if (selectedDevice) {
+        const device = deviceList.find((d) => (d.serial || d.name) === selectedDevice);
+        if (device) {
+          const existingByName = appsToCheck.find(
+            (app) => app.name?.toLowerCase() === device.name.toLowerCase()
+          );
+          const existingBySerial = appsToCheck.find(
+            (app) => app.emulatorSerial?.toLowerCase() === (device.serial || device.name).toLowerCase()
+          );
+          if (existingByName) {
+            error.name = `Name "${existingByName.name}" already exists`;
+            console.log('[Duplicate Check] Android device duplicate found:', existingByName.name);
+          }
+          if (existingBySerial) {
+            error.value = `Device "${existingBySerial.emulatorSerial}" already exists`;
+            console.log('[Duplicate Check] Android serial duplicate found:', existingBySerial.emulatorSerial);
+          }
+        }
+      }
+    }
+
+    if (Object.keys(error).length > 0) {
+      console.log('[Duplicate Check] Final error:', error);
+    }
+    setDuplicateError(error);
+  }, [platform, name, url, command, selectedPcApp, selectedDevice, deviceList, existingApps, isEdit]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -290,13 +497,13 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
   };
 
   const canSubmit =
-    platform === 'web'
+    (platform === 'web'
       ? !!(name && url)
       : platform === 'cli'
         ? !!(name && command)
         : platform === 'pc'
           ? !!selectedPcApp
-          : !!selectedDevice;
+          : !!selectedDevice) && !duplicateError.name && !duplicateError.value;
 
   const platformMeta = {
     web: { icon: Globe, label: 'Website', color: 'text-sky-400' },
@@ -354,6 +561,45 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
           {/* Web */}
           {platform === 'web' && (
             <div className="p-5 space-y-4">
+              {/* Warning Cards for Duplicate Targets */}
+              {suggestions.length > 0 && (
+                <div className="mb-2">
+                  <label className="block text-xs font-bold text-red-400 mb-2">DUPLICATE TARGET</label>
+                  <div className="space-y-2">
+                    {suggestions.map((suggestion, idx) => {
+                      const faviconUrl = suggestion.url ? `https://www.google.com/s2/favicons?domain=${new URL(suggestion.url).hostname}&sz=32` : null;
+                      return (
+                        <div
+                          key={idx}
+                          className="w-full text-left p-3 rounded-xl bg-red-500/5 border border-red-500/30"
+                        >
+                          <div className="flex items-center gap-2">
+                            {faviconUrl && (
+                              <img 
+                                src={faviconUrl} 
+                                alt="" 
+                                className="w-5 h-5 rounded-sm"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            )}
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-text-primary">
+                                {suggestion.name}
+                              </div>
+                              {suggestion.url && (
+                                <div className="text-xs text-text-secondary truncate mt-0.5 font-mono">
+                                  {suggestion.url}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
                 <input
@@ -361,8 +607,14 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. My API Server"
-                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
+                  className={cn(
+                    "w-full bg-table-headerBg border rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary",
+                    duplicateError.name ? "border-red-500" : "border-input-border-default"
+                  )}
                 />
+                {duplicateError.name && (
+                  <p className="text-xs text-red-400 mt-1.5">{duplicateError.name}</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">URL</label>
@@ -371,8 +623,14 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://example.com"
-                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary"
+                  className={cn(
+                    "w-full bg-table-headerBg border rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary",
+                    duplicateError.value ? "border-red-500" : "border-input-border-default"
+                  )}
                 />
+                {duplicateError.value && (
+                  <p className="text-xs text-red-400 mt-1.5">{duplicateError.value}</p>
+                )}
               </div>
             </div>
           )}
@@ -387,8 +645,14 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. My Node API"
-                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
+                  className={cn(
+                    "w-full bg-table-headerBg border rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary",
+                    duplicateError.name ? "border-red-500" : "border-input-border-default"
+                  )}
                 />
+                {duplicateError.name && (
+                  <p className="text-xs text-red-400 mt-1.5">{duplicateError.name}</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">
@@ -399,8 +663,14 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   onChange={(e) => setCommand(e.target.value)}
                   placeholder="e.g. npm run start"
                   rows={3}
-                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary resize-none"
+                  className={cn(
+                    "w-full bg-table-headerBg border rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary resize-none",
+                    duplicateError.value ? "border-red-500" : "border-input-border-default"
+                  )}
                 />
+                {duplicateError.value && (
+                  <p className="text-xs text-red-400 mt-1.5">{duplicateError.value}</p>
+                )}
                 <p className="text-[10px] text-text-secondary mt-1.5 italic">
                   Proxy env vars will be auto-injected.
                 </p>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { NetworkRequest } from '../../../../../types/inspector';
-import { X, ArrowRightLeft, Wand2 } from 'lucide-react';
+import { X, ArrowRightLeft, Wand2, Plus, Save } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
 import { CodeBlock, CodeBlockRef, HighlightRange } from '../../../../../core/components/common/CodeBlock';
 import * as Diff from 'diff';
@@ -11,9 +11,13 @@ interface DiffViewProps {
   onClose: () => void;
   initialTab?: DiffTab;
   initialSearchTerm?: string;
+  isTempDiff?: boolean;
+  compareName?: string;
+  compareDesc?: string;
+  onSaveCompare?: (name: string, desc: string) => void;
 }
 
-export type DiffTab = 'body' | 'headers' | 'params' | 'cookies';
+export type DiffTab = 'header-req' | 'header-res' | 'body-req' | 'body-res';
 
 export function DiffView({
   request1,
@@ -21,10 +25,17 @@ export function DiffView({
   onClose,
   initialTab,
   initialSearchTerm,
+  isTempDiff = false,
+  compareName,
+  compareDesc,
+  onSaveCompare,
 }: DiffViewProps) {
-  const [activeTab, setActiveTab] = useState<DiffTab>('body');
+  const [activeTab, setActiveTab] = useState<DiffTab>('header-req');
   const codeBlockRef1 = useRef<CodeBlockRef>(null);
   const codeBlockRef2 = useRef<CodeBlockRef>(null);
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [newCompareName, setNewCompareName] = useState('');
+  const [newCompareDesc, setNewCompareDesc] = useState('');
 
   useState(() => {
     if (initialTab) {
@@ -43,70 +54,26 @@ export function DiffView({
   const getContent = (req: NetworkRequest | null) => {
     if (!req) return '';
 
-    if (activeTab === 'body') {
-      const parts: string[] = [];
-
-      if (req.requestBody) {
-        parts.push('=== REQUEST BODY ===');
-        parts.push(req.requestBody);
-      }
-
-      if (req.responseBody) {
-        if (parts.length > 0) parts.push(''); // Empty line separator
-        parts.push('=== RESPONSE BODY ===');
-        parts.push(req.responseBody);
-      }
-
-      return parts.join('\n');
-    }
-
-    if (activeTab === 'headers') {
-      const parts: string[] = [];
-
+    if (activeTab === 'header-req') {
       if (req.requestHeaders && Object.keys(req.requestHeaders).length > 0) {
-        parts.push('=== REQUEST HEADERS ===');
-        parts.push(JSON.stringify(req.requestHeaders, null, 2));
+        return JSON.stringify(req.requestHeaders, null, 2);
       }
+      return '{}';
+    }
 
+    if (activeTab === 'header-res') {
       if (req.responseHeaders && Object.keys(req.responseHeaders).length > 0) {
-        if (parts.length > 0) parts.push(''); // Empty line separator
-        parts.push('=== RESPONSE HEADERS ===');
-        parts.push(JSON.stringify(req.responseHeaders, null, 2));
+        return JSON.stringify(req.responseHeaders, null, 2);
       }
-
-      return parts.join('\n');
+      return '{}';
     }
 
-    if (activeTab === 'cookies') {
-      const parts: string[] = [];
-
-      // Request cookies from cookie header
-      const reqCookies = req.requestHeaders?.['cookie'] || req.requestHeaders?.['Cookie'];
-      if (reqCookies) {
-        parts.push('=== REQUEST COOKIES ===');
-        parts.push(JSON.stringify(reqCookies, null, 2));
-      }
-
-      // Response cookies from set-cookie
-      const resCookies = req.responseHeaders?.['set-cookie'];
-      if (resCookies) {
-        if (parts.length > 0) parts.push('');
-        parts.push('=== RESPONSE COOKIES ===');
-        parts.push(JSON.stringify(resCookies, null, 2));
-      }
-
-      return parts.join('\n');
+    if (activeTab === 'body-req') {
+      return req.requestBody || '';
     }
 
-    if (activeTab === 'params') {
-      const qs = req.path.split('?')[1];
-      if (!qs) return '{}';
-      const params: Record<string, string> = {};
-      qs.split('&').forEach((p) => {
-        const [k, v] = p.split('=');
-        if (k) params[k] = decodeURIComponent(v || '');
-      });
-      return JSON.stringify(params, null, 2);
+    if (activeTab === 'body-res') {
+      return req.responseBody || '';
     }
 
     return '';
@@ -253,80 +220,94 @@ export function DiffView({
     };
   }, [content1, content2, initialSearchTerm]);
 
-  const handleFormat = () => {
-    codeBlockRef1.current?.format();
-    codeBlockRef2.current?.format();
-  };
+  
 
   return (
-    <div className="flex flex-col h-full bg-background relative overflow-hidden">
+    <div className="flex flex-col h-full bg-table-bodyBg relative overflow-hidden">
       {/* Header */}
-      <div className="h-10 border-b border-border flex items-center justify-between px-4 bg-background/50 shrink-0">
-        <div className="flex items-center gap-2 font-medium">
-          <ArrowRightLeft className="w-4 h-4 text-purple-500" />
-          <span>Diff Compare</span>
+      <div className="px-4 pt-4 pb-3 border-b border-divider shrink-0 flex items-center gap-3">
+        <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-purple-500/15 border border-purple-500/25 shrink-0">
+          <ArrowRightLeft className="w-4 h-4 text-purple-400" />
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleFormat}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/30 transition-colors"
-            title="Format both code blocks"
-          >
-            <Wand2 className="w-3 h-3" />
-            Format
-          </button>
-
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
-            title="Close Diff View"
-          >
-            <X className="w-4 h-4" />
-          </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-text-primary">Diff Compare</h2>
+            {isTempDiff && (
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-500 rounded-md uppercase">
+                Temp
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-text-secondary mt-0.5">Compare two requests side by side</p>
         </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-lg text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Tabs Row */}
-      <div className="p-2 border-b border-border/50 shrink-0">
-        <div className="flex items-center justify-center gap-2 bg-muted/20 p-1 rounded-lg w-fit mx-auto">
-          {(['body', 'headers', 'params', 'cookies'] as const).map((tab) => {
-            const isActive = activeTab === tab;
-            let activeClass = '';
+      {/* Compare Info Section */}
+      {(isTempDiff || compareName) && (
+        <div className="px-4 py-2 border-b border-divider/50 bg-table-headerBg/30 flex items-center justify-between">
+          <div className="flex-1">
+            {compareName ? (
+              <>
+                <h3 className="text-sm font-semibold text-text-primary">{compareName}</h3>
+                {compareDesc && <p className="text-xs text-text-secondary mt-0.5">{compareDesc}</p>}
+              </>
+            ) : (
+              <p className="text-xs text-text-secondary italic">Temporary comparison (not saved)</p>
+            )}
+          </div>
+          {isTempDiff && (
+            <button
+              onClick={() => setShowDrawer(true)}
+              className="p-1.5 rounded-lg text-text-secondary hover:text-primary hover:bg-primary/10 transition-all"
+              title="Save this comparison"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
-            switch (tab) {
-              case 'body':
-                activeClass = 'bg-blue-500/15 text-blue-500';
-                break;
-              case 'headers':
-                activeClass = 'bg-purple-500/15 text-purple-500';
-                break;
-              case 'params':
-                activeClass = 'bg-orange-500/15 text-orange-500';
-                break;
-              case 'cookies':
-                activeClass = 'bg-green-500/15 text-green-500';
-                break;
-            }
+{/* Tabs Row */}
+      <div className="px-0 border-b border-divider/50 shrink-0 bg-table-headerBg">
+        <div className="grid grid-cols-4">
+          {([
+            { id: 'header-req' as DiffTab, label: 'Header Request', color: 'blue' },
+            { id: 'header-res' as DiffTab, label: 'Header Response', color: 'purple' },
+            { id: 'body-req' as DiffTab, label: 'Body Request', color: 'orange' },
+            { id: 'body-res' as DiffTab, label: 'Body Response', color: 'green' },
+          ]).map((tab) => {
+            const isActive = activeTab === tab.id;
+            const colorClass = isActive
+              ? tab.color === 'blue'
+                ? 'bg-blue-500/15 text-blue-500 border-b-2 border-blue-500'
+                : tab.color === 'purple'
+                  ? 'bg-purple-500/15 text-purple-500 border-b-2 border-purple-500'
+                  : tab.color === 'orange'
+                    ? 'bg-orange-500/15 text-orange-500 border-b-2 border-orange-500'
+                    : 'bg-green-500/15 text-green-500 border-b-2 border-green-500'
+              : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-itemHover';
 
             return (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'px-3 py-1 text-xs font-medium rounded-md transition-all',
-                  isActive
-                    ? activeClass
-                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50',
+                  'py-2.5 text-xs font-medium transition-all text-center',
+                  colorClass,
                 )}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab.label}
               </button>
             );
           })}
         </div>
       </div>
-
       {/* Validation Warning */}
       {!isValidForDiff && validationError && (
         <div className="px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/20 text-yellow-500 text-xs flex items-center gap-2">
@@ -342,11 +323,13 @@ export function DiffView({
         </div>
       )}
 
+      
+
       {/* Split Diff Content */}
-      <div className="flex-1 flex flex-col overflow-hidden p-2 gap-2">
+      <div className="flex-1 flex flex-col overflow-hidden py-2 gap-2">
         {/* Top Side (Request 1) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="h-6 flex items-center px-1 text-xs font-medium text-muted-foreground truncate mb-1">
+          <div className="h-6 flex items-center px-1 text-sm font-medium text-muted-foreground truncate mb-1">
             <span className="w-2 h-2 rounded-full bg-red-500/50 mr-2"></span>
             {request1 ? (
               <span className="flex items-center gap-2">
@@ -371,7 +354,7 @@ export function DiffView({
               'Select Request 1'
             )}
           </div>
-          <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
+          <div className="flex-1 bg-secondary/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
             {request1 ? (
               <CodeBlock
                 ref={codeBlockRef1}
@@ -398,6 +381,12 @@ export function DiffView({
                   renderLineHighlight: 'none',
                   selectionHighlight: false,
                   occurrencesHighlight: false,
+                  padding: {
+                    top: 16,
+                    bottom: 16,
+                    left: 0,
+                    right: 0,
+                  },
                 }}
               />
             ) : (
@@ -410,7 +399,7 @@ export function DiffView({
 
         {/* Bottom Side (Request 2) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="h-6 flex items-center px-1 text-xs font-medium text-muted-foreground truncate mb-1">
+          <div className="h-6 flex items-center px-1 text-sm font-medium text-muted-foreground truncate mb-1">
             <span className="w-2 h-2 rounded-full bg-green-500/50 mr-2"></span>
             {request2 ? (
               <span className="flex items-center gap-2">
@@ -435,7 +424,7 @@ export function DiffView({
               'Select Request 2'
             )}
           </div>
-          <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
+          <div className="flex-1 bg-secondary/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
             {request2 ? (
               <CodeBlock
                 ref={codeBlockRef2}
@@ -462,6 +451,12 @@ export function DiffView({
                   renderLineHighlight: 'none',
                   selectionHighlight: false,
                   occurrencesHighlight: false,
+                  padding: {
+                    top: 16,
+                    bottom: 16,
+                    left: 0,
+                    right: 0,
+                  },
                 }}
               />
             ) : (
@@ -472,6 +467,80 @@ export function DiffView({
           </div>
         </div>
       </div>
+
+      {/* Save Compare Drawer */}
+      {showDrawer && (
+        <>
+          <div className="absolute inset-0 bg-black/40 z-40" onClick={() => setShowDrawer(false)} />
+          <div
+            className="absolute bottom-0 left-0 right-0 z-50 bg-dialog-background border-t border-divider rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
+            style={{ height: '50%' }}
+          >
+            <div className="px-4 pt-4 pb-3 border-b border-divider flex items-center gap-3 shrink-0">
+              <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-purple-500/15 border border-purple-500/25 shrink-0">
+                <Save className="w-4 h-4 text-purple-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-text-primary">Save Comparison</h3>
+                <p className="text-xs text-text-secondary mt-0.5">Name and describe this comparison</p>
+              </div>
+              <button
+                onClick={() => setShowDrawer(false)}
+                className="p-1.5 rounded-lg bg-secondary text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">COMPARE NAME</label>
+                <input
+                  type="text"
+                  value={newCompareName}
+                  onChange={(e) => setNewCompareName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && newCompareName.trim() && onSaveCompare?.(newCompareName, newCompareDesc)}
+                  placeholder="e.g. Login API Comparison"
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">DESCRIPTION (OPTIONAL)</label>
+                <textarea
+                  value={newCompareDesc}
+                  onChange={(e) => setNewCompareDesc(e.target.value)}
+                  placeholder="Add a description for this comparison..."
+                  rows={4}
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
+              <button
+                onClick={() => setShowDrawer(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (newCompareName.trim() && onSaveCompare) {
+                    onSaveCompare(newCompareName, newCompareDesc);
+                    setShowDrawer(false);
+                    setNewCompareName('');
+                    setNewCompareDesc('');
+                  }
+                }}
+                disabled={!newCompareName.trim()}
+                className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
+              >
+                Save Compare
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

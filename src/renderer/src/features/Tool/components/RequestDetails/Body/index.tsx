@@ -108,7 +108,7 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
               </div>
             </div>
 
-            <div className="flex-1 bg-muted/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
+            <div className="flex-1 bg-secondary/20 border border-border/50 rounded-md overflow-hidden relative min-h-0">
               <CodeBlock
                 ref={requestBlockRef}
                 code={requestBodyContent}

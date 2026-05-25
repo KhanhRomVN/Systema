@@ -11,14 +11,13 @@ import {
 import { NetworkRequest } from '../../../../../types/inspector';
 import { EmptyState } from '../EmptyState';
 
-interface CollectionsTabProps {
+interface CollectionsPanelProps {
   onSelectRequest?: (request: NetworkRequest) => void;
-  currentRequest?: NetworkRequest | null;
   appId: string;
-  requests?: NetworkRequest[]; // For request selection dropdown
+  requests?: NetworkRequest[];
 }
 
-export function CollectionsTab({ onSelectRequest, appId, requests = [] }: CollectionsTabProps) {
+export function CollectionsPanel({ onSelectRequest, appId, requests = [] }: CollectionsPanelProps) {
   const [collection, setCollection] = useState<RequestCollection | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,7 +29,6 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
 
   useEffect(() => {
     loadData();
-
     const handleUpdate = () => loadData();
     window.addEventListener(COLLECTIONS_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(COLLECTIONS_UPDATED_EVENT, handleUpdate);
@@ -47,8 +45,6 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
   };
 
   const handleCreateCollection = () => {
-    // For now, just add selected request to default collection
-    // Later can implement multiple collections
     if (selectedRequestId) {
       const request = requests.find(r => r.id === selectedRequestId);
       if (request) {
@@ -91,13 +87,15 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
   return (
     <div className="h-full flex flex-col bg-table-bodyBg">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-divider shrink-0 flex items-center gap-3">
-        <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-orange-500/15 border border-orange-500/25 shrink-0">
-          <Bookmark className="w-4 h-4 text-orange-400" />
-        </div>
-        <div>
-          <h2 className="text-base font-bold text-text-primary">Collections</h2>
-          <p className="text-xs text-text-secondary mt-0.5">Saved requests for replay</p>
+      <div className="px-4 pt-4 pb-3 border-b border-divider shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-orange-500/15 border border-orange-500/25 shrink-0">
+            <Bookmark className="w-4 h-4 text-orange-400" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-base font-bold text-text-primary">Composers Manager</h2>
+            <p className="text-xs text-text-secondary mt-0.5">Save and manage your composed requests</p>
+          </div>
         </div>
       </div>
 
@@ -115,8 +113,14 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
         </div>
         <button
           onClick={() => setIsDrawerOpen(true)}
-          className="flex items-center justify-center w-11 h-11 bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary rounded-lg border border-divider hover:border-primary/30 transition-all active:scale-95 shrink-0"
-          title="Add to collection"
+          disabled={!appId}
+          className={cn(
+            "flex items-center justify-center w-11 h-11 rounded-lg border transition-all active:scale-95 shrink-0",
+            appId
+              ? "bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary border-divider hover:border-primary/30"
+              : "bg-zinc-800/50 text-zinc-600 border-zinc-800/80 cursor-not-allowed opacity-50"
+          )}
+          title={appId ? "Add to collection" : "Select a target first"}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -191,9 +195,8 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
           <div className="absolute inset-0 bg-black/40 z-40" onClick={() => setIsDrawerOpen(false)} />
           <div
             className="absolute bottom-0 left-0 right-0 z-50 bg-dialog-background border-t border-divider rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
-            style={{ maxHeight: '80%' }}
+            style={{ height: '60%' }}
           >
-            {/* Header */}
             <div className="px-4 pt-4 pb-3 border-b border-divider flex items-center gap-3 shrink-0">
               <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-orange-500/15 border border-orange-500/25 shrink-0">
                 <Plus className="w-4 h-4 text-orange-400" />
@@ -210,9 +213,7 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
               </button>
             </div>
 
-            {/* Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* Collection Name (optional) */}
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">
                   COLLECTION NAME <span className="text-text-secondary/50">(optional)</span>
@@ -222,15 +223,12 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
                   value={newCollectionName}
                   onChange={(e) => setNewCollectionName(e.target.value)}
                   placeholder="e.g. API Endpoints, Login Flow..."
-                  className="w-full bg-input-background border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
                 />
               </div>
 
-              {/* Request Selector */}
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">
-                  SELECT REQUEST
-                </label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">SELECT REQUEST</label>
                 <div className="relative">
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary pointer-events-none" />
@@ -243,7 +241,7 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
                       }}
                       onFocus={() => setShowRequestDropdown(true)}
                       placeholder="Search requests by URL, method, status..."
-                      className="w-full bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
+                      className="w-full bg-table-headerBg border border-input-border-default rounded-lg pl-8 pr-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
                     />
                   </div>
                   {showRequestDropdown && filteredRequestsForDropdown.length > 0 && (
@@ -298,7 +296,6 @@ export function CollectionsTab({ onSelectRequest, appId, requests = [] }: Collec
               </div>
             </div>
 
-            {/* Footer */}
             <div className="px-5 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => setIsDrawerOpen(false)}

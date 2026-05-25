@@ -7,7 +7,6 @@ interface RequestListProps {
   requests: NetworkRequest[];
   selectedId: string | null;
   onSelectRequest: (id: string | null) => void;
-  onSetComposerRequest: (req: NetworkRequest | null) => void;
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
   interceptedIds: Set<string>;
@@ -19,6 +18,7 @@ interface RequestListProps {
   onSetCompare1: (req: NetworkRequest | null) => void;
   onSetCompare2: (req: NetworkRequest | null) => void;
   setFilter: (filter: InspectorFilter) => void;
+  onAnalyzeRequest?: (req: NetworkRequest) => void;
 }
 
 export function RequestList({
@@ -26,7 +26,6 @@ export function RequestList({
   requests,
   selectedId,
   onSelectRequest,
-  onSetComposerRequest,
   searchTerm,
   onSearchTermChange,
   interceptedIds,
@@ -38,6 +37,7 @@ export function RequestList({
   onSetCompare1,
   onSetCompare2,
   setFilter,
+  onAnalyzeRequest,
 }: RequestListProps) {
   return (
     <div className="h-full flex flex-col">
@@ -57,7 +57,6 @@ export function RequestList({
         selectedId={selectedId}
         onSelect={(id) => {
           onSelectRequest(id);
-          onSetComposerRequest(null);
         }}
         searchTerm={searchTerm}
         onSearchChange={onSearchTermChange}
@@ -69,6 +68,7 @@ export function RequestList({
         appId={appId || 'unknown'}
         onSetCompare1={onSetCompare1}
         onSetCompare2={onSetCompare2}
+        onAnalyzeRequest={onAnalyzeRequest}
       />
     </div>
   );
