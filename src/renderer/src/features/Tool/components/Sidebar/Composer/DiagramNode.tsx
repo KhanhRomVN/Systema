@@ -14,10 +14,11 @@ interface DiagramNodeData {
   request: NetworkRequest;
   showHandles?: boolean;
   connectionIndex?: number;
+  selected?: boolean;
 }
 
 export function DiagramNode({ data }: { data: DiagramNodeData }) {
-  const { request, showHandles = false, connectionIndex } = data;
+  const { request, showHandles = false, connectionIndex, selected = false } = data;
   const methodColor = methodColors[request.method] || 'text-gray-400';
 
   const dotStyle: React.CSSProperties = {
@@ -31,7 +32,10 @@ export function DiagramNode({ data }: { data: DiagramNodeData }) {
   };
 
   return (
-    <div className="relative rounded-lg bg-zinc-900 border border-zinc-700 min-w-[180px] p-2 shadow-md">
+    <div className={cn(
+      'relative rounded-lg bg-zinc-900 border min-w-[180px] p-2 shadow-md transition-all duration-150',
+      selected ? 'border-blue-500' : 'border-zinc-700'
+    )}>
       {connectionIndex !== undefined && (
         <span className="absolute -top-2 -left-2 w-4 h-4 flex items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white leading-none">
           {connectionIndex}

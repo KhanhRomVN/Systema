@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback, useRef } from 'react';
 import { HomePanel } from './Agent/HomePanel';
 import { ChatPanel } from './Agent/ChatPanel';
 import SettingsPanel from './Agent/SettingsPanel';
@@ -8,7 +8,7 @@ import { SourcesPanel } from './Source';
 import { LogViewer } from './Log';
 import { CollectionsPanel } from './Composer/CollectionsPanel';
 import { ComposerManager } from './Composer/ComposerManager';
-import { DiagramView } from './Composer/DiagramView';
+import { DiagramViewMemo as DiagramView } from './Composer/DiagramView';
 import { TraceTab } from './Trace';
 import { CryptoTab } from './Crypto';
 import { ComparePanel } from './Compare';
@@ -72,8 +72,10 @@ interface ChatContainerProps {
   inspectorContext: InspectorContext;
 }
 
-export function ChatContainer({ inspectorContext }: ChatContainerProps) {
+export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
   const [activeTab, setActiveTab] = useState<string>('chat');
+  const inspectorContextRef = useRef(inspectorContext);
+  inspectorContextRef.current = inspectorContext;
   // Lifted state from TabPanel
   // History removed, using single active session or similar if needed.
   // For now just tracking selected ID is enough if we generate it on demand?
@@ -152,6 +154,11 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     return cleanup;
   }, [activeTab, inspectorContext.appId]);
 
+  const handleDiagramClose = useCallback(() => {
+    inspectorContextRef.current.onClearAnalyzing?.();
+    setActiveTab('chat');
+  }, []);
+
   const renderContent = () => {
     if (activeTab === 'target') {
       return (
@@ -207,10 +214,7 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
       return (
         <DiagramView
           request={inspectorContext.analyzingRequest}
-          onClose={() => {
-            inspectorContext.onClearAnalyzing?.();
-            setActiveTab('chat');
-          }}
+          onClose={handleDiagramClose}
           onNodeClick={inspectorContext.onNodeClick}
         />
       );
@@ -346,3 +350,5 @@ export function ChatContainer({ inspectorContext }: ChatContainerProps) {
     </div>
   );
 }
+
+export const ChatContainer = memo(ChatContainerInner);

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -62,7 +62,7 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
     setNodes((nds) => {
       const updated = nds.map((n) => ({
         ...n,
-        data: { ...n.data, showHandles: n.id === selectedNodeId || isConnecting },
+        data: { ...n.data, showHandles: n.id === selectedNodeId || isConnecting, selected: n.id === selectedNodeId },
       }));
       console.log('[DiagramView] → updated showHandles on', updated.length, 'nodes');
       return updated;
@@ -90,6 +90,7 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
 
   const connectStartNodeIdRef = useRef<string | null>(null);
   const connectStartHandleIdRef = useRef<string | null>(null);
+  const justConnectedRef = useRef(false);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -114,7 +115,7 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
       setEdges((eds) => {
         const result = addEdge(normalizedParams, eds).map((e) =>
           e.source === normalizedParams.source && e.target === normalizedParams.target
-            ? { ...e, markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' }, style: { stroke: '#3b82f6', strokeWidth: 1.5 } }
+            ? { ...e, animated: true, markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' }, style: { stroke: '#3b82f6', strokeWidth: 1.5, strokeDasharray: '6 3' } }
             : e
         );
         console.log('[DiagramView] → edge added, total edges:', result.length);
@@ -194,6 +195,7 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
           }
         }}
         onPaneClick={() => {
+          if (justConnectedRef.current) return;
           console.log('[DiagramView] onPaneClick — clearing selectedNodeId');
           setSelectedNodeId(null);
         }}
@@ -206,6 +208,8 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
         onConnectEnd={() => {
           console.log('[DiagramView] onConnectEnd');
           setIsConnecting(false);
+          justConnectedRef.current = true;
+          setTimeout(() => { justConnectedRef.current = false; }, 0);
         }}
         onError={(id, msg) => {
           console.error('[DiagramView] ReactFlow onError — id:', id, '| msg:', msg);
@@ -251,3 +255,12 @@ export function DiagramView(props: DiagramViewProps) {
     </div>
   );
 }
+
+// Re-export as memoized — only re-renders when request.id, onClose, or onNodeClick change
+export { DiagramView as DiagramViewBase };
+const MemoizedDiagramView = memo(DiagramView, (prev, next) =>
+  prev.request?.id === next.request?.id &&
+  prev.onClose === next.onClose &&
+  prev.onNodeClick === next.onNodeClick
+);
+export { MemoizedDiagramView as DiagramViewMemo };

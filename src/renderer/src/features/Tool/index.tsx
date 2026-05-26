@@ -645,6 +645,79 @@ export default function InspectorPage() {
   const selectedRequest = displayedRequests.find((r) => r.id === selectedId) || null;
   const appName = currentAppName || selectedApp;
 
+  const handleSelectSavedRequest = useCallback((request: NetworkRequest) => {
+    console.log('Saved request selected:', request);
+  }, []);
+  const handleClearAnalyzing = useCallback(() => {
+    setAnalyzingRequest(null);
+    setActiveSidebarTab('collections');
+  }, []);
+  const handleClearComparison = useCallback(() => {
+    setCompareRequest1(null);
+    setCompareRequest2(null);
+  }, []);
+  const handleCloseConfirmSwitch = useCallback(() => {
+    setIsConfirmSwitchOpen(false);
+    setPendingSwitchData(null);
+  }, []);
+  const handleCloseConfirmStop = useCallback(() => setIsConfirmStopOpen(false), []);
+  const handleOpenStopConfirm = useCallback(() => setIsConfirmStopOpen(true), []);
+  const handleNodeClick = useCallback((request: NetworkRequest) => {
+    setAnalyzingRequest(request);
+    setDetailsTab('composer');
+  }, []);
+
+  const inspectorContext = useMemo<InspectorContext>(() => {
+    console.log('[InspectorContext] useMemo recomputing');
+    return {
+      requests,
+      filteredRequests,
+      selectedRequestId: selectedId,
+      filter,
+      onSetFilter: setFilter,
+      onSelectRequest: setSelectedId,
+      onDeleteRequest: handleDeleteRequest,
+      onSelectSavedRequest: handleSelectSavedRequest,
+      analyzingRequest,
+      onClearAnalyzing: handleClearAnalyzing,
+      activeSidebarTab,
+      onSetActiveSidebarTab: setActiveSidebarTab,
+      targetApp: appName,
+      emulatorSerial: emulatorSerial || '',
+      appId: selectedApp || '',
+      compareRequest1,
+      compareRequest2,
+      onClearComparison: handleClearComparison,
+      onJumpToValue: handleJumpToValue,
+      onCompareRequests: handleCompareRequests,
+      initialDiffTab,
+      initialDiffSearch,
+      onSelectApp: handleSelectApp,
+      onStopSession: handleStopSession,
+      onLoadProfile: handleLoadProfile,
+      isConfirmSwitchOpen,
+      onCloseConfirmSwitch: handleCloseConfirmSwitch,
+      onConfirmSwitch: handleConfirmSwitch,
+      currentAppName,
+      newAppName: pendingSwitchData?.appName || '',
+      isConfirmStopOpen,
+      onCloseConfirmStop: handleCloseConfirmStop,
+      onConfirmStop: handleConfirmStop,
+      onOpenStopConfirm: handleOpenStopConfirm,
+      onNodeClick: handleNodeClick,
+    };
+  }, [
+    requests, filteredRequests, selectedId, filter, handleDeleteRequest,
+    handleSelectSavedRequest, analyzingRequest, handleClearAnalyzing,
+    activeSidebarTab, appName, emulatorSerial, selectedApp,
+    compareRequest1, compareRequest2, handleClearComparison,
+    handleJumpToValue, handleCompareRequests, initialDiffTab, initialDiffSearch,
+    handleSelectApp, handleStopSession, handleLoadProfile,
+    isConfirmSwitchOpen, handleCloseConfirmSwitch, handleConfirmSwitch,
+    currentAppName, pendingSwitchData?.appName, isConfirmStopOpen,
+    handleCloseConfirmStop, handleConfirmStop, handleOpenStopConfirm, handleNodeClick,
+  ]);
+
   return (
     <div className="h-screen w-screen bg-background">
       {/* ── Topbar ── */}
@@ -878,61 +951,7 @@ export default function InspectorPage() {
           </ResizableSplit>
 
           {/* ── Sidebar (RightPanel) ── */}
-          <ChatContainer
-            inspectorContext={
-              {
-                requests,
-                filteredRequests,
-                selectedRequestId: selectedId,
-                filter,
-                onSetFilter: setFilter,
-                onSelectRequest: setSelectedId,
-                onDeleteRequest: handleDeleteRequest,
-                onSelectSavedRequest: (request) => {
-                  console.log('Saved request selected:', request);
-                },
-                analyzingRequest,
-                onClearAnalyzing: () => {
-                  setAnalyzingRequest(null);
-                  setActiveSidebarTab('collections');
-                },
-                activeSidebarTab,
-                onSetActiveSidebarTab: setActiveSidebarTab,
-                targetApp: appName,
-                emulatorSerial: emulatorSerial || '',
-                appId: selectedApp || '',
-                compareRequest1,
-                compareRequest2,
-                onClearComparison: () => {
-                  setCompareRequest1(null);
-                  setCompareRequest2(null);
-                },
-                onJumpToValue: handleJumpToValue,
-                onCompareRequests: handleCompareRequests,
-                initialDiffTab,
-                initialDiffSearch,
-                onSelectApp: handleSelectApp,
-                onStopSession: handleStopSession,
-                onLoadProfile: handleLoadProfile,
-                isConfirmSwitchOpen,
-                onCloseConfirmSwitch: () => {
-                  setIsConfirmSwitchOpen(false);
-                  setPendingSwitchData(null);
-                },
-                onConfirmSwitch: handleConfirmSwitch,
-                currentAppName,
-                newAppName: pendingSwitchData?.appName || '',
-                isConfirmStopOpen,
-                onCloseConfirmStop: () => setIsConfirmStopOpen(false),
-                onConfirmStop: handleConfirmStop,
-                onOpenStopConfirm: () => setIsConfirmStopOpen(true),
-                onNodeClick: (request) => {
-                  setAnalyzingRequest(request);
-                  setDetailsTab('composer');
-                },
-              } as InspectorContext
-            }
-          />
+          <ChatContainer inspectorContext={inspectorContext} />
         </ResizableSplit>
       </div>
 
