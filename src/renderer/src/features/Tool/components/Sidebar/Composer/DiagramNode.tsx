@@ -13,10 +13,11 @@ const methodColors: Record<string, string> = {
 interface DiagramNodeData {
   request: NetworkRequest;
   showHandles?: boolean;
+  connectionIndex?: number;
 }
 
 export function DiagramNode({ data }: { data: DiagramNodeData }) {
-  const { request, showHandles = false } = data;
+  const { request, showHandles = false, connectionIndex } = data;
   const methodColor = methodColors[request.method] || 'text-gray-400';
 
   const dotStyle: React.CSSProperties = {
@@ -30,7 +31,12 @@ export function DiagramNode({ data }: { data: DiagramNodeData }) {
   };
 
   return (
-    <div className="rounded-lg bg-zinc-900 border border-zinc-700 min-w-[180px] p-2 shadow-md">
+    <div className="relative rounded-lg bg-zinc-900 border border-zinc-700 min-w-[180px] p-2 shadow-md">
+      {connectionIndex !== undefined && (
+        <span className="absolute -top-2 -left-2 w-4 h-4 flex items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white leading-none">
+          {connectionIndex}
+        </span>
+      )}
       <Handle type="source" position={Position.Top}    id="t" style={dotStyle} />
       <Handle type="target" position={Position.Top}    id="t-in" style={{ opacity: 0, width: 10, height: 10 }} />
       <Handle type="source" position={Position.Bottom} id="b" style={dotStyle} />
