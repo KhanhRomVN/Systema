@@ -14,8 +14,8 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { NetworkRequest } from '../../../../../types/inspector';
-import { X, GitBranch } from 'lucide-react';
+import { NetworkRequest } from '../../../../../../types/inspector';
+import { X, GitBranch, Save } from 'lucide-react';
 import { DiagramNode } from './DiagramNode';
 
 const nodeTypes = { request: DiagramNode };
@@ -24,6 +24,9 @@ interface DiagramViewProps {
   request?: NetworkRequest | null;
   onClose?: () => void;
   onNodeClick?: (request: NetworkRequest) => void;
+  composerName?: string;
+  composerDescription?: string;
+  isTemp?: boolean;
 }
 
 function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
@@ -34,13 +37,10 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const diagramRequestIdsRef = useRef<Set<string>>(new Set());
 
-  console.log('[DiagramView] render — request:', request?.id, '| nodes:', nodes.length, '| edges:', edges.length, '| selectedNodeId:', selectedNodeId, '| isConnecting:', isConnecting);
 
   // Effect: add root node when request changes
   useEffect(() => {
-    console.log('[DiagramView] useEffect[request.id] fired — request:', request?.id, '| diagramIds:', [...diagramRequestIdsRef.current]);
     if (request && !diagramRequestIdsRef.current.has(request.id)) {
-      console.log('[DiagramView] → new request, resetting diagram with root node', request.id);
       diagramRequestIdsRef.current = new Set([request.id]);
       const rootNode: Node = {
         id: `root-${request.id}`,
@@ -48,42 +48,35 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
         position: { x: 300, y: 150 },
         data: { request, showHandles: false },
       };
-      console.log('[DiagramView] → setNodes([rootNode]):', rootNode);
       setNodes([rootNode]);
       setEdges([]);
     } else {
-      console.log('[DiagramView] → request already in diagram or null, skipping reset');
     }
   }, [request?.id]);
 
   // Effect: sync showHandles on all nodes
   useEffect(() => {
-    console.log('[DiagramView] useEffect[selectedNodeId, isConnecting] — selectedNodeId:', selectedNodeId, '| isConnecting:', isConnecting);
     setNodes((nds) => {
       const updated = nds.map((n) => ({
         ...n,
         data: { ...n.data, showHandles: n.id === selectedNodeId || isConnecting, selected: n.id === selectedNodeId },
       }));
-      console.log('[DiagramView] → updated showHandles on', updated.length, 'nodes');
       return updated;
     });
   }, [selectedNodeId, isConnecting]);
 
   // Effect: compute connectionIndex from edges
   useEffect(() => {
-    console.log('[DiagramView] useEffect[edges] — edges count:', edges.length, '| edges:', edges.map(e => `${e.source}→${e.target}`));
     const order: string[] = [];
     edges.forEach((e) => {
       if (e.source && !order.includes(e.source)) order.push(e.source);
       if (e.target && !order.includes(e.target)) order.push(e.target);
     });
-    console.log('[DiagramView] → connection order:', order);
     setNodes((nds) => {
       const updated = nds.map((n) => {
         const idx = order.indexOf(n.id);
         return { ...n, data: { ...n.data, connectionIndex: idx === -1 ? undefined : idx + 1 } };
       });
-      console.log('[DiagramView] → connectionIndex assigned:', updated.map(n => `${n.id}=${n.data.connectionIndex}`));
       return updated;
     });
   }, [edges]);
@@ -94,7 +87,6 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
 
   const onConnect = useCallback(
     (params: Connection) => {
-      console.log('[DiagramView] onConnect — params:', params);
       if (params.source === params.target) {
         console.warn('[DiagramView] onConnect — self-loop blocked');
         return;
@@ -118,7 +110,6 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
             ? { ...e, animated: true, markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' }, style: { stroke: '#3b82f6', strokeWidth: 1.5, strokeDasharray: '6 3' } }
             : e
         );
-        console.log('[DiagramView] → edge added, total edges:', result.length);
         return result;
       });
     },
@@ -128,23 +119,19 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    console.log('[DiagramView] onDragOver');
   }, []);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       const raw = e.dataTransfer.getData('application/requestData');
-      console.log('[DiagramView] onDrop — raw data length:', raw?.length, '| raw:', raw?.slice(0, 100));
       if (!raw) {
         console.warn('[DiagramView] onDrop — no requestData in dataTransfer');
         return;
       }
       try {
         const dropped: NetworkRequest = JSON.parse(raw);
-        console.log('[DiagramView] onDrop — parsed request:', dropped.id, dropped.method, dropped.host);
         const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-        console.log('[DiagramView] onDrop — flow position:', position);
         diagramRequestIdsRef.current.add(dropped.id);
         setNodes((nds) => {
           const newNode: Node = {
@@ -153,7 +140,6 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
             position,
             data: { request: dropped, showHandles: false },
           };
-          console.log('[DiagramView] → adding node:', newNode.id, '| total after:', nds.length + 1);
           return [...nds, newNode];
         });
       } catch (err) {
@@ -169,11 +155,9 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
         nodes={nodes}
         edges={edges}
         onNodesChange={(changes) => {
-          console.log('[DiagramView] onNodesChange — changes:', changes);
           onNodesChange(changes);
         }}
         onEdgesChange={(changes) => {
-          console.log('[DiagramView] onEdgesChange — changes:', changes);
           onEdgesChange(changes);
         }}
         onConnect={onConnect}
@@ -181,32 +165,26 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
         onDragOver={onDragOver}
         onDrop={onDrop}
         onNodeClick={(_e, node) => {
-          console.log('[DiagramView] onNodeClick — node:', node.id, '| data.request:', (node.data as any)?.request?.id);
           const isDeselect = selectedNodeId === node.id;
           const next = isDeselect ? null : node.id;
-          console.log('[DiagramView] → selectedNodeId:', selectedNodeId, '→', next, isDeselect ? '(deselect, skip onNodeClick)' : '');
           setSelectedNodeId(next);
           if (!isDeselect) {
             const req = (node.data as { request?: NetworkRequest }).request;
             if (req && onNodeClick) {
-              console.log('[DiagramView] → calling onNodeClick with request:', req.id);
               onNodeClick(req);
             }
           }
         }}
         onPaneClick={() => {
           if (justConnectedRef.current) return;
-          console.log('[DiagramView] onPaneClick — clearing selectedNodeId');
           setSelectedNodeId(null);
         }}
         onConnectStart={(_, params) => {
-          console.log('[DiagramView] onConnectStart — params:', params);
           connectStartNodeIdRef.current = params.nodeId ?? null;
           connectStartHandleIdRef.current = params.handleId ?? null;
           setIsConnecting(true);
         }}
         onConnectEnd={() => {
-          console.log('[DiagramView] onConnectEnd');
           setIsConnecting(false);
           justConnectedRef.current = true;
           setTimeout(() => { justConnectedRef.current = false; }, 0);
@@ -227,8 +205,11 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
 }
 
 export function DiagramView(props: DiagramViewProps) {
-  const { request, onClose } = props;
-  console.log('[DiagramView] DiagramView wrapper render — request:', request?.id);
+  const { request, onClose, composerName, composerDescription, isTemp } = props;
+  const [isSaveDrawerOpen, setIsSaveDrawerOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saveDesc, setSaveDesc] = useState('');
+
   return (
     <div className="h-full flex flex-col bg-table-bodyBg">
       <div className="px-4 pt-4 pb-3 border-b border-divider shrink-0 flex items-center justify-between">
@@ -237,18 +218,95 @@ export function DiagramView(props: DiagramViewProps) {
             <GitBranch className="w-4 h-4 text-blue-400" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-text-primary">Diagram Composer</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-text-primary">
+                {composerName || (isTemp ? <span className="text-text-secondary italic">Untitled Diagram</span> : 'Diagram Composer')}
+              </h2>
+              {isTemp && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-warning/15 text-warning border border-warning/30">TEMP</span>
+              )}
+            </div>
             <p className="text-xs text-text-secondary">
-              {request ? `${request.method} ${request.host}` : 'No request selected'}
+              {composerDescription || (isTemp ? <span className="italic">No description</span> : (request ? `${request.method} ${request.host}` : 'No request selected'))}
             </p>
           </div>
         </div>
-        {onClose && (
-          <button onClick={onClose} className="p-1.5 rounded-lg text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all">
-            <X className="w-4 h-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {isTemp && (
+            <button
+              onClick={() => setIsSaveDrawerOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-all"
+            >
+              <Save className="w-3.5 h-3.5" />
+              Save
+            </button>
+          )}
+          {onClose && (
+            <button onClick={onClose} className="p-1.5 rounded-lg text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Save Drawer */}
+      {isSaveDrawerOpen && (
+        <>
+          <div className="absolute inset-0 bg-black/40 z-40" onClick={() => setIsSaveDrawerOpen(false)} />
+          <div
+            className="absolute bottom-0 left-0 right-0 z-50 bg-dialog-background border-t border-divider rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-300"
+            style={{ height: '45%' }}
+          >
+            <div className="px-4 pt-4 pb-3 border-b border-divider flex items-center gap-3 shrink-0">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/15 border border-primary/25 shrink-0">
+                <Save className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-text-primary">Save Diagram</h3>
+                <p className="text-xs text-text-secondary mt-0.5">Give this diagram a name and description</p>
+              </div>
+              <button onClick={() => setIsSaveDrawerOpen(false)} className="p-1.5 rounded-lg bg-secondary text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="e.g. Auth Flow, Payment API..."
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">DESCRIPTION</label>
+                <textarea
+                  value={saveDesc}
+                  onChange={(e) => setSaveDesc(e.target.value)}
+                  placeholder="Describe what this diagram represents..."
+                  rows={3}
+                  className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
+              <button onClick={() => setIsSaveDrawerOpen(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => setIsSaveDrawerOpen(false)}
+                disabled={!saveName.trim()}
+                className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
+              >
+                Save Diagram
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <ReactFlowProvider>
         <DiagramViewInner {...props} />
       </ReactFlowProvider>

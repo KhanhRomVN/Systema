@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { NetworkRequest } from '../../../../../types/inspector';
-import { X, FileCode, CheckCircle2, AlertTriangle, ShieldAlert, Download, Search } from 'lucide-react';
+import { FileCode, Download, Search, Cpu } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
-import { WasmViewer } from './WasmViewer';
 import { detectWasmModules, WasmItem } from '../../../../../utils/detectors';
 
 interface WasmPanelProps {
@@ -10,210 +9,113 @@ interface WasmPanelProps {
   onClose: () => void;
 }
 
-export function WasmPanel({ requests, onClose }: WasmPanelProps) {
-  const [wasmItems, setWasmItems] = useState<WasmItem[]>([]);
-  const [isScanning, setIsScanning] = useState(false);
-  const [selectedWasmId, setSelectedWasmId] = useState<string | null>(null);
-  const [wasmSearchTerm, setWasmSearchTerm] = useState('');
+function WasmCard({ item, request }: { item: WasmItem; request?: NetworkRequest }) {
+  const isClickable = item.detectionMethod !== 'JS Heuristic';
 
-  const selectedRequest = useMemo(
-    () => requests.find((r) => r.id === selectedWasmId),
-    [requests, selectedWasmId],
-  );
-
-  useEffect(() => {
-    setIsScanning(true);
-    const items = detectWasmModules(requests);
-    setWasmItems(items);
-    setIsScanning(false);
-  }, [requests]);
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!request?.responseBody) return;
+    try {
+      const bytes = Uint8Array.from(atob(request.responseBody), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }));
+      const a = Object.assign(document.createElement('a'), { href: url, download: item.filename });
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    } catch {}
+  };
 
   return (
-    <div className="flex flex-col h-full bg-table-bodyBg relative overflow-hidden">
+    <div className={cn(
+      'group rounded-xl border border-divider bg-muted/10 p-3 flex flex-col gap-2.5 transition-all',
+      !isClickable && 'opacity-60'
+    )}>
+      <div className="flex items-start gap-2.5">
+        <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/20 flex items-center justify-center shrink-0">
+          <Cpu className="w-4 h-4 text-purple-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-text-primary truncate leading-tight">{item.filename}</p>
+          <p className="text-[10px] text-text-secondary truncate mt-0.5">{item.url}</p>
+        </div>
+        {isClickable && (
+          <button
+            onClick={handleDownload}
+            className="p-1.5 rounded-lg text-text-secondary hover:text-purple-400 hover:bg-purple-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0"
+            title="Download .wasm"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function WasmPanel({ requests, onClose }: WasmPanelProps) {
+  const [wasmItems, setWasmItems] = useState<WasmItem[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    setWasmItems(detectWasmModules(requests));
+  }, [requests]);
+
+  const filtered = useMemo(() =>
+    wasmItems.filter(item =>
+      !searchTerm ||
+      item.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.url.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [wasmItems, searchTerm]);
+
+  return (
+    <div className="flex flex-col h-full bg-table-bodyBg">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-divider shrink-0 flex items-center gap-3">
         <div className="flex items-center justify-center w-9 h-10 rounded-lg bg-purple-500/15 border border-purple-500/25 shrink-0">
           <FileCode className="w-4 h-4 text-purple-400" />
         </div>
-        <div>
-          <h2 className="text-base font-bold text-text-primary">WASM Modules</h2>
-          <p className="text-xs text-text-secondary mt-0.5">Web Assembly detected in traffic</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-bold text-text-primary">WASM Manager</h2>
+          <p className="text-xs text-text-secondary mt-0.5">Web Assembly modules</p>
         </div>
+        <button onClick={onClose} className="p-1.5 rounded text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all">
+          ✕
+        </button>
       </div>
 
-      {/* Search Bar */}
+      {/* Search */}
       <div className="px-3 py-2 border-b border-divider shrink-0">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
           <input
             type="text"
-            placeholder="Search WASM modules..."
-            value={wasmSearchTerm}
-            onChange={(e) => setWasmSearchTerm(e.target.value)}
+            placeholder="Search modules..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
             className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-3">
-          {wasmItems.filter(item => 
-            !wasmSearchTerm || 
-            item.filename.toLowerCase().includes(wasmSearchTerm.toLowerCase()) ||
-            item.url.toLowerCase().includes(wasmSearchTerm.toLowerCase())
-          ).map((item) => (
-            <div
-              key={item.id}
-              onClick={() => {
-                if (item.detectionMethod !== 'JS Heuristic') {
-                  setSelectedWasmId(item.id);
-                }
-              }}
-              title={
-                item.detectionMethod === 'JS Heuristic'
-                  ? 'JS Loader - Not a binary WASM file'
-                  : 'Click to disassemble'
-              }
-              className={cn(
-                'border border-border rounded-lg bg-card p-3 flex flex-col gap-3 hover:border-purple-500/50 transition-colors shadow-sm group relative',
-                item.detectionMethod !== 'JS Heuristic'
-                  ? 'cursor-pointer hover:bg-muted/50'
-                  : 'cursor-default opacity-80',
-              )}
-            >
-              {/* Row 1: Header (Icon + Name) */}
-              <div className="flex items-center gap-3 w-full">
-                <div className="w-10 h-10 rounded bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
-                  <span className="text-xs font-bold">ASM</span>
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium truncate" title={item.filename}>
-                      {item.filename}
-                    </span>
-                    {item.detectionMethod !== 'JS Heuristic' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const req = requests.find((r) => r.id === item.id);
-                          if (req && req.responseBody) {
-                            try {
-                              const byteCharacters = atob(req.responseBody);
-                              const byteNumbers = new Array(byteCharacters.length);
-                              for (let i = 0; i < byteCharacters.length; i++) {
-                                byteNumbers[i] = byteCharacters.charCodeAt(i);
-                              }
-                              const byteArray = new Uint8Array(byteNumbers);
-                              const blob = new Blob([byteArray], { type: 'application/wasm' });
+      {/* List */}
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+        {filtered.map(item => (
+          <WasmCard key={item.id} item={item} request={requests.find(r => r.id === item.id)} />
+        ))}
 
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = item.filename;
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              URL.revokeObjectURL(url);
-                            } catch (error) {
-                              console.error('Failed to download WASM:', error);
-                            }
-                          }
-                        }}
-                        className="p-1.5 hover:bg-purple-500/20 text-muted-foreground hover:text-purple-500 rounded-md transition-colors opacity-0 group-hover:opacity-100"
-                        title="Download .wasm file"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground truncate" title={item.url}>
-                    {item.url}
-                  </span>
-                </div>
-              </div>
-
-              {/* Row 2: Stats Grid */}
-              <div className="grid grid-cols-3 gap-2 w-full p-2 rounded bg-muted/30 text-xs">
-                <div className="flex flex-col overflow-hidden">
-                  <span className="text-muted-foreground text-[10px] uppercase tracking-wider truncate">
-                    Size
-                  </span>
-                  <span className="font-medium truncate" title={item.size}>
-                    {item.size}
-                  </span>
-                </div>
-                <div className="flex flex-col overflow-hidden">
-                  <span className="text-muted-foreground text-[10px] uppercase tracking-wider truncate">
-                    Detection
-                  </span>
-                  <span className="font-medium truncate" title={item.detectionMethod}>
-                    {item.detectionMethod}
-                  </span>
-                </div>
-                <div className="flex flex-col overflow-hidden">
-                  <span className="text-muted-foreground text-[10px] uppercase tracking-wider truncate">
-                    Confidence
-                  </span>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {item.confidence === 'High' && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                    )}
-                    {item.confidence === 'Medium' && (
-                      <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-                    )}
-                    {item.confidence === 'Low' && (
-                      <ShieldAlert className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    )}
-                    <span
-                      className={cn(
-                        'font-medium truncate',
-                        item.confidence === 'High'
-                          ? 'text-green-500'
-                          : item.confidence === 'Medium'
-                            ? 'text-yellow-500'
-                            : 'text-blue-500',
-                      )}
-                    >
-                      {item.confidence}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 3: Extra Details (if any) */}
-              {item.details && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1.5 rounded">
-                  <div className="w-1 h-1 rounded-full bg-purple-500/50 shrink-0" />
-                  <span className="truncate" title={item.details}>
-                    {item.details}
-                  </span>
-                </div>
-              )}
+        {wasmItems.length === 0 && (
+          <div className="flex flex-col items-center justify-center flex-1 py-20 gap-3">
+            <div className="w-14 h-14 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+              <FileCode className="w-7 h-7 text-purple-400/50" />
             </div>
-          ))}
-
-          {wasmItems.length === 0 && !isScanning && (
-            <div className="flex-1 flex flex-col items-center justify-center py-20">
-              <div className="w-16 h-16 rounded-xl bg-purple-500/15 flex items-center justify-center mb-4 border border-purple-500/25">
-                <FileCode className="w-8 h-8 text-purple-400" />
-              </div>
-              <p className="text-sm text-text-primary font-medium">No WASM Modules</p>
-              <p className="text-xs text-text-secondary mt-1">
-                Navigate to a page that uses WebAssembly
-              </p>
+            <div className="text-center">
+              <p className="text-sm font-medium text-text-primary">No WASM Modules</p>
+              <p className="text-xs text-text-secondary mt-0.5">Navigate to a page that uses WebAssembly</p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-
-      {selectedRequest && (
-        <WasmViewer
-          url={`${selectedRequest.protocol}://${selectedRequest.host}${selectedRequest.path}`}
-          responseBody={selectedRequest.responseBody}
-          onClose={() => setSelectedWasmId(null)}
-        />
-      )}
     </div>
   );
 }
+
 export type { WasmPanelProps };

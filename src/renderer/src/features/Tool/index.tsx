@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Clock, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { cn } from '../../shared/lib/utils';
 import { MemoryMonitor } from '../../core/components/common/MemoryMonitor';
-import { formatDistanceToNow } from 'date-fns';
 import { ResizableSplit } from '../../core/components/common/ResizableSplit';
 import { SaveProfileModal } from '../../core/components/common/modal/SaveProfileModal';
 import { SSLBypassModal } from '../../core/components/common/modal/SSLBypassModal';
@@ -20,26 +19,6 @@ import {
   parseTime,
 } from './components/RequestDetails/Filter';
 import { DiffTab } from './components/Sidebar/Compare/DiffView';
-
-// ─── Countdown Timer ────────────────────────────────────────────────────────
-const CountdownTimer = React.memo(({ nextSaveTime }: { nextSaveTime: number | null }) => {
-  const [, setTick] = React.useState(0);
-  React.useEffect(() => {
-    if (!nextSaveTime) return;
-    const timer = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(timer);
-  }, [nextSaveTime]);
-  if (!nextSaveTime) return null;
-  const diff = Math.max(0, Math.ceil((nextSaveTime - Date.now()) / 1000));
-  const mins = Math.floor(diff / 60);
-  const secs = diff % 60;
-  return (
-    <span className="text-[10px] text-text-secondary px-1.5 border-l border-divider/50 tabular-nums">
-      {mins}:{secs.toString().padStart(2, '0')}
-    </span>
-  );
-});
-CountdownTimer.displayName = 'CountdownTimer';
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function InspectorPage() {
@@ -439,14 +418,11 @@ export default function InspectorPage() {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   const [detailsTab, setDetailsTab] = useState('headers');
   const [isSaveProfileModalOpen, setIsSaveProfileModalOpen] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPaused] = useState(false);
   const [displayedRequests, setDisplayedRequests] = useState<NetworkRequest[]>([]);
   const [initialDiffTab, setInitialDiffTab] = useState<DiffTab | undefined>();
   const [initialDiffSearch, setInitialDiffSearch] = useState<string | undefined>();
-  const [autoSaveInterval, setAutoSaveInterval] = useState<number>(0);
-  const [nextSaveTime, setNextSaveTime] = useState<number | null>(null);
-  const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
-  const [isIntercepting, setIsIntercepting] = useState(false);
+  const [isIntercepting] = useState(false);
   const [interceptedIds, setInterceptedIds] = useState<Set<string>>(new Set());
   const [pendingActionIds, setPendingActionIds] = useState<Set<string>>(new Set());
   const [processedIds] = useState(new Set<string>());
@@ -507,12 +483,6 @@ export default function InspectorPage() {
       setFilter(initialFilterState);
     }
   }, [currentAppName]);
-
-  const handleSetIntercept = (enabled: boolean) => {
-    setIsIntercepting(enabled);
-    window.api.invoke('proxy:set-intercept', enabled);
-    if (!enabled) setPendingActionIds(new Set());
-  };
 
   const handleForward = async (id: string) => {
     await window.api.invoke('proxy:forward-request', id);
@@ -584,33 +554,6 @@ export default function InspectorPage() {
       localStorage.setItem(`inspector-filter-state-${currentAppName}`, JSON.stringify(filter));
   }, [filter, currentAppName]);
 
-  useEffect(() => {
-    if (autoSaveInterval === 0 || !currentAppName) {
-      setNextSaveTime(null);
-      return;
-    }
-    const intervalMs = autoSaveInterval * 60 * 1000;
-    const timer = setInterval(() => {
-      createProfile(
-        `${currentAppName} (Auto-saved)`,
-        currentAppName,
-        selectedApp,
-        requests,
-        filter,
-        selectedId,
-        platform,
-      );
-      setLastSavedTime(Date.now());
-      setNextSaveTime(Date.now() + intervalMs);
-    }, intervalMs);
-    return () => clearInterval(timer);
-  }, [autoSaveInterval, currentAppName, selectedApp, requests, filter, selectedId, platform]);
-
-  useEffect(() => {
-    if (autoSaveInterval > 0) setNextSaveTime(Date.now() + autoSaveInterval * 60 * 1000);
-    else setNextSaveTime(null);
-  }, [autoSaveInterval]);
-
   const filteredRequests = useMemo(() => {
     return displayedRequests.filter((req) => {
       const method = req.method.toUpperCase();
@@ -668,7 +611,6 @@ export default function InspectorPage() {
   }, []);
 
   const inspectorContext = useMemo<InspectorContext>(() => {
-    console.log('[InspectorContext] useMemo recomputing');
     return {
       requests,
       filteredRequests,
@@ -722,9 +664,11 @@ export default function InspectorPage() {
     <div className="h-screen w-screen bg-background">
       {/* ── Topbar ── */}
       <div className="h-10 border-b border-divider flex items-center px-3 bg-table-headerBg gap-3 select-none">
+        <span className="text-sm font-bold text-text-primary">Systema</span>
+        <div className="h-4 w-px bg-divider/50" />
         <div
           className={cn(
-            'text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 border select-none',
+            'text-xs px-2.5 rounded font-bold flex items-center gap-1.5 border select-none self-stretch',
             selectedApp
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
               : 'bg-primary/10 text-primary border-primary/20',
@@ -745,102 +689,14 @@ export default function InspectorPage() {
             </>
           )}
         </div>
-        <div className="h-4 w-px bg-divider/50" />
 
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {selectedRequest ? (
-            <span
-              className="text-xs text-text-secondary truncate max-w-[300px]"
-              title={`${selectedRequest.protocol}://${selectedRequest.host}${selectedRequest.path}`}
-            >
-              {selectedRequest.protocol}://{selectedRequest.host}
-              {selectedRequest.path}
-            </span>
-          ) : (
-            <span className="text-xs text-text-secondary italic">No request selected</span>
-          )}
-          {requests.length > 0 && (
-            <button
-              onClick={() => setIsPaused(!isPaused)}
-              className={cn(
-                'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-all',
-                isPaused
-                  ? 'bg-warning/10 text-warning border-warning/30 hover:bg-warning/20'
-                  : 'bg-success/10 text-success border-success/30 hover:bg-success/20',
-              )}
-              title={isPaused ? 'Resume Tracking' : 'Pause Tracking'}
-            >
-              {isPaused ? (
-                <Pause className="w-3 h-3 fill-current" />
-              ) : (
-                <Play className="w-3 h-3 fill-current" />
-              )}
-              {isPaused ? 'Paused' : 'Tracking'}
-            </button>
-          )}
-          <div className="flex items-center gap-2 ml-2">
-            <div className="flex items-center rounded-md border border-divider/50 p-0.5 bg-background/50">
-              <button
-                onClick={() => {
-                  const modes = [0, 1, 5, 10];
-                  const next = modes[(modes.indexOf(autoSaveInterval) + 1) % modes.length];
-                  setAutoSaveInterval(next);
-                  if (next > 0) setNextSaveTime(Date.now() + next * 60 * 1000);
-                  else setNextSaveTime(null);
-                }}
-                className={cn(
-                  'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors',
-                  autoSaveInterval > 0
-                    ? 'text-primary bg-primary/10'
-                    : 'text-text-secondary hover:text-text-primary',
-                )}
-                title="Toggle Auto-save Interval (Off, 1m, 5m, 10m)"
-              >
-                <Clock className="w-3 h-3" />
-                {autoSaveInterval > 0 ? `${autoSaveInterval}m` : 'Off'}
-              </button>
-              {autoSaveInterval > 0 && <CountdownTimer nextSaveTime={nextSaveTime} />}
-            </div>
-            {lastSavedTime && (
-              <div className="flex items-center gap-1 text-[10px] text-text-secondary animate-in fade-in slide-in-from-left-2 duration-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Saved {formatDistanceToNow(lastSavedTime, { addSuffix: true })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 border-x border-divider/50 px-2 min-w-fit">
-          <button
-            onClick={() => handleSetIntercept(!isIntercepting)}
-            className={cn(
-              'p-1.5 rounded text-xs font-medium transition-all',
-              isIntercepting
-                ? 'bg-error/20 text-error hover:bg-error/30'
-                : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
-            )}
-            title={isIntercepting ? 'Stop Intercepting' : 'Start Intercepting'}
-          >
-            <div
-              className={cn(
-                'w-4 h-4 rounded-full border-2',
-                isIntercepting ? 'border-error bg-error' : 'border-divider',
-              )}
-            />
-          </button>
-          {selectedApp && (
-            <button
-              onClick={() => setIsSaveProfileModalOpen(true)}
-              className="px-2 py-1 rounded text-xs font-medium border border-divider hover:bg-secondary text-text-secondary hover:text-text-primary transition-all"
-              title="Save Current Profile"
-            >
-              Save Profile
-            </button>
-          )}
-        </div>
+        <div className="flex-1" />
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 text-primary text-xs whitespace-nowrap">
+          <div
+            title={`${requests.filter((r) => r.protocol === 'https').length} HTTPS requests`}
+            className="flex items-center gap-1.5 px-2 rounded bg-primary/10 text-primary text-xs whitespace-nowrap self-stretch"
+          >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -902,7 +758,7 @@ export default function InspectorPage() {
       </div>
 
       {/* ── Main Layout ── */}
-      <div className="h-[calc(100vh-2.5rem)] w-full bg-background text-text-primary overflow-hidden">
+      <div className="h-[calc(100vh-2.5rem-1.5rem)] w-full bg-background text-text-primary overflow-hidden">
         <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
           <ResizableSplit direction="vertical" initialSize={50} minSize={10} maxSize={90}>
             <RequestList
@@ -954,6 +810,49 @@ export default function InspectorPage() {
           <ChatContainer inspectorContext={inspectorContext} />
         </ResizableSplit>
       </div>
+
+      {/* ── FootBar ── */}
+      {(() => {
+        const httpsCount = requests.filter((r) => r.protocol === 'https').length;
+        const totalSize = requests.reduce((acc, r) => {
+          const n = parseFloat(r.size);
+          if (isNaN(n)) return acc;
+          if (r.size.toLowerCase().includes('kb')) return acc + n * 1024;
+          if (r.size.toLowerCase().includes('mb')) return acc + n * 1024 * 1024;
+          return acc + n;
+        }, 0);
+        const sizeStr = totalSize > 1024 * 1024
+          ? `${(totalSize / 1024 / 1024).toFixed(1)} MB`
+          : totalSize > 1024
+          ? `${(totalSize / 1024).toFixed(1)} KB`
+          : `${totalSize.toFixed(0)} B`;
+        const times = requests.map((r) => parseFloat(r.time)).filter((n) => !isNaN(n) && n > 0);
+        const avgTime = times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0;
+        const errCount = requests.filter((r) => r.status >= 400).length;
+        return (
+          <div className="h-6 border-t border-divider flex items-center px-3 gap-4 bg-table-headerBg text-[10px] text-text-secondary select-none shrink-0">
+            <span>{requests.length} requests</span>
+            <span className="text-divider">|</span>
+            <span>{httpsCount} HTTPS</span>
+            <span className="text-divider">|</span>
+            <span>{sizeStr} transferred</span>
+            <span className="text-divider">|</span>
+            <span>{avgTime > 0 ? `${avgTime}ms avg` : '—'}</span>
+            {errCount > 0 && (
+              <>
+                <span className="text-divider">|</span>
+                <span className="text-red-400">{errCount} errors</span>
+              </>
+            )}
+            {filteredRequests.length !== requests.length && (
+              <>
+                <span className="text-divider">|</span>
+                <span className="text-warning">{filteredRequests.length} shown</span>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       <SSLBypassModal
         isOpen={isSSLBypassModalOpen}

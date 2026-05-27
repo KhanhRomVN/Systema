@@ -22,7 +22,10 @@ export function MemoryMonitor() {
   }, []);
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-purple-500/10 text-purple-500 text-xs whitespace-nowrap">
+    <div
+      title={`Memory: ${memory} MB`}
+      className="flex items-center gap-1.5 px-2 rounded bg-purple-500/10 text-purple-500 text-xs whitespace-nowrap self-stretch"
+    >
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"

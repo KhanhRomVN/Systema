@@ -6,9 +6,8 @@ import { InspectorFilter } from '../RequestDetails/Filter';
 import { NetworkRequest } from '../../../../types/inspector';
 import { SourcesPanel } from './Source';
 import { LogViewer } from './Log';
-import { CollectionsPanel } from './Composer/CollectionsPanel';
 import { ComposerManager } from './Composer/ComposerManager';
-import { DiagramViewMemo as DiagramView } from './Composer/DiagramView';
+import { DiagramViewMemo as DiagramView } from './Composer/DiagramComposer';
 import { TraceTab } from './Trace';
 import { CryptoTab } from './Crypto';
 import { ComparePanel } from './Compare';
@@ -95,6 +94,13 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     }
   }, [inspectorContext.compareRequest1, inspectorContext.compareRequest2]);
 
+  // Auto-switch to crypto tab when "Add to Crypto" event fires
+  useEffect(() => {
+    const handler = () => setActiveTab('crypto');
+    window.addEventListener('add-to-crypto', handler);
+    return () => window.removeEventListener('add-to-crypto', handler);
+  }, []);
+
   // Sync active tab from context (for external navigation like Analyze Request)
   useEffect(() => {
     if (inspectorContext.activeSidebarTab) {
@@ -175,7 +181,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     }
 
     if (activeTab === 'crypto') {
-      return <CryptoTab />;
+      return <CryptoTab targetApp={inspectorContext.targetApp} />;
     }
 
     if (activeTab === 'media') {
@@ -203,7 +209,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     if (activeTab === 'collections') {
       return (
         <ComposerManager
-          onSelectRequest={inspectorContext.onSelectSavedRequest}
+          onSelectRequest={inspectorContext.onSelectSavedRequest || (() => {})}
           appId={inspectorContext.appId || 'unknown'}
           requests={inspectorContext.requests}
         />
@@ -216,6 +222,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
           request={inspectorContext.analyzingRequest}
           onClose={handleDiagramClose}
           onNodeClick={inspectorContext.onNodeClick}
+          isTemp={true}
         />
       );
     }

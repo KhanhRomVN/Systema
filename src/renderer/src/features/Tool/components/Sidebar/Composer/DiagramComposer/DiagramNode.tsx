@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react';
-import { NetworkRequest } from '../../../../../types/inspector';
-import { cn } from '../../../../../shared/lib/utils';
+import { NetworkRequest } from '../../../../../../types/inspector';
+import { cn } from '../../../../../../shared/lib/utils';
 
 const methodColors: Record<string, string> = {
   GET: 'text-blue-400',
