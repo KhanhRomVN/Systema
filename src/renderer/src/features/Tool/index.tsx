@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Globe } from 'lucide-react';
 import { cn } from '../../shared/lib/utils';
 import { MemoryMonitor } from '../../core/components/common/MemoryMonitor';
@@ -8,6 +8,8 @@ import { SSLBypassModal } from '../../core/components/common/modal/SSLBypassModa
 import { NetworkRequest } from '../../types/inspector';
 import { InspectorProfile, createProfile } from '../../utils/profiles';
 import { generateRequestAnalysis } from '../../utils/analysisGenerator';
+import { scanRequest } from './utils/securityScanner';
+import { analyzeTls, TlsScanResult } from './utils/securityScanner';
 import { RequestList } from './components/RequestList';
 import { RequestDetails } from './components/RequestDetails';
 import { ChatContainer, InspectorContext } from './components/Sidebar';
@@ -228,7 +230,7 @@ export default function InspectorPage() {
             time: `${Date.now() - req.timestamp}ms`,
             responseHeaders: data.headers || {},
           };
-          return { ...updatedReq, analysis: generateRequestAnalysis(updatedReq) };
+          return { ...updatedReq, analysis: generateRequestAnalysis(updatedReq), securityIssues: scanRequest(updatedReq) };
         }
         if (
           !data.id &&
@@ -241,7 +243,7 @@ export default function InspectorPage() {
             time: `${Date.now() - req.timestamp}ms`,
             responseHeaders: data.headers || {},
           };
-          return { ...reqWithStatus, analysis: generateRequestAnalysis(reqWithStatus) };
+          return { ...reqWithStatus, analysis: generateRequestAnalysis(reqWithStatus), securityIssues: scanRequest(reqWithStatus) };
         }
         return req;
       }),
@@ -259,7 +261,7 @@ export default function InspectorPage() {
           isBinary: data.isBinary,
           contentType: data.contentType,
         };
-        return { ...reqWithBody, analysis: generateRequestAnalysis(reqWithBody) };
+        return { ...reqWithBody, analysis: generateRequestAnalysis(reqWithBody), securityIssues: scanRequest(reqWithBody) };
       }),
     );
   }, []);
@@ -418,11 +420,11 @@ export default function InspectorPage() {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   const [detailsTab, setDetailsTab] = useState('headers');
   const [isSaveProfileModalOpen, setIsSaveProfileModalOpen] = useState(false);
-  const [isPaused] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [displayedRequests, setDisplayedRequests] = useState<NetworkRequest[]>([]);
   const [initialDiffTab, setInitialDiffTab] = useState<DiffTab | undefined>();
   const [initialDiffSearch, setInitialDiffSearch] = useState<string | undefined>();
-  const [isIntercepting] = useState(false);
+  const [isIntercepting, setIsIntercepting] = useState(false);
   const [interceptedIds, setInterceptedIds] = useState<Set<string>>(new Set());
   const [pendingActionIds, setPendingActionIds] = useState<Set<string>>(new Set());
   const [processedIds] = useState(new Set<string>());
@@ -430,6 +432,29 @@ export default function InspectorPage() {
   const [compareRequest2, setCompareRequest2] = useState<NetworkRequest | null>(null);
   const [analyzingRequest, setAnalyzingRequest] = useState<NetworkRequest | null>(null);
   const [activeSidebarTab, setActiveSidebarTab] = useState<string>('chat');
+
+  // TLS scan cache: host → issues (scanned once per host per session)
+  const tlsScannedHosts = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const httpsRequests = requests.filter((r) => r.protocol === 'https' && r.host && !tlsScannedHosts.current.has(r.host));
+    if (httpsRequests.length === 0) return;
+    const newHosts = [...new Set(httpsRequests.map((r) => r.host))];
+    newHosts.forEach(async (host) => {
+      tlsScannedHosts.current.add(host);
+      try {
+        const result: TlsScanResult = await window.api.invoke('tls:scan', host);
+        const tlsIssues = analyzeTls(result, host);
+        if (tlsIssues.length === 0) return;
+        setRequests((prev) =>
+          prev.map((req) =>
+            req.host === host && req.protocol === 'https'
+              ? { ...req, securityIssues: [...(req.securityIssues || []), ...tlsIssues] }
+              : req,
+          ),
+        );
+      } catch { /* ignore */ }
+    });
+  }, [requests]);
 
   const [filter, setFilter] = useState<InspectorFilter>(() => {
     try {
@@ -483,6 +508,14 @@ export default function InspectorPage() {
       setFilter(initialFilterState);
     }
   }, [currentAppName]);
+
+  const handleToggleIntercept = useCallback(async () => {
+    const next = !isIntercepting;
+    console.log(`[Renderer] Intercept toggle: ${isIntercepting} → ${next}`);
+    setIsIntercepting(next);
+    const result = await window.api.invoke('proxy:set-intercept', next, '');
+    console.log(`[Renderer] proxy:set-intercept result:`, result);
+  }, [isIntercepting]);
 
   const handleForward = async (id: string) => {
     await window.api.invoke('proxy:forward-request', id);
@@ -692,6 +725,28 @@ export default function InspectorPage() {
 
         <div className="flex-1" />
 
+        <button
+          onClick={handleToggleIntercept}
+          title={isIntercepting ? 'Resume traffic (intercept ON)' : 'Pause traffic (intercept OFF)'}
+          className={cn(
+            'flex items-center justify-center w-7 h-7 rounded border transition-colors',
+            isIntercepting
+              ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+              : 'bg-transparent text-text-secondary border-divider/50 hover:bg-secondary hover:text-text-primary',
+          )}
+        >
+          {isIntercepting ? (
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="5" width="4" height="14" rx="1" />
+              <rect x="14" y="5" width="4" height="14" rx="1" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
+
         <div className="flex items-center gap-2">
           <div
             title={`${requests.filter((r) => r.protocol === 'https').length} HTTPS requests`}
@@ -779,8 +834,11 @@ export default function InspectorPage() {
               setFilter={setFilter}
               onAnalyzeRequest={(req) => {
                 setAnalyzingRequest(req);
-                // setDetailsTab('composer');
                 setActiveSidebarTab('composer');
+              }}
+              onSendToFuzzer={(req) => {
+                window.dispatchEvent(new CustomEvent('fuzzer:send-request', { detail: req }));
+                setActiveSidebarTab('fuzzer');
               }}
             />
 
@@ -803,6 +861,7 @@ export default function InspectorPage() {
               onSetCompare2={setCompareRequest2}
               appId={selectedApp}
               initialComposerRequest={analyzingRequest}
+              showComposerTab={activeSidebarTab === 'composer'}
             />
           </ResizableSplit>
 

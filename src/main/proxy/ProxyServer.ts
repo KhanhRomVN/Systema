@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { EventEmitter } from 'events';
 import { INJECT_SCRIPT } from './injection';
-import * as zlib from 'zlib'; // Ensure zlib is imported for decompression
+import * as zlib from 'zlib';
 import { cacheHeaders } from './headerCache';
 import { mediaCache } from './mediaCache';
 import * as path from 'path';
@@ -9,14 +9,38 @@ import * as fs from 'fs';
 import { Proxy } from 'http-mitm-proxy';
 import { decompress } from '@mongodb-js/zstd';
 import * as net from 'net';
+import * as http from 'http';
+import { WebSocketServer, WebSocket as WS } from 'ws';
+
+export interface BreakpointRule {
+  id: string;
+  urlPattern: string;   // substring or regex string
+  methods: string[];    // empty = all
+  phase: 'request' | 'response' | 'both';
+  enabled: boolean;
+}
+
+export interface PendingBreakpoint {
+  id: string;           // requestId
+  phase: 'request' | 'response';
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+  statusCode?: number;
+}
 
 export class ProxyServer extends EventEmitter {
   private proxy: any;
   private isRunning: boolean = false;
+  private port: number = 8081;
+  private wsPort: number = 0;
+  private wss: WebSocketServer | null = null;
   private window: BrowserWindow | null = null;
   private isIntercepting: boolean = false;
-  // Map of requestId -> callback to resume request
-  private pendingRequests: Map<string, () => void> = new Map();
+  private breakpointRules: BreakpointRule[] = [];
+  private pendingBreakpoints: Map<string, (edited: PendingBreakpoint | null) => void> = new Map();
+  private pendingRequests: Map<string, { proceed: () => void; drop: () => void }> = new Map();
   zstd: any;
 
   constructor() {
@@ -34,35 +58,98 @@ export class ProxyServer extends EventEmitter {
     this.window = window;
   }
 
-  public start(port: number = 8081) {
-    if (this.isRunning) return;
+  private startWss(wsPort: number): Promise<void> {
+    return new Promise((resolve) => {
+      const server = http.createServer();
+      this.wss = new WebSocketServer({ server });
+      this.wss.on('connection', (ws) => {
+        ws.send(JSON.stringify({ intercepting: this.isIntercepting }));
+      });
+      server.listen(wsPort, '0.0.0.0', () => {
+        this.wsPort = wsPort;
+        resolve();
+      });
+    });
+  }
 
-    this.setupListeners();
+  private broadcastIntercept() {
+    if (!this.wss) return;
+    const msg = JSON.stringify({ intercepting: this.isIntercepting });
+    this.wss.clients.forEach((ws) => {
+      if (ws.readyState === WS.OPEN) ws.send(msg);
+    });
+  }
 
-    this.proxy.listen({ port, host: '0.0.0.0' }, () => {
-      this.isRunning = true;
-      this.emit('started', port);
+  public start(port: number = 8081): Promise<void> {
+    return new Promise(async (resolve) => {
+      if (this.isRunning) { resolve(); return; }
+      this.port = port;
+      await this.startWss(port + 1);
+      this.setupListeners();
+      this.proxy.listen({ port, host: '0.0.0.0' }, () => {
+        this.isRunning = true;
+        this.emit('started', port);
+        resolve();
+      });
     });
   }
 
   public stop() {
     if (!this.isRunning) return;
     this.proxy.close();
+    this.wss?.close();
     this.isRunning = false;
   }
 
+  public setBreakpointRules(rules: BreakpointRule[]) {
+    this.breakpointRules = rules;
+  }
+
+  public resolveBreakpoint(requestId: string, edited: PendingBreakpoint | null) {
+    const resolve = this.pendingBreakpoints.get(requestId);
+    if (resolve) {
+      this.pendingBreakpoints.delete(requestId);
+      resolve(edited);
+      return true;
+    }
+    return false;
+  }
+
+  private matchesBreakpoint(url: string, method: string, phase: 'request' | 'response'): BreakpointRule | undefined {
+    return this.breakpointRules.find(rule => {
+      if (!rule.enabled) return false;
+      if (rule.phase !== 'both' && rule.phase !== phase) return false;
+      if (rule.methods.length > 0 && !rule.methods.includes(method.toUpperCase())) return false;
+      try {
+        return new RegExp(rule.urlPattern, 'i').test(url);
+      } catch {
+        return url.includes(rule.urlPattern);
+      }
+    });
+  }
+
+  private waitForBreakpointResolution(pending: PendingBreakpoint): Promise<PendingBreakpoint | null> {
+    return new Promise(resolve => {
+      this.pendingBreakpoints.set(pending.id, resolve);
+      this.sendToRenderer('proxy:breakpoint-hit', pending);
+    });
+  }
+
   public setIntercept(enabled: boolean) {
+    console.log(`[Intercept] setIntercept(${enabled}), pending=${this.pendingRequests.size}, wsClients=${this.wss?.clients.size ?? 0}`);
     this.isIntercepting = enabled;
+    this.broadcastIntercept();
     if (!enabled) {
-      this.pendingRequests.forEach((resume) => resume());
+      console.log(`[Intercept] Resuming ${this.pendingRequests.size} held requests`);
+      this.pendingRequests.forEach(({ proceed }) => proceed());
       this.pendingRequests.clear();
     }
   }
 
   public forwardRequest(id: string) {
-    const resume = this.pendingRequests.get(id);
-    if (resume) {
-      resume();
+    const entry = this.pendingRequests.get(id);
+    if (entry) {
+      entry.proceed();
       this.pendingRequests.delete(id);
       return true;
     }
@@ -70,8 +157,9 @@ export class ProxyServer extends EventEmitter {
   }
 
   public dropRequest(id: string) {
-    const resume = this.pendingRequests.get(id);
-    if (resume) {
+    const entry = this.pendingRequests.get(id);
+    if (entry) {
+      entry.drop();
       this.pendingRequests.delete(id);
       return true;
     }
@@ -97,7 +185,7 @@ export class ProxyServer extends EventEmitter {
       }
     });
 
-    this.proxy.onConnect((req: any, socket: any, head: any, callback: any) => {
+    this.proxy.onConnect((req: any, socket: any, _head: any, callback: any) => {
       const hostUrl = req.url || '';
       console.log(`[ProxyServer Connect] ${hostUrl} (Host: ${req.headers.host})`);
 
@@ -164,12 +252,23 @@ export class ProxyServer extends EventEmitter {
       return callback();
     });
 
-    this.proxy.onRequest((ctx: any, callback: any) => {
+    this.proxy.onRequest(async (ctx: any, callback: any) => {
       const req = ctx.clientToProxyRequest;
       const method = req.method;
       const url = (ctx.isSSL ? 'https://' : 'http://') + req.headers.host + req.url;
       const requestId = Date.now().toString() + Math.random();
       ctx.requestId = requestId;
+
+      // Systema intercept status endpoint
+      if (!ctx.isSSL && req.url === '/systema-intercept-status') {
+        ctx.proxyToClientResponse.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+        });
+        ctx.proxyToClientResponse.end(JSON.stringify({ intercepting: this.isIntercepting }));
+        return;
+      }
 
       // Setup Page Logic
       if (!ctx.isSSL && req.url && (req.url === '/ssl' || req.url.startsWith('/ssl/'))) {
@@ -445,14 +544,35 @@ export class ProxyServer extends EventEmitter {
         initiator: initiator, // Send initiator to renderer
       });
 
-      const proceed = () => {
+      const proceed = async () => {
+        // Check request-phase breakpoint
+        const reqRule = this.matchesBreakpoint(url, method, 'request');
+        if (reqRule) {
+          const pending: PendingBreakpoint = {
+            id: requestId,
+            phase: 'request',
+            url,
+            method,
+            headers: req.headers as Record<string, string>,
+          };
+          const edited = await this.waitForBreakpointResolution(pending);
+          if (edited === null) {
+            // Drop
+            ctx.proxyToClientResponse.writeHead(502, { 'Content-Type': 'text/plain' });
+            ctx.proxyToClientResponse.end('Dropped by Systema breakpoint');
+            return;
+          }
+          // Apply edits
+          if (edited.headers) Object.assign(req.headers, edited.headers);
+        }
+
         const requestChunks: any[] = [];
-        ctx.onRequestData((ctx: any, chunk: any, callback: any) => {
+        ctx.onRequestData((_ctx: any, chunk: any, callback: any) => {
           requestChunks.push(chunk);
           return callback(null, chunk);
         });
 
-        ctx.onRequestEnd(async (ctx: any, callback: any) => {
+        ctx.onRequestEnd(async (_ctx: any, callback: any) => {
           try {
             const buffer = Buffer.concat(requestChunks);
             const encodingHeader = req.headers['content-encoding'];
@@ -554,11 +674,22 @@ export class ProxyServer extends EventEmitter {
       };
 
       if (this.isIntercepting) {
-        // Store the proceed function
-        this.pendingRequests.set(requestId, proceed);
-
-        // Notify renderer that this specific request is waiting for action
-        // (Actually 'proxy:request' with isIntercepted=true is enough for now)
+        console.log(`[Intercept] Holding request ${requestId} ${method} ${url}`);
+        await new Promise<void>((resolve, reject) => {
+          this.pendingRequests.set(requestId, {
+            proceed: resolve,
+            drop: () => {
+              ctx.proxyToClientResponse.writeHead(502, { 'Content-Type': 'text/plain' });
+              ctx.proxyToClientResponse.end('Dropped by Systema intercept');
+              reject(new Error('dropped'));
+            },
+          });
+        }).then(() => {
+          console.log(`[Intercept] Resuming request ${requestId}`);
+          proceed();
+        }).catch(() => {
+          console.log(`[Intercept] Dropped request ${requestId}`);
+        });
       } else {
         proceed();
       }
@@ -587,7 +718,7 @@ export class ProxyServer extends EventEmitter {
         delete res.headers['content-security-policy-report-only'];
       }
 
-      ctx.onResponseData((ctx: any, chunk: any, callback: any) => {
+      ctx.onResponseData((_ctx: any, chunk: any, callback: any) => {
         if (isHtml) {
           // Buffer HTML to inject script
           responseChunks.push(chunk);
@@ -599,6 +730,28 @@ export class ProxyServer extends EventEmitter {
 
       ctx.onResponseEnd(async (ctx: any, callback: any) => {
         const buffer = Buffer.concat(responseChunks);
+
+        // --- Response-phase breakpoint ---
+        const resRule = this.matchesBreakpoint(url, req.method, 'response');
+        if (resRule) {
+          const pending: PendingBreakpoint = {
+            id: ctx.requestId + '_res',
+            phase: 'response',
+            url,
+            method: req.method,
+            headers: res?.headers as Record<string, string>,
+            statusCode: res?.statusCode,
+          };
+          const edited = await this.waitForBreakpointResolution(pending);
+          if (edited === null) {
+            ctx.proxyToClientResponse.writeHead(502, { 'Content-Type': 'text/plain' });
+            ctx.proxyToClientResponse.end('Dropped by Systema breakpoint');
+            return callback();
+          }
+          if (edited.headers) Object.assign(res.headers, edited.headers);
+          if (edited.statusCode) res.statusCode = edited.statusCode;
+        }
+        // ---------------------------------
 
         // --- Injection Logic for HTML ---
         if (isHtml) {
@@ -617,7 +770,6 @@ export class ProxyServer extends EventEmitter {
             } else if (contentEncoding === 'deflate') {
               body = zlib.inflateSync(buffer).toString('utf8');
             } else if (contentEncoding === 'zstd' && this.zstd) {
-              // @oneidentity/zstd-js decompression
               body = Buffer.from(this.zstd.decompress(buffer)).toString('utf8');
             } else {
               body = buffer.toString('utf8');
@@ -626,15 +778,22 @@ export class ProxyServer extends EventEmitter {
             if (res.headers['content-encoding']) {
               delete res.headers['content-encoding'];
             }
-            // Update Content-Length
+
+            // Inject Systema script
+            const script = `<script>${INJECT_SCRIPT.replace('__PROXY_PORT__', String(this.port)).replace('__WS_PORT__', String(this.wsPort))}<\/script>`;
+            const headIdx = body.indexOf('<head');
+            const headEndIdx = headIdx !== -1 ? body.indexOf('>', headIdx) + 1 : -1;
+            if (headEndIdx > 0) {
+              body = body.slice(0, headEndIdx) + script + body.slice(headEndIdx);
+            } else {
+              body = script + body;
+            }
+
             const newBuffer = Buffer.from(body, 'utf8');
             res.headers['content-length'] = newBuffer.length;
-
-            // Write modified data to client
             ctx.proxyToClientResponse.write(newBuffer);
           } catch (e) {
             console.error('[Proxy] Injection failed:', e);
-            // Fallback: send original buffer
             ctx.proxyToClientResponse.write(buffer);
           }
         }

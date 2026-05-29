@@ -23,6 +23,7 @@ import {
   Copy,
   Check,
   Target,
+  Zap,
 } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import {
@@ -58,6 +59,7 @@ interface RequestTableProps {
   onSetCompare1: (req: NetworkRequest) => void;
   onSetCompare2: (req: NetworkRequest) => void;
   onAnalyzeRequest?: (req: NetworkRequest) => void;
+  onSendToFuzzer?: (req: NetworkRequest) => void;
 }
 
 export function RequestTable({
@@ -75,6 +77,7 @@ export function RequestTable({
   onSetCompare1,
   onSetCompare2,
   onAnalyzeRequest,
+  onSendToFuzzer,
 }: RequestTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
@@ -348,6 +351,17 @@ export function RequestTable({
               label: 'SSE',
               tooltip: 'Server-Sent Events stream',
               className: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold',
+            });
+          }
+
+          // Security issues — only show badge if there are high severity issues
+          const secIssues = req.securityIssues || [];
+          const highCount = secIssues.filter((i) => i.severity === 'high').length;
+          if (highCount > 0) {
+            tags.push({
+              label: '⚠',
+              tooltip: `${secIssues.length} security issue(s) detected (${highCount} high)`,
+              className: 'bg-red-500/15 text-red-400 border border-red-500/30 font-bold',
             });
           }
 
@@ -723,6 +737,11 @@ export function RequestTable({
                   <ContextMenuItem onClick={() => onAnalyzeRequest?.(row.original)}>
                     <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
                     <span>Analyze Request</span>
+                  </ContextMenuItem>
+
+                  <ContextMenuItem onClick={() => onSendToFuzzer?.(row.original)}>
+                    <Zap className="mr-2 h-3.5 w-3.5 text-amber-400" />
+                    <span>Send to Fuzzer</span>
                   </ContextMenuItem>
 
                   <ContextMenuItem onClick={() => toggleHighlight(row.original.id)}>

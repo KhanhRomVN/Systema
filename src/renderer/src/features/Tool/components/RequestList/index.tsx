@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RequestTable } from './RequestTable';
-import { TimelineView } from './TimelineView';
+import { WaterfallView } from './WaterfallView';
 import { NetworkRequest } from '../../../../types/inspector';
 import { InspectorFilter, initialFilterState } from '../RequestDetails/Filter';
 import { List, BarChart2 } from 'lucide-react';
@@ -23,6 +23,7 @@ interface RequestListProps {
   onSetCompare2: (req: NetworkRequest | null) => void;
   setFilter: (filter: InspectorFilter) => void;
   onAnalyzeRequest?: (req: NetworkRequest) => void;
+  onSendToFuzzer?: (req: NetworkRequest) => void;
 }
 
 export function RequestList({
@@ -42,13 +43,14 @@ export function RequestList({
   onSetCompare2,
   setFilter,
   onAnalyzeRequest,
+  onSendToFuzzer,
 }: RequestListProps) {
   const [view, setView] = useState<'table' | 'timeline'>('table');
 
   return (
     <div className="h-full flex">
       {/* Left tab bar */}
-      <div className="w-8 border-r border-divider flex flex-col items-center py-2 gap-1.5 shrink-0 bg-table-headerBg">
+      <div className="w-12 border-r border-divider flex flex-col items-center py-2 gap-1.5 shrink-0 bg-table-headerBg">
         <button
           onClick={() => setView('table')}
           title="Table View"
@@ -104,9 +106,10 @@ export function RequestList({
             onSetCompare1={onSetCompare1}
             onSetCompare2={onSetCompare2}
             onAnalyzeRequest={onAnalyzeRequest}
+            onSendToFuzzer={onSendToFuzzer}
           />
         ) : (
-          <TimelineView
+          <WaterfallView
             requests={filteredRequests}
             selectedId={selectedId}
             onSelect={(id) => onSelectRequest(id)}

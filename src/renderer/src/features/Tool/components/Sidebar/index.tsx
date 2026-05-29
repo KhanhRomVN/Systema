@@ -15,8 +15,9 @@ import { WasmPanel } from './Wasm';
 import { MediaPanel } from './Media';
 import { TargetSelector } from './Target';
 import { ConfirmSwitchDrawer } from './Target/ConfirmSwitchDrawer';
+import { FuzzerPanel } from './Fuzzer';
 import { Tooltip } from './Tooltip';
-import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, GitBranch, KeyRound, ArrowRightLeft, Image, Cpu, Crosshair, PenTool } from 'lucide-react';
+import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, GitBranch, KeyRound, ArrowRightLeft, Image, Cpu, Crosshair, Zap } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 import { DiffTab } from './Compare/DiffView';
 import { ProviderConfig, ProviderType } from '../../../../types/provider-types';
@@ -192,6 +193,10 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
       return <WasmPanel requests={inspectorContext.requests} onClose={() => setActiveTab('chat')} />;
     }
 
+    if (activeTab === 'fuzzer') {
+      return <FuzzerPanel requests={inspectorContext.requests} isTargetRunning={!!inspectorContext.appId} />;
+    }
+
     if (activeTab === 'compare') {
       return <ComparePanel inspectorContext={inspectorContext} />;
     }
@@ -296,6 +301,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     { id: 'crypto', label: 'Crypto', icon: KeyRound, color: 'yellow', description: 'Cryptographic tools and analysis' },
     { id: 'media', label: 'Media', icon: Image, color: 'blue', description: 'Media files and assets viewer' },
     { id: 'wasm', label: 'WASM', icon: Cpu, color: 'purple', description: 'WebAssembly module analyzer' },
+    { id: 'fuzzer', label: 'Fuzzer', icon: Zap, color: 'amber', description: 'Spam HTTPS với nhiều payload' },
   ] as const;
 
   const colorMap: Record<string, string> = {
@@ -307,6 +313,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     pink: 'bg-pink-500/10 text-pink-400 border-pink-500/30',
     indigo: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
     yellow: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
+    amber: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
   };
 
   return (

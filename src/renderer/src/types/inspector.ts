@@ -1,4 +1,5 @@
 import { RequestAnalysis } from './analysis';
+import { SecurityIssue } from '../features/Tool/utils/securityScanner';
 
 export interface NetworkRequest {
   id: string;
@@ -27,6 +28,7 @@ export interface NetworkRequest {
   analysis?: RequestAnalysis;
   isIntercepted?: boolean;
   initiator?: string;
+  securityIssues?: SecurityIssue[];
 }
 
 export const MOCK_REQUESTS: NetworkRequest[] = [

@@ -10,14 +10,14 @@ import {
   Filter,
   ScanEye,
   KeyRound,
-  GitBranch,
   Send,
+  ShieldAlert,
 } from 'lucide-react';
 
 import { HeadersDetails } from './Headers';
 import { BodyDetails, BodyDetailsRef } from './Body';
 import { NetworkDetails as NetworkDetailsSub } from './Network';
-import { TracePanel } from './Trace';
+import { SecurityDetails } from './Security';
 import { DiffTab } from '../Sidebar/Compare/DiffView';
 import { InspectorFilter, NetworkFilter } from './Filter';
 import { ResizableSplit } from '../../../../core/components/common/ResizableSplit';
@@ -61,6 +61,7 @@ interface NetworkDetailsProps {
   onSetCompare2?: (req: NetworkRequest) => void;
   appId?: string;
   initialComposerRequest?: NetworkRequest | null;
+  showComposerTab?: boolean;
 }
 
 function TextSelectionMenu({
@@ -143,6 +144,7 @@ export function RequestDetails({
   onSetCompare2,
   appId,
   initialComposerRequest,
+  showComposerTab = false,
 }: NetworkDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('headers');
   const [isRawMode, setIsRawMode] = useState(false);
@@ -356,21 +358,7 @@ export function RequestDetails({
         activeAction: 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400',
       },
     },
-    {
-      id: 'trace',
-      label: 'Trace',
-      icon: GitBranch,
-      count: 0,
-      importantCount: 0,
-      colors: {
-        text: 'text-orange-500',
-        border: 'border-orange-500',
-        badge: 'bg-orange-500/20 text-orange-500',
-        hover: 'hover:bg-orange-500/10',
-        activeAction: 'bg-orange-500/20 text-orange-500',
-      },
-    },
-    {
+    ...(showComposerTab ? [{
       id: 'composer',
       label: 'Composer',
       icon: Send,
@@ -383,7 +371,21 @@ export function RequestDetails({
         hover: 'hover:bg-blue-500/10',
         activeAction: 'bg-blue-500/20 text-blue-500',
       },
-    },
+    }] : []),
+    ...(request?.protocol === 'https' && (request?.securityIssues?.length ?? 0) > 0 ? [{
+      id: 'security',
+      label: 'Security',
+      icon: ShieldAlert,
+      count: request.securityIssues!.length,
+      importantCount: 0,
+      colors: {
+        text: 'text-red-400',
+        border: 'border-red-400',
+        badge: 'bg-red-500/20 text-red-400',
+        hover: 'hover:bg-red-500/10',
+        activeAction: 'bg-red-500/20 text-red-400',
+      },
+    }] : []),
   ] as const;
 
   const scrollToNextMatch = () => {
@@ -411,8 +413,8 @@ export function RequestDetails({
     setCurrentMatchIndex(nextIndex);
   };
 
-  const isFullPanel = activeTab === 'trace';
   const isComposerTab = activeTab === 'composer';
+  const isSecurityTab = activeTab === 'security';
 
   const content = (
     <div className="flex-1 overflow-hidden h-full" onContextMenu={handleContextMenu}>
@@ -420,21 +422,16 @@ export function RequestDetails({
         <div className="h-full flex items-center justify-center text-text-secondary bg-table-bodyBg">
           Select a request to view details
         </div>
-      ) : isFullPanel ? (
-        <div className="h-full w-full">
-          {activeTab === 'trace' && request && (
-            <TracePanel
-              request={request}
-              requests={requests}
-              onSelectRequest={onSelectRequest}
-              onSetCompare1={onSetCompare1}
-              onSetCompare2={onSetCompare2}
-            />
-          )}
-        </div>
       ) : isComposerTab ? (
         <div className="h-full w-full">
           <Composer appId={appId || 'unknown'} initialRequest={initialComposerRequest} />
+        </div>
+      ) : isSecurityTab && request ? (
+        <div className="flex-1 overflow-auto h-full">
+          <SecurityDetails request={request} onJumpToEvidence={(tab, term) => {
+            setActiveTab(tab);
+            if (onSearchTermChange) onSearchTermChange(term);
+          }} />
         </div>
       ) : isRawMode ? (
         <CodeBlock
@@ -449,19 +446,20 @@ export function RequestDetails({
             <BodyDetails ref={bodyDetailsRef} request={request} searchTerm={searchTerm} />
           )}
           {activeTab === 'network' && request && <NetworkDetailsSub request={request} />}
+          {activeTab === 'security' && request && <SecurityDetails request={request} />}
         </div>
       )}
     </div>
   );
 
   const currentTabHasMatches =
-    searchTerm && !isRawMode && !isComposerTab && (matches[activeTab as keyof typeof matches] || 0) > 0;
+    searchTerm && !isRawMode && !isComposerTab && !isSecurityTab && (matches[activeTab as keyof typeof matches] || 0) > 0;
 
   return (
     <div className="h-full">
       <div className="h-full flex flex-col bg-table-bodyBg border-t border-divider/50">
         <div className="flex h-10 items-center border-b border-divider/50 bg-table-headerBg">
-          <div className="flex-1 overflow-x-auto no-scrollbar flex items-center px-2 h-full">
+          <div className="flex-1 overflow-x-auto no-scrollbar flex items-center h-full">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -480,7 +478,7 @@ export function RequestDetails({
                     {tab.label}
                     <Badge count={tab.count} className={tab.colors.badge} />
 
-                    {tab.id !== 'composer' && (
+                    {tab.id !== 'composer' && tab.id !== 'security' && (
                       <div
                         className={cn(
                           'ml-2 pl-2 border-l flex items-center gap-1 transition-colors',
@@ -564,7 +562,7 @@ export function RequestDetails({
         </div>
 
         <div className="flex-1 overflow-hidden relative">
-          {isFilterOpen && activeTab !== 'composer' ? (
+          {isFilterOpen && activeTab !== 'composer' && activeTab !== 'security' ? (
             <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
               {content}
               <NetworkFilter filter={filter} onChange={onFilterChange} requests={requests} />

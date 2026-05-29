@@ -1,4 +1,4 @@
-import { ProxyServer } from './ProxyServer';
+import { ProxyServer, BreakpointRule, PendingBreakpoint } from './ProxyServer';
 import { findAvailablePort } from '../utils/net';
 import { BrowserWindow } from 'electron';
 
@@ -66,9 +66,31 @@ export class ProxyManager {
   // Forward methods to specific session
   setIntercept(id: string, enabled: boolean) {
     const session = this.sessions.get(id);
+    console.log(`[ProxyManager] setIntercept id="${id}" enabled=${enabled} found=${!!session} sessions=[${[...this.sessions.keys()].join(',')}]`);
     if (session) {
       session.server.setIntercept(enabled);
       return true;
+    }
+    return false;
+  }
+
+  setInterceptAll(enabled: boolean) {
+    console.log(`[ProxyManager] setInterceptAll enabled=${enabled} sessions=[${[...this.sessions.keys()].join(',')}]`);
+    for (const session of this.sessions.values()) {
+      session.server.setIntercept(enabled);
+    }
+    return true;
+  }
+
+  setBreakpointRules(rules: BreakpointRule[]) {
+    for (const session of this.sessions.values()) {
+      session.server.setBreakpointRules(rules);
+    }
+  }
+
+  resolveBreakpoint(requestId: string, edited: PendingBreakpoint | null): boolean {
+    for (const session of this.sessions.values()) {
+      if (session.server.resolveBreakpoint(requestId, edited)) return true;
     }
     return false;
   }

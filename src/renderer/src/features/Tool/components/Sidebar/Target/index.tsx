@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { UserApp, AppPlatform, MobileEmulator } from '../../../../../types/apps';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Square, Terminal, History, FolderOpen, Crosshair, Pencil } from 'lucide-react';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Square, Terminal, History, FolderOpen, Crosshair, Pencil, Zap, X } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
 import { loadProfiles, InspectorProfile, deleteProfilesByAppId } from '../../../../../utils/profiles';
 import { AddTargetDrawer } from './AddTargetDrawer';
@@ -140,6 +140,28 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
     setDrawerOpen(true);
     setContextMenu(null);
   };
+
+  // Breakpoint rules
+  const [bpRules, setBpRules] = useState<{ id: string; urlPattern: string; methods: string[]; phase: 'request' | 'response' | 'both'; enabled: boolean }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('systema-bp-rules') || '[]'); } catch { return []; }
+  });
+  const [bpExpanded, setBpExpanded] = useState(false);
+  const [bpPattern, setBpPattern] = useState('');
+  const [bpPhase, setBpPhase] = useState<'request' | 'response' | 'both'>('both');
+
+  useEffect(() => {
+    localStorage.setItem('systema-bp-rules', JSON.stringify(bpRules));
+    window.api.invoke('proxy:set-breakpoint-rules', bpRules);
+  }, [bpRules]);
+
+  const addBpRule = () => {
+    if (!bpPattern.trim()) return;
+    setBpRules(prev => [...prev, { id: crypto.randomUUID(), urlPattern: bpPattern.trim(), methods: [], phase: bpPhase, enabled: true }]);
+    setBpPattern('');
+  };
+
+  const toggleBpRule = (id: string) => setBpRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
+  const deleteBpRule = (id: string) => setBpRules(prev => prev.filter(r => r.id !== id));
 
   const contextMenuApp = contextMenu ? apps.find(a => a.id === contextMenu.appId) : null;
   const activePlatform = PLATFORM_TABS.find(t => t.id === activeTab)!;
@@ -345,6 +367,71 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
         onConfirm={() => deleteAppId && handleDeleteApp(deleteAppId)}
         appName={deleteAppName}
       />
+
+      {/* Breakpoint Rules */}
+      <div className="border-t border-divider shrink-0">
+        <button
+          onClick={() => setBpExpanded(v => !v)}
+          className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <Zap className="w-3.5 h-3.5 text-amber-400" />
+          <span className="flex-1 text-left">Breakpoints</span>
+          {bpRules.filter(r => r.enabled).length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold">
+              {bpRules.filter(r => r.enabled).length} active
+            </span>
+          )}
+          <span className="text-[10px]">{bpExpanded ? '▲' : '▼'}</span>
+        </button>
+
+        {bpExpanded && (
+          <div className="px-3 pb-3 flex flex-col gap-2">
+            {/* Add rule */}
+            <div className="flex gap-1.5">
+              <input
+                value={bpPattern}
+                onChange={e => setBpPattern(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addBpRule()}
+                placeholder="URL pattern (regex)"
+                className="flex-1 h-8 bg-input-background border border-input-border-default rounded-lg px-2.5 text-xs text-text-primary focus:border-amber-500/50 outline-none"
+              />
+              <select
+                value={bpPhase}
+                onChange={e => setBpPhase(e.target.value as any)}
+                className="h-8 bg-input-background border border-input-border-default rounded-lg px-2 text-xs text-text-primary outline-none"
+              >
+                <option value="both">Both</option>
+                <option value="request">Req</option>
+                <option value="response">Res</option>
+              </select>
+              <button
+                onClick={addBpRule}
+                className="h-8 px-2.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Rule list */}
+            {bpRules.map(rule => (
+              <div key={rule.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-divider bg-muted/10">
+                <button onClick={() => toggleBpRule(rule.id)} className={`w-3.5 h-3.5 rounded-sm border shrink-0 transition-colors ${rule.enabled ? 'bg-amber-500 border-amber-500' : 'border-divider'}`} />
+                <span className="flex-1 text-xs text-text-primary truncate font-mono">{rule.urlPattern}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${rule.phase === 'request' ? 'bg-blue-500/15 text-blue-400' : rule.phase === 'response' ? 'bg-orange-500/15 text-orange-400' : 'bg-purple-500/15 text-purple-400'}`}>
+                  {rule.phase}
+                </span>
+                <button onClick={() => deleteBpRule(rule.id)} className="p-0.5 rounded hover:bg-red-500/10 text-text-secondary hover:text-red-400 transition-colors shrink-0">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+
+            {bpRules.length === 0 && (
+              <p className="text-xs text-text-secondary text-center py-2">No breakpoints. Add a URL pattern above.</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

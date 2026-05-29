@@ -96,3 +96,4 @@
 
 
 Breakpoints (Ngắt quãng): Dừng request/response trước khi gửi/nhận để chỉnh sửa header, body, status code theo thời gian thực.
+Intruder (Tấn công tự động)	Gửi cùng một request với nhiều payload (từ danh sách, brute-force, số, ngày tháng…) vào các vị trí được đánh dấu, dùng để phát hiện SQLi, XSS, IDOR…
