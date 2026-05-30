@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { RequestTable } from './RequestTable';
 import { WaterfallView } from './WaterfallView';
-import { NetworkRequest } from '../../../../types/inspector';
+import { WebSocketTable } from './WebSocketTable';
+import { NetworkRequest, WebSocketConnection } from '../../../../types/inspector';
 import { InspectorFilter, initialFilterState } from '../RequestDetails/Filter';
-import { List, BarChart2 } from 'lucide-react';
+import { Tooltip } from '../Sidebar/Tooltip';
+import { List, BarChart2, Wifi } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 
 interface RequestListProps {
@@ -24,6 +26,11 @@ interface RequestListProps {
   setFilter: (filter: InspectorFilter) => void;
   onAnalyzeRequest?: (req: NetworkRequest) => void;
   onSendToFuzzer?: (req: NetworkRequest) => void;
+  // WebSocket
+  wsConnections: WebSocketConnection[];
+  selectedWsId: string | null;
+  onSelectWsConnection: (id: string | null) => void;
+  onDeleteWsConnection: (id: string) => void;
 }
 
 export function RequestList({
@@ -44,42 +51,64 @@ export function RequestList({
   setFilter,
   onAnalyzeRequest,
   onSendToFuzzer,
+  wsConnections,
+  selectedWsId,
+  onSelectWsConnection,
+  onDeleteWsConnection,
 }: RequestListProps) {
-  const [view, setView] = useState<'table' | 'timeline'>('table');
+  const [view, setView] = useState<'table' | 'timeline' | 'websocket'>('table');
 
   return (
     <div className="h-full flex">
       {/* Left tab bar */}
-      <div className="w-12 border-r border-divider flex flex-col items-center py-2 gap-1.5 shrink-0 bg-table-headerBg">
-        <button
-          onClick={() => setView('table')}
-          title="Table View"
-          className={cn(
-            'w-6 h-6 flex items-center justify-center rounded transition-colors',
-            view === 'table'
-              ? 'bg-primary/15 text-primary'
-              : 'text-text-secondary hover:text-text-primary hover:bg-muted/50',
-          )}
-        >
-          <List className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => setView('timeline')}
-          title="Timeline View"
-          className={cn(
-            'w-6 h-6 flex items-center justify-center rounded transition-colors',
-            view === 'timeline'
-              ? 'bg-primary/15 text-primary'
-              : 'text-text-secondary hover:text-text-primary hover:bg-muted/50',
-          )}
-        >
-          <BarChart2 className="w-3.5 h-3.5" />
-        </button>
+      <div className="w-12 border-r border-border flex flex-col items-center py-3 gap-1.5 shrink-0 bg-table-headerBg z-10">
+        <Tooltip title="Table View" description="View HTTP/HTTPS requests in a table" side="right">
+          <button
+            onClick={() => setView('table')}
+            className={cn(
+              'relative flex items-center justify-center w-8 h-8 rounded-md transition-all border',
+              view === 'table'
+                ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent',
+            )}
+          >
+            <List className="w-4 h-4 shrink-0" />
+          </button>
+        </Tooltip>
+        <Tooltip title="Timeline View" description="Waterfall chart of request timing" side="right">
+          <button
+            onClick={() => setView('timeline')}
+            className={cn(
+              'relative flex items-center justify-center w-8 h-8 rounded-md transition-all border',
+              view === 'timeline'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent',
+            )}
+          >
+            <BarChart2 className="w-4 h-4 shrink-0" />
+          </button>
+        </Tooltip>
+        <Tooltip title="WebSocket" description="View WebSocket connections and messages" side="right">
+          <button
+            onClick={() => setView('websocket')}
+            className={cn(
+              'relative flex items-center justify-center w-8 h-8 rounded-md transition-all border',
+              view === 'websocket'
+                ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent',
+            )}
+          >
+            <Wifi className="w-4 h-4 shrink-0" />
+            {wsConnections.filter((c) => c.status === 'connected').length > 0 && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border border-background" />
+            )}
+          </button>
+        </Tooltip>
       </div>
 
       {/* Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {filteredRequests.length === 0 && requests.length > 0 && (
+        {view === 'table' && filteredRequests.length === 0 && requests.length > 0 && (
           <div className="p-4 bg-warning/10 text-warning text-xs text-center border-b border-warning/20 shrink-0">
             All {requests.length} requests are hidden by filters.
             <button
@@ -107,6 +136,15 @@ export function RequestList({
             onSetCompare2={onSetCompare2}
             onAnalyzeRequest={onAnalyzeRequest}
             onSendToFuzzer={onSendToFuzzer}
+          />
+        ) : view === 'websocket' ? (
+          <WebSocketTable
+            connections={wsConnections}
+            selectedWsId={selectedWsId}
+            onSelectConnection={onSelectWsConnection}
+            onDeleteConnection={onDeleteWsConnection}
+            searchTerm={searchTerm}
+            onSearchTermChange={onSearchTermChange}
           />
         ) : (
           <WaterfallView

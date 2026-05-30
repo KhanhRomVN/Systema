@@ -34,6 +34,7 @@ export interface InspectorContext {
   targetApp: string;
   emulatorSerial?: string;
   appId?: string;
+  platform?: 'web' | 'pc' | 'android' | 'cli';
   compareRequest1?: NetworkRequest | null;
   compareRequest2?: NetworkRequest | null;
   onClearComparison?: () => void;
@@ -290,19 +291,39 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     );
   };
 
-  const tabs = [
-    { id: 'chat', label: 'Chat', icon: MessageSquare, color: 'blue', description: 'AI-powered chat assistant for debugging and analysis' },
-    { id: 'target', label: 'Target', icon: Crosshair, color: 'emerald', description: 'Select and manage target applications' },
-    { id: 'sources', label: 'Sources', icon: FileCode, color: 'purple', description: 'View and analyze source code files' },
-    { id: 'logs', label: 'Log', icon: TerminalSquare, color: 'green', description: 'Real-time log viewer and filter' },
-    { id: 'collections', label: 'Composers Manager', icon: BookmarkPlus, color: 'orange', description: 'Save and organize HTTP requests' },
-    { id: 'trace', label: 'Trace', icon: GitBranch, color: 'pink', description: 'Request trace and call hierarchy' },
-    { id: 'compare', label: 'Compare', icon: ArrowRightLeft, color: 'indigo', description: 'Compare two requests side by side' },
-    { id: 'crypto', label: 'Crypto', icon: KeyRound, color: 'yellow', description: 'Cryptographic tools and analysis' },
-    { id: 'media', label: 'Media', icon: Image, color: 'blue', description: 'Media files and assets viewer' },
-    { id: 'wasm', label: 'WASM', icon: Cpu, color: 'purple', description: 'WebAssembly module analyzer' },
-    { id: 'fuzzer', label: 'Fuzzer', icon: Zap, color: 'amber', description: 'Spam HTTPS với nhiều payload' },
+  const allTabs = [
+    { id: 'chat', label: 'Chat', icon: MessageSquare, color: 'blue', description: 'AI-powered chat assistant for debugging and analysis', showAlways: true },
+    { id: 'target', label: 'Target', icon: Crosshair, color: 'emerald', description: 'Select and manage target applications', showAlways: true },
+    { id: 'sources', label: 'Sources', icon: FileCode, color: 'purple', description: 'View and analyze source code files', platforms: ['web'] as Array<'web' | 'pc' | 'android' | 'cli'> },
+    { id: 'logs', label: 'Log', icon: TerminalSquare, color: 'green', description: 'Real-time log viewer and filter', platforms: ['android'] as Array<'web' | 'pc' | 'android' | 'cli'> },
+    { id: 'collections', label: 'Composers Manager', icon: BookmarkPlus, color: 'orange', description: 'Save and organize HTTP requests', showAlways: true },
+    { id: 'trace', label: 'Trace', icon: GitBranch, color: 'pink', description: 'Request trace and call hierarchy', showAlways: true },
+    { id: 'compare', label: 'Compare', icon: ArrowRightLeft, color: 'indigo', description: 'Compare two requests side by side', showAlways: true },
+    { id: 'crypto', label: 'Crypto', icon: KeyRound, color: 'yellow', description: 'Cryptographic tools and analysis', showAlways: true },
+    { id: 'media', label: 'Media', icon: Image, color: 'blue', description: 'Media files and assets viewer', showAlways: true },
+    { id: 'wasm', label: 'WASM', icon: Cpu, color: 'purple', description: 'WebAssembly module analyzer', showAlways: true },
+    { id: 'fuzzer', label: 'Fuzzer', icon: Zap, color: 'amber', description: 'Spam HTTPS với nhiều payload', showAlways: true },
   ] as const;
+
+  const platform = inspectorContext.platform;
+  
+  const tabs = allTabs.filter(tab => {
+    if ('showAlways' in tab && tab.showAlways) return true;
+    if ('platforms' in tab && tab.platforms && platform) {
+      return tab.platforms.includes(platform);
+    }
+    // Nếu tab có điều kiện platforms nhưng platform hiện tại không khớp → ẩn
+    if ('platforms' in tab) return false;
+    return true; // Hiển thị nếu không có điều kiện
+  });
+
+  // Auto-switch về 'chat' nếu tab hiện tại bị ẩn
+  useEffect(() => {
+    const isTabVisible = tabs.some(t => t.id === activeTab);
+    if (!isTabVisible) {
+      setActiveTab('chat');
+    }
+  }, [tabs, activeTab]);
 
   const colorMap: Record<string, string> = {
     blue: 'bg-blue-500/10 text-blue-400 border-blue-500/30',

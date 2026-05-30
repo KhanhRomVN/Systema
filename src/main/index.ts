@@ -427,16 +427,27 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('proxy:stop', async () => {
-    proxyManager.stopAll();
+    console.log('[IPC] proxy:stop called');
+    await proxyManager.stopAll();
     closeAllGenericWebWindows();
     if (activeChildProcess) {
+      console.log('[IPC] Killing active child process');
       activeChildProcess.kill();
       activeChildProcess = null;
     }
     if (activeProxyUrl) {
+      console.log(`[IPC] Purging processes with proxy ${activeProxyUrl}`);
       exec(`pkill -f -- "--proxy-server=${activeProxyUrl}"`);
       activeProxyUrl = null;
     }
+    console.log('[IPC] proxy:stop completed');
+    return true;
+  });
+
+  ipcMain.handle('proxy:stop-session', async (_, appId: string) => {
+    console.log(`[IPC] proxy:stop-session called for "${appId}"`);
+    await proxyManager.stopSession(appId);
+    console.log(`[IPC] proxy:stop-session completed for "${appId}"`);
     return true;
   });
 
@@ -494,11 +505,23 @@ app.whenReady().then(async () => {
       },
     );
     activeChildProcess = child;
+    console.log(`[LaunchBrowser] Spawned browser PID: ${child.pid}, profile: ${profileName}, proxy: ${proxyUrl}`);
 
-    child.on('exit', () => {
+    child.on('exit', (code, signal) => {
+      console.log(`[LaunchBrowser] Browser exited: PID=${child.pid}, code=${code}, signal=${signal}, profile=${profileName}`);
       if (activeChildProcess === child) {
         activeChildProcess = null;
         activeProxyUrl = null;
+        // Notify renderer that the browser was closed
+        const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+        if (win) {
+          console.log(`[LaunchBrowser] Sending app:process-exit for "${profileName}"`);
+          win.webContents.send('app:process-exit', profileName);
+        } else {
+          console.log('[LaunchBrowser] No main window found to send exit event');
+        }
+      } else {
+        console.log('[LaunchBrowser] activeChildProcess !== child, not sending exit event');
       }
     });
 
@@ -563,9 +586,12 @@ app.whenReady().then(async () => {
         child.on('exit', () => {
           if (activeChildProcess === child) {
             activeChildProcess = null;
-            // Don't clear activeProxyUrl here immediately, as we might want to ensure cleanup on explicit stop
-            // But effectively if it exits, it's gone.
             activeProxyUrl = null;
+            // Notify renderer that the process was closed
+            const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+            if (win) {
+              win.webContents.send('app:process-exit', appName);
+            }
           }
         });
 
@@ -662,6 +688,11 @@ app.whenReady().then(async () => {
 
         child.unref();
         return true;
+      }
+
+      // All Websites - launch browser with Google as default start page
+      if (appName === '__all_websites__') {
+        return launchBrowser('https://google.com', appName, proxyUrl);
       }
 
       // App Configurations Map for Electron Mode
@@ -1800,8 +1831,8 @@ app.whenReady().then(async () => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 // explicit with Cmd + Q.
-const cleanup = () => {
-  proxyManager.stopAll();
+const cleanup = async () => {
+  await proxyManager.stopAll();
   closeAllGenericWebWindows();
   if (activeChildProcess) {
     activeChildProcess.kill();

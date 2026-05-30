@@ -31,6 +31,36 @@ export interface NetworkRequest {
   securityIssues?: SecurityIssue[];
 }
 
+export interface WebSocketConnection {
+  id: string;
+  url: string;
+  host: string;
+  path: string;
+  status: 'connecting' | 'connected' | 'closed';
+  clientCloseCode?: number;
+  serverCloseCode?: number;
+  clientCloseReason?: string;
+  serverCloseReason?: string;
+  startTime: number;
+  endTime?: number;
+  messages: WebSocketMessage[];
+  totalMessages: number;
+  clientBytesSent: number;
+  serverBytesSent: number;
+  requestHeaders: Record<string, string>;
+  responseHeaders: Record<string, string>;
+}
+
+export interface WebSocketMessage {
+  id: string;
+  connectionId: string;
+  direction: 'client' | 'server';
+  data: string; // text or base64 for binary
+  dataType: 'text' | 'binary';
+  size: number;
+  timestamp: number;
+}
+
 export const MOCK_REQUESTS: NetworkRequest[] = [
   {
     id: '1',

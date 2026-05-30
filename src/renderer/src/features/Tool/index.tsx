@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Globe } from 'lucide-react';
 import { cn } from '../../shared/lib/utils';
-import { MemoryMonitor } from '../../core/components/common/MemoryMonitor';
 import { ResizableSplit } from '../../core/components/common/ResizableSplit';
 import { SaveProfileModal } from '../../core/components/common/modal/SaveProfileModal';
 import { SSLBypassModal } from '../../core/components/common/modal/SSLBypassModal';
-import { NetworkRequest } from '../../types/inspector';
+import { NetworkRequest, WebSocketConnection, WebSocketMessage } from '../../types/inspector';
 import { InspectorProfile, createProfile } from '../../utils/profiles';
 import { generateRequestAnalysis } from '../../utils/analysisGenerator';
 import { scanRequest } from './utils/securityScanner';
@@ -27,8 +26,11 @@ export default function InspectorPage() {
   const [isScanning, setIsScanning] = useState(true);
   const [selectedApp, setSelectedApp] = useState<string>('');
   const [currentAppName, setCurrentAppName] = useState<string>('');
+  const [targetUrl, setTargetUrl] = useState<string>('');
   const [requests, setRequests] = useState<NetworkRequest[]>([]);
   const [platform, setPlatform] = useState<'web' | 'pc' | 'android' | undefined>();
+  const [wsConnections, setWsConnections] = useState<WebSocketConnection[]>([]);
+  const [selectedWsId, setSelectedWsId] = useState<string | null>(null);
   const [fridaStatus, setFridaStatus] = useState<
     'running' | 'installed' | 'not_installed' | 'unknown'
   >('unknown');
@@ -266,6 +268,65 @@ export default function InspectorPage() {
     );
   }, []);
 
+  // ─── WebSocket Handlers ──────────────────────────────────────────────────
+  const handleWsConnect = useCallback((_: any, data: any) => {
+    console.log('[Inspector WS] Connect:', data.id, data.url);
+    setWsConnections((prev) => {
+      if (prev.some((c) => c.id === data.id)) return prev;
+      return [...prev, { ...data, messages: [], totalMessages: 0, clientBytesSent: 0, serverBytesSent: 0 }];
+    });
+  }, []);
+
+  const handleWsMessage = useCallback((_: any, data: WebSocketMessage) => {
+    setWsConnections((prev) =>
+      prev.map((conn) => {
+        if (conn.id !== data.connectionId) return conn;
+        return {
+          ...conn,
+          messages: [...conn.messages, data],
+          totalMessages: conn.totalMessages + 1,
+          clientBytesSent: conn.clientBytesSent + (data.direction === 'client' ? data.size : 0),
+          serverBytesSent: conn.serverBytesSent + (data.direction === 'server' ? data.size : 0),
+        };
+      }),
+    );
+  }, []);
+
+  const handleWsUpdate = useCallback((_: any, data: any) => {
+    setWsConnections((prev) =>
+      prev.map((conn) => {
+        if (conn.id !== data.id) return conn;
+        return {
+          ...conn,
+          status: data.status || conn.status,
+          responseHeaders: data.responseHeaders || conn.responseHeaders,
+          totalMessages: data.totalMessages ? conn.totalMessages + data.totalMessages : conn.totalMessages,
+          clientBytesSent: data.clientBytesSent ? conn.clientBytesSent + data.clientBytesSent : conn.clientBytesSent,
+          serverBytesSent: data.serverBytesSent ? conn.serverBytesSent + data.serverBytesSent : conn.serverBytesSent,
+        };
+      }),
+    );
+  }, []);
+
+  const handleWsClose = useCallback((_: any, data: any) => {
+    console.log('[Inspector WS] Close:', data.id);
+    setWsConnections((prev) =>
+      prev.map((conn) => {
+        if (conn.id !== data.id) return conn;
+        return {
+          ...conn,
+          status: 'closed' as const,
+          endTime: data.endTime || Date.now(),
+        };
+      }),
+    );
+  }, []);
+
+  const handleDeleteWsConnection = useCallback((id: string) => {
+    setWsConnections((prev) => prev.filter((c) => c.id !== id));
+    if (selectedWsId === id) setSelectedWsId(null);
+  }, [selectedWsId]);
+
   useEffect(() => {
     if (!isScanning) return;
     window.api.on('proxy:request', handleRequest);
@@ -275,6 +336,10 @@ export default function InspectorPage() {
     window.api.on('cdp:request', handleRequest);
     window.api.on('cdp:response', handleResponse);
     window.api.on('cdp:response-body', handleResponseBody);
+    window.api.on('ws:connect', handleWsConnect);
+    window.api.on('ws:message', handleWsMessage);
+    window.api.on('ws:update', handleWsUpdate);
+    window.api.on('ws:close', handleWsClose);
     return () => {
       window.api.off('proxy:request', handleRequest);
       window.api.off('proxy:request-body', handleRequestBody);
@@ -283,29 +348,75 @@ export default function InspectorPage() {
       window.api.off('cdp:request', handleRequest);
       window.api.off('cdp:response', handleResponse);
       window.api.off('cdp:response-body', handleResponseBody);
+      window.api.off('ws:connect', handleWsConnect);
+      window.api.off('ws:message', handleWsMessage);
+      window.api.off('ws:update', handleWsUpdate);
+      window.api.off('ws:close', handleWsClose);
       window.api.invoke('app:terminate').catch(console.error);
     };
-  }, [isScanning, handleRequest, handleRequestBody, handleResponse, handleResponseBody]);
+  }, [isScanning, handleRequest, handleRequestBody, handleResponse, handleResponseBody, handleWsConnect, handleWsMessage, handleWsUpdate, handleWsClose]);
 
   const handleStopSession = async () => {
+    console.log('[Inspector] handleStopSession called, selectedApp:', selectedApp);
     try {
       if (selectedApp) {
         const allApps: any[] = await window.api.invoke('apps:get-all');
         const app = allApps.find((a) => a.id === selectedApp);
         if (app?.platform === 'android' && app?.emulatorSerial) {
+          console.log('[Inspector] Clearing mobile proxy...');
           await window.api.invoke('mobile:clear-proxy', app.emulatorSerial, app.name);
         }
       }
+      console.log('[Inspector] Calling proxy:stop...');
       await window.api.invoke('proxy:stop');
+      console.log('[Inspector] proxy:stop completed');
+      console.log('[Inspector] Calling app:terminate...');
       await window.api.invoke('app:terminate');
+      console.log('[Inspector] app:terminate completed');
     } catch (error) {
-      console.error('Error stopping proxy:', error);
+      console.error('[Inspector] Error stopping proxy:', error);
     }
+    console.log('[Inspector] Resetting state...');
     setSelectedApp('');
     setCurrentAppName('');
+    setTargetUrl('');
     setPlatform(undefined);
+    setWsConnections([]);
+    setSelectedWsId(null);
+    console.log('[Inspector] handleStopSession done');
     // Do NOT clear requests array when stopping
   };
+
+  // Auto-shutdown when browser/process is closed externally
+  const selectedAppRef = useRef(selectedApp);
+  selectedAppRef.current = selectedApp;
+  const handleStopSessionRef = useRef(handleStopSession);
+  handleStopSessionRef.current = handleStopSession;
+  const isStoppingRef = useRef(false);
+
+  useEffect(() => {
+    const handleProcessExit = (_: any, appId: string) => {
+      console.log(`[Inspector] Process exited: ${appId}, current: ${selectedAppRef.current}, isStopping: ${isStoppingRef.current}`);
+      if (appId !== selectedAppRef.current) {
+        console.log('[Inspector] appId does not match current, ignoring');
+        return;
+      }
+      if (isStoppingRef.current) {
+        console.log('[Inspector] Already stopping, ignoring duplicate event');
+        return;
+      }
+      isStoppingRef.current = true;
+      console.log('[Inspector] Auto-shutting down target...');
+      handleStopSessionRef.current().finally(() => {
+        console.log('[Inspector] Stop session completed, resetting isStopping');
+        isStoppingRef.current = false;
+      });
+    };
+    window.api.on('app:process-exit', handleProcessExit);
+    return () => {
+      window.api.off('app:process-exit', handleProcessExit);
+    };
+  }, []);
 
   const [isConfirmSwitchOpen, setIsConfirmSwitchOpen] = useState(false);
   const [isConfirmStopOpen, setIsConfirmStopOpen] = useState(false);
@@ -315,19 +426,22 @@ export default function InspectorPage() {
     customUrl?: string;
     mode?: 'browser' | 'electron' | 'native';
   } | null>(null);
-
   const executeLaunchApp = async (
     appName: string,
     _proxyUrl: string,
     customUrl?: string,
     mode?: 'browser' | 'electron' | 'native',
   ) => {
+    console.log(`[Inspector] executeLaunchApp called: appName="${appName}", mode="${mode}"`);
     try {
+      console.log('[Inspector] Calling proxy:create-session...');
       const port = await window.api.invoke('proxy:create-session', appName);
+      console.log(`[Inspector] Got port: ${port}`);
       const dynamicProxyUrl = `http://127.0.0.1:${port}`;
       const allApps: any[] = await window.api.invoke('apps:get-all');
       const app = allApps.find((a) => a.id === appName);
       if (app?.platform === 'android' && app?.emulatorSerial) {
+        console.log('[Inspector] Configuring mobile proxy...');
         const configured = await window.api.invoke(
           'mobile:configure-proxy',
           app.emulatorSerial,
@@ -340,6 +454,7 @@ export default function InspectorPage() {
             'Failed to configure proxy on device.\nHTTPS tracking may not work.\n\nPlease ensure the device is connected and ADB is working.',
           );
       }
+      console.log('[Inspector] Calling app:launch...');
       const launched = await window.api.invoke(
         'app:launch',
         appName,
@@ -347,12 +462,29 @@ export default function InspectorPage() {
         customUrl,
         mode,
       );
+      console.log(`[Inspector] app:launch result: ${launched}`);
       if (launched) {
         setSelectedApp(appName);
+        setTargetUrl(customUrl || dynamicProxyUrl);
         setRequests([]);
-      } else console.error('[Inspector] ❌ Failed to launch app');
+        console.log('[Inspector] Launch successful, state updated');
+      } else {
+        console.error('[Inspector] ❌ Failed to launch app');
+        // Cleanup: stop only the proxy session that was just created
+        console.log('[Inspector] Cleaning up session after failed launch...');
+        await window.api.invoke('proxy:stop-session', appName);
+        console.log('[Inspector] Cleanup done');
+      }
     } catch (error) {
       console.error('[Inspector] ❌ Error starting proxy or launching app:', error);
+      // Cleanup on error: stop only this session
+      try {
+        console.log('[Inspector] Cleaning up session after error...');
+        await window.api.invoke('proxy:stop-session', appName);
+        console.log('[Inspector] Cleanup done');
+      } catch (cleanupError) {
+        console.error('[Inspector] ❌ Error during cleanup:', cleanupError);
+      }
     }
   };
 
@@ -362,11 +494,14 @@ export default function InspectorPage() {
     customUrl?: string,
     mode?: 'browser' | 'electron' | 'native',
   ) => {
+    console.log(`[Inspector] handleSelectApp: appName="${appName}", selectedApp="${selectedApp}"`);
     if (selectedApp) {
+      console.log('[Inspector] Another app is active, opening confirm switch modal');
       setPendingSwitchData({ appName, proxyUrl: _proxyUrl, customUrl, mode });
       setIsConfirmSwitchOpen(true);
       return;
     }
+    console.log('[Inspector] No active app, launching directly');
     await executeLaunchApp(appName, _proxyUrl, customUrl, mode);
   };
 
@@ -660,6 +795,7 @@ export default function InspectorPage() {
       targetApp: appName,
       emulatorSerial: emulatorSerial || '',
       appId: selectedApp || '',
+      platform: platform,
       compareRequest1,
       compareRequest2,
       onClearComparison: handleClearComparison,
@@ -684,7 +820,7 @@ export default function InspectorPage() {
   }, [
     requests, filteredRequests, selectedId, filter, handleDeleteRequest,
     handleSelectSavedRequest, analyzingRequest, handleClearAnalyzing,
-    activeSidebarTab, appName, emulatorSerial, selectedApp,
+    activeSidebarTab, appName, emulatorSerial, selectedApp, platform,
     compareRequest1, compareRequest2, handleClearComparison,
     handleJumpToValue, handleCompareRequests, initialDiffTab, initialDiffSearch,
     handleSelectApp, handleStopSession, handleLoadProfile,
@@ -697,75 +833,60 @@ export default function InspectorPage() {
     <div className="h-screen w-screen bg-background">
       {/* ── Topbar ── */}
       <div className="h-10 border-b border-divider flex items-center px-3 bg-table-headerBg gap-3 select-none">
-        <span className="text-sm font-bold text-text-primary">Systema</span>
+        <span className="text-base font-bold text-text-primary">Systema</span>
         <div className="h-4 w-px bg-divider/50" />
         <div
           className={cn(
-            'text-xs px-2.5 rounded font-bold flex items-center gap-1.5 border select-none self-stretch',
-            selectedApp
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              : 'bg-primary/10 text-primary border-primary/20',
+            'text-xs px-2.5 py-0.5 rounded font-medium flex items-center gap-1.5 border select-none',
+            'bg-table-headerBg brightness-125 text-text-primary border-divider/50',
           )}
         >
           {selectedApp ? (
             <>
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-              </span>
-              Target: {appName}
+              <Globe className="w-3.5 h-3.5 shrink-0 text-text-secondary" />
+              <span className="font-semibold">{appName}</span>
+              <span className="text-text-secondary">|</span>
+              <span className="text-text-secondary truncate max-w-[200px]">{targetUrl}</span>
             </>
           ) : (
             <>
               <Globe className="w-3.5 h-3.5" />
-              No Target
+              <span className="text-text-secondary">No Target</span>
             </>
           )}
         </div>
 
         <div className="flex-1" />
 
-        <button
-          onClick={handleToggleIntercept}
-          title={isIntercepting ? 'Resume traffic (intercept ON)' : 'Pause traffic (intercept OFF)'}
-          className={cn(
-            'flex items-center justify-center w-7 h-7 rounded border transition-colors',
-            isIntercepting
-              ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
-              : 'bg-transparent text-text-secondary border-divider/50 hover:bg-secondary hover:text-text-primary',
-          )}
-        >
-          {isIntercepting ? (
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <rect x="6" y="5" width="4" height="14" rx="1" />
-              <rect x="14" y="5" width="4" height="14" rx="1" />
-            </svg>
-          ) : (
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          )}
-        </button>
-
-        <div className="flex items-center gap-2">
-          <div
-            title={`${requests.filter((r) => r.protocol === 'https').length} HTTPS requests`}
-            className="flex items-center gap-1.5 px-2 rounded bg-primary/10 text-primary text-xs whitespace-nowrap self-stretch"
+        {selectedApp && (
+          <button
+            onClick={handleToggleIntercept}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-medium transition-all',
+              isIntercepting
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                : 'bg-table-headerBg brightness-110 text-text-secondary border-divider/50 hover:brightness-125 hover:text-text-primary',
+            )}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-            <span className="font-medium">
-              {requests.filter((r) => r.protocol === 'https').length}
+            {isIntercepting ? (
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+            <span>Intercept</span>
+            <span className={cn(
+              'font-bold',
+              isIntercepting ? 'text-amber-400' : 'text-text-secondary',
+            )}>
+              {isIntercepting ? 'ON' : 'OFF'}
             </span>
-          </div>
-          <MemoryMonitor />
-        </div>
+          </button>
+        )}
 
         {platform === 'android' && (
           <div className="flex items-center gap-2 border-l border-divider/50 pl-2">
@@ -840,6 +961,10 @@ export default function InspectorPage() {
                 window.dispatchEvent(new CustomEvent('fuzzer:send-request', { detail: req }));
                 setActiveSidebarTab('fuzzer');
               }}
+              wsConnections={wsConnections}
+              selectedWsId={selectedWsId}
+              onSelectWsConnection={setSelectedWsId}
+              onDeleteWsConnection={handleDeleteWsConnection}
             />
 
             {/* ── RequestDetails (DetailSection) ── */}

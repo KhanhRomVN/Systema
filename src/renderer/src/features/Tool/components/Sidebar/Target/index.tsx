@@ -121,9 +121,24 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
     ), [appsByPlatform, activeTab, searchQuery]);
 
   const handleLaunchApp = async (app: UserApp, mode?: 'browser' | 'electron' | 'native') => {
+    if (isLaunching) {
+      console.log('[TargetSelector] Already launching, ignoring duplicate click');
+      return;
+    }
+    console.log(`[TargetSelector] handleLaunchApp: app="${app.name}", mode="${mode}"`);
     setIsLaunching(true);
-    try { await onSelectApp(app.id, 'http://127.0.0.1:8081', app.url, mode); }
-    catch (e) { console.error(e); } finally { setIsLaunching(false); }
+    recordUsage(app.id);
+    try {
+      console.log('[TargetSelector] Calling onSelectApp...');
+      await onSelectApp(app.id, 'http://127.0.0.1:8081', app.url, mode);
+      console.log('[TargetSelector] onSelectApp completed');
+    }
+    catch (e) {
+      console.error('[TargetSelector] Error in handleLaunchApp:', e);
+    } finally {
+      console.log('[TargetSelector] Resetting isLaunching');
+      setIsLaunching(false);
+    }
     setContextMenu(null);
   };
 
@@ -165,6 +180,19 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
 
   const contextMenuApp = contextMenu ? apps.find(a => a.id === contextMenu.appId) : null;
   const activePlatform = PLATFORM_TABS.find(t => t.id === activeTab)!;
+
+  // Recently used tracking
+  const [lastUsedTimestamps, setLastUsedTimestamps] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('systema-last-used') || '{}'); } catch { return {}; }
+  });
+
+  const recordUsage = (appId: string) => {
+    setLastUsedTimestamps(prev => {
+      const updated = { ...prev, [appId]: Date.now() };
+      localStorage.setItem('systema-last-used', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   return (
     <div className="flex flex-col h-full bg-table-bodyBg overflow-hidden relative">
@@ -216,8 +244,56 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
 
       {/* App list */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+        {/* All Websites card - always at top for web platform */}
+        {activeTab === 'web' && (
+          <div
+            onClick={(e) => {
+              if (activeAppId === '__all_websites__') return;
+              setContextMenu({ appId: '__all_websites__', x: e.clientX, y: e.clientY });
+            }}
+            onContextMenu={(e) => {
+              if (activeAppId === '__all_websites__') return;
+              e.preventDefault();
+              setContextMenu({ appId: '__all_websites__', x: e.clientX, y: e.clientY });
+            }}
+            className={cn(
+              "w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+              activeAppId === '__all_websites__'
+                ? "bg-sky-500/5 border-2 border-sky-500/40 hover:border-sky-500/60 hover:scale-[1.01]"
+                : "bg-table-headerBg border border-dashed border-sky-400/40 hover:bg-sky-500/5 hover:border-sky-400/60 hover:scale-[1.01]"
+            )}
+          >
+            <div className="w-11 h-11 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
+              <Globe className="w-5 h-5 text-sky-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-text-primary">All Websites</div>
+              <div className="text-xs text-text-secondary mt-0.5">Inspect any website without a specific target</div>
+            </div>
+            {activeAppId === '__all_websites__' && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (onOpenStopConfirm) {
+                    onOpenStopConfirm();
+                  } else {
+                    if (confirm('Stop the current tracking session?')) await onStopSession();
+                  }
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 rounded-lg transition-all active:scale-95 shrink-0"
+              >
+                <Square className="w-3 h-3 fill-current" /> Stop
+              </button>
+            )}
+          </div>
+        )}
+
         {(() => {
-          const sortedApps = [...filteredApps];
+          const sortedApps = [...filteredApps].sort((a, b) => {
+            const aTime = lastUsedTimestamps[a.id] || 0;
+            const bTime = lastUsedTimestamps[b.id] || 0;
+            return bTime - aTime; // most recent first
+          });
           const activeIndex = sortedApps.findIndex(app => app.id === activeAppId);
           if (activeIndex !== -1) {
             const [activeApp] = sortedApps.splice(activeIndex, 1);
@@ -287,36 +363,48 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
       </div>
 
       {/* Context menu (left click or right click) */}
-      {contextMenu && contextMenuApp && (
+      {contextMenu && (contextMenuApp || contextMenu.appId === '__all_websites__') && (
         <div ref={contextMenuRef}
           className="fixed z-50 bg-dialog-background border border-divider rounded-xl shadow-2xl py-1.5 min-w-[200px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}>
           {/* App info */}
-          <div className="px-4 py-2 border-b border-divider mb-1">
-            <div className="text-sm font-semibold text-text-primary truncate">{contextMenuApp.name}</div>
-            <div className="text-xs text-text-secondary truncate mt-0.5">{contextMenuApp.url || contextMenuApp.platform}</div>
-          </div>
+          {contextMenu.appId === '__all_websites__' ? (
+            <div className="px-4 py-2 border-b border-divider mb-1">
+              <div className="text-sm font-semibold text-text-primary truncate">All Websites</div>
+              <div className="text-xs text-text-secondary truncate mt-0.5">Inspect any website</div>
+            </div>
+          ) : (
+            <div className="px-4 py-2 border-b border-divider mb-1">
+              <div className="text-sm font-semibold text-text-primary truncate">{contextMenuApp!.name}</div>
+              <div className="text-xs text-text-secondary truncate mt-0.5">{contextMenuApp!.url || contextMenuApp!.platform}</div>
+            </div>
+          )}
 
           {/* Launch actions */}
-          {contextMenuApp.platform === 'web' && (
-            <button onClick={() => handleLaunchApp(contextMenuApp, 'browser')} disabled={isLaunching}
+          {contextMenu.appId === '__all_websites__' ? (
+            <button onClick={() => { recordUsage('__all_websites__'); onSelectApp('__all_websites__', 'http://127.0.0.1:8081', undefined, 'browser'); setContextMenu(null); }} disabled={isLaunching}
+              className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+              <Globe className="w-4 h-4 text-sky-400" />Launch Browser (All Websites)
+            </button>
+          ) : contextMenuApp!.platform === 'web' && (
+            <button onClick={() => handleLaunchApp(contextMenuApp!, 'browser')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
               <Globe className="w-4 h-4 text-sky-400" />Launch Browser
             </button>
           )}
-          {contextMenuApp.platform === 'pc' && (
+          {contextMenuApp && contextMenuApp.platform === 'pc' && (
             <button onClick={() => handleLaunchApp(contextMenuApp, 'electron')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
               <Monitor className="w-4 h-4 text-violet-400" />Launch App
             </button>
           )}
-          {contextMenuApp.platform === 'android' && (
+          {contextMenuApp && contextMenuApp.platform === 'android' && (
             <button onClick={() => handleLaunchApp(contextMenuApp, 'electron')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
               <Smartphone className="w-4 h-4 text-emerald-400" />Connect & Inspect
             </button>
           )}
-          {contextMenuApp.platform === 'cli' && (
+          {contextMenuApp && contextMenuApp.platform === 'cli' && (
             <button onClick={() => handleLaunchApp(contextMenuApp, 'native')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
               <Terminal className="w-4 h-4 text-amber-400" />Run in Terminal
@@ -324,7 +412,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
           )}
 
           {/* Profile restore */}
-          {(() => {
+          {contextMenuApp && (() => {
             const profile = getAppProfile(contextMenuApp.id, contextMenuApp.name);
             if (!profile) return null;
             return (
@@ -336,16 +424,18 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
             );
           })()}
 
-          <div className="border-t border-divider mt-1 pt-1">
-            <button onClick={() => openEditDrawer(contextMenuApp)}
-              className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Pencil className="w-4 h-4 text-text-secondary" />Edit Target
-            </button>
-            <button onClick={() => openDeleteDrawer(contextMenuApp.id, contextMenuApp.name)}
-              className="w-full px-4 py-2 text-sm text-left hover:bg-red-500/10 text-red-400 flex items-center gap-2.5">
-              <Trash2 className="w-4 h-4" />Delete Target
-            </button>
-          </div>
+          {contextMenuApp && (
+            <div className="border-t border-divider mt-1 pt-1">
+              <button onClick={() => openEditDrawer(contextMenuApp)}
+                className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+                <Pencil className="w-4 h-4 text-text-secondary" />Edit Target
+              </button>
+              <button onClick={() => openDeleteDrawer(contextMenuApp.id, contextMenuApp.name)}
+                className="w-full px-4 py-2 text-sm text-left hover:bg-red-500/10 text-red-400 flex items-center gap-2.5">
+                <Trash2 className="w-4 h-4" />Delete Target
+              </button>
+            </div>
+          )}
         </div>
       )}
 

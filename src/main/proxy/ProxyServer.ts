@@ -14,14 +14,14 @@ import { WebSocketServer, WebSocket as WS } from 'ws';
 
 export interface BreakpointRule {
   id: string;
-  urlPattern: string;   // substring or regex string
-  methods: string[];    // empty = all
+  urlPattern: string; // substring or regex string
+  methods: string[]; // empty = all
   phase: 'request' | 'response' | 'both';
   enabled: boolean;
 }
 
 export interface PendingBreakpoint {
-  id: string;           // requestId
+  id: string; // requestId
   phase: 'request' | 'response';
   url: string;
   method: string;
@@ -81,24 +81,91 @@ export class ProxyServer extends EventEmitter {
   }
 
   public start(port: number = 8081): Promise<void> {
-    return new Promise(async (resolve) => {
-      if (this.isRunning) { resolve(); return; }
+    return new Promise(async (resolve, reject) => {
+      if (this.isRunning) {
+        console.log(`[ProxyServer] Already running, resolving start()`);
+        resolve();
+        return;
+      }
       this.port = port;
+      console.log(`[ProxyServer] Starting WSS on port ${port + 1}...`);
       await this.startWss(port + 1);
+      console.log(`[ProxyServer] WSS started, setting up listeners...`);
       this.setupListeners();
+      console.log(`[ProxyServer] Starting proxy on port ${port}...`);
       this.proxy.listen({ port, host: '0.0.0.0' }, () => {
         this.isRunning = true;
+        console.log(`[ProxyServer] Proxy listening on port ${port}`);
         this.emit('started', port);
         resolve();
+      });
+      this.proxy.on('error', (err: any) => {
+        console.error(`[ProxyServer] Error on proxy:`, err);
+        reject(err);
       });
     });
   }
 
-  public stop() {
-    if (!this.isRunning) return;
-    this.proxy.close();
-    this.wss?.close();
+  public async stop(): Promise<void> {
+    console.log(`[ProxyServer] stop() called, isRunning=${this.isRunning}, port=${this.port}`);
+    if (!this.isRunning) {
+      console.log('[ProxyServer] Already stopped, returning');
+      return;
+    }
     this.isRunning = false;
+
+    // Close WebSocket server first
+    if (this.wss) {
+      console.log('[ProxyServer] Closing WSS...');
+      try {
+        await new Promise<void>((resolve) => {
+          this.wss!.close(() => {
+            console.log('[ProxyServer] WSS closed');
+            resolve();
+          });
+        });
+      } catch (e) {
+        console.error('[ProxyServer] Error closing WSS:', e);
+      }
+      this.wss = null;
+    }
+
+    // Close proxy server and wait for it to fully release the port
+    // Use a timeout to prevent hanging if the callback is never called
+    console.log('[ProxyServer] Closing proxy server on port', this.port);
+    try {
+      await new Promise<void>((resolve) => {
+        let resolved = false;
+        const done = () => {
+          if (!resolved) {
+            resolved = true;
+            console.log('[ProxyServer] Proxy close done (port released)');
+            resolve();
+          }
+        };
+
+        // Set a timeout to prevent hanging indefinitely
+        const timeout = setTimeout(() => {
+          console.warn('[ProxyServer] close() timed out after 3s, forcing resolve');
+          done();
+        }, 3000);
+
+        try {
+          this.proxy.close(() => {
+            clearTimeout(timeout);
+            console.log('[ProxyServer] proxy.close() callback fired');
+            done();
+          });
+        } catch (e) {
+          clearTimeout(timeout);
+          console.error('[ProxyServer] Error calling proxy.close():', e);
+          done();
+        }
+      });
+    } catch (e) {
+      console.error('[ProxyServer] Error during stop:', e);
+    }
+    console.log('[ProxyServer] stop() completed');
   }
 
   public setBreakpointRules(rules: BreakpointRule[]) {
@@ -115,8 +182,12 @@ export class ProxyServer extends EventEmitter {
     return false;
   }
 
-  private matchesBreakpoint(url: string, method: string, phase: 'request' | 'response'): BreakpointRule | undefined {
-    return this.breakpointRules.find(rule => {
+  private matchesBreakpoint(
+    url: string,
+    method: string,
+    phase: 'request' | 'response',
+  ): BreakpointRule | undefined {
+    return this.breakpointRules.find((rule) => {
       if (!rule.enabled) return false;
       if (rule.phase !== 'both' && rule.phase !== phase) return false;
       if (rule.methods.length > 0 && !rule.methods.includes(method.toUpperCase())) return false;
@@ -128,15 +199,19 @@ export class ProxyServer extends EventEmitter {
     });
   }
 
-  private waitForBreakpointResolution(pending: PendingBreakpoint): Promise<PendingBreakpoint | null> {
-    return new Promise(resolve => {
+  private waitForBreakpointResolution(
+    pending: PendingBreakpoint,
+  ): Promise<PendingBreakpoint | null> {
+    return new Promise((resolve) => {
       this.pendingBreakpoints.set(pending.id, resolve);
       this.sendToRenderer('proxy:breakpoint-hit', pending);
     });
   }
 
   public setIntercept(enabled: boolean) {
-    console.log(`[Intercept] setIntercept(${enabled}), pending=${this.pendingRequests.size}, wsClients=${this.wss?.clients.size ?? 0}`);
+    console.log(
+      `[Intercept] setIntercept(${enabled}), pending=${this.pendingRequests.size}, wsClients=${this.wss?.clients.size ?? 0}`,
+    );
     this.isIntercepting = enabled;
     this.broadcastIntercept();
     if (!enabled) {
@@ -196,6 +271,168 @@ export class ProxyServer extends EventEmitter {
       const host = hostUrl.split(':')[0];
       const port = parseInt(hostUrl.split(':')[1]) || 443;
 
+      // Check if this is a WebSocket upgrade request
+      const isWebSocket = req.headers?.upgrade?.toLowerCase() === 'websocket';
+
+      if (isWebSocket) {
+        console.log(`[ProxyServer WS] WebSocket upgrade: ${hostUrl}`);
+        const wsId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        const wsUrl = `wss://${host}${req.url || ''}`;
+        const wsPath = req.url || '/';
+
+        // Send connection info to renderer
+        this.sendToRenderer('ws:connect', {
+          id: wsId,
+          url: wsUrl,
+          host: host,
+          path: wsPath,
+          status: 'connecting',
+          startTime: Date.now(),
+          messages: [],
+          totalMessages: 0,
+          clientBytesSent: 0,
+          serverBytesSent: 0,
+          requestHeaders: req.headers || {},
+          responseHeaders: {},
+        });
+
+        const conn = net.connect({ port, host, allowHalfOpen: true }, () => {
+          // Forward the CONNECT success to client
+          socket.write('HTTP/1.1 200 Connection Established\r\n\r\n', 'utf-8', () => {
+            // Now client will send WebSocket upgrade, forward everything
+
+            let clientBuffer = Buffer.alloc(0);
+            let serverBuffer = Buffer.alloc(0);
+
+            // Capture server response headers (first response from server)
+            let responseHeadersCaptured = false;
+            let serverHeaderBuffer = '';
+
+            conn.on('data', (data: Buffer) => {
+              // Capture WebSocket frames
+              const frameInfo = this.parseWebSocketFrame(data, 'server');
+              if (frameInfo) {
+                this.sendToRenderer('ws:message', {
+                  id: `ws-msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                  connectionId: wsId,
+                  direction: 'server',
+                  data: frameInfo.isBinary
+                    ? data.toString('base64')
+                    : frameInfo.payload || data.toString('utf8'),
+                  dataType: frameInfo.isBinary ? 'binary' : 'text',
+                  size: data.length,
+                  timestamp: Date.now(),
+                });
+
+                // Update connection stats
+                this.sendToRenderer('ws:update', {
+                  id: wsId,
+                  totalMessages: frameInfo.isControl ? undefined : 1, // increment handled by renderer
+                  serverBytesSent: data.length,
+                });
+              }
+
+              if (!responseHeadersCaptured) {
+                serverHeaderBuffer += data.toString('utf8');
+                const headerEnd = serverHeaderBuffer.indexOf('\r\n\r\n');
+                if (headerEnd !== -1) {
+                  responseHeadersCaptured = true;
+                  const headerStr = serverHeaderBuffer.substring(0, headerEnd);
+                  const headers: Record<string, string> = {};
+                  headerStr.split('\r\n').forEach((line) => {
+                    const colonIdx = line.indexOf(':');
+                    if (colonIdx > 0) {
+                      headers[line.substring(0, colonIdx).trim().toLowerCase()] = line
+                        .substring(colonIdx + 1)
+                        .trim();
+                    } else if (line.startsWith('HTTP/')) {
+                      headers[':status'] = line.split(' ')[1] || '101';
+                    }
+                  });
+                  this.sendToRenderer('ws:update', {
+                    id: wsId,
+                    status: 'connected',
+                    responseHeaders: headers,
+                  });
+                }
+              }
+
+              socket.write(data);
+            });
+
+            socket.on('data', (data: Buffer) => {
+              // Capture WebSocket frames
+              const frameInfo = this.parseWebSocketFrame(data, 'client');
+              if (frameInfo) {
+                this.sendToRenderer('ws:message', {
+                  id: `ws-msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                  connectionId: wsId,
+                  direction: 'client',
+                  data: frameInfo.isBinary
+                    ? data.toString('base64')
+                    : frameInfo.payload || data.toString('utf8'),
+                  dataType: frameInfo.isBinary ? 'binary' : 'text',
+                  size: data.length,
+                  timestamp: Date.now(),
+                });
+
+                this.sendToRenderer('ws:update', {
+                  id: wsId,
+                  totalMessages: frameInfo.isControl ? undefined : 1,
+                  clientBytesSent: data.length,
+                });
+              }
+
+              conn.write(data);
+            });
+
+            conn.on('close', () => {
+              this.sendToRenderer('ws:close', {
+                id: wsId,
+                endTime: Date.now(),
+                status: 'closed',
+              });
+              socket.end();
+            });
+
+            socket.on('close', () => {
+              this.sendToRenderer('ws:close', {
+                id: wsId,
+                endTime: Date.now(),
+                status: 'closed',
+              });
+              conn.end();
+            });
+
+            conn.on('error', (err: any) => {
+              if (err.code !== 'ECONNRESET') {
+                console.error(`[ProxyServer WS] Server error:`, err);
+              }
+            });
+
+            socket.on('error', (err: any) => {
+              if (err.code !== 'ECONNRESET') {
+                console.error(`[ProxyServer WS] Client error:`, err);
+              }
+            });
+          });
+        });
+
+        conn.on('error', (err: any) => {
+          if (err.code !== 'ECONNRESET') {
+            console.error(`[ProxyServer WS] Connection error:`, err);
+          }
+          this.sendToRenderer('ws:close', {
+            id: wsId,
+            endTime: Date.now(),
+            status: 'closed',
+          });
+          socket.destroy();
+        });
+
+        return; // Don't call callback(), we handle it manually
+      }
+
       // Danh sách các domain bỏ qua giải mã SSL (bypassed domains)
       const bypassList = [
         'cloudflare.com',
@@ -207,14 +444,16 @@ export class ProxyServer extends EventEmitter {
         'turnstile.cloudflare.com',
         'openai.com',
         'chatgpt.com',
-        'google-analytics.com'
+        'google-analytics.com',
       ];
 
-      const shouldBypass = bypassList.some((domain) => host.endsWith(domain) || host.includes(domain));
+      const shouldBypass = bypassList.some(
+        (domain) => host.endsWith(domain) || host.includes(domain),
+      );
 
       if (shouldBypass) {
         console.log(`[ProxyServer Connect] Bypassing SSL decryption (tunneling) for: ${hostUrl}`);
-        
+
         const conn = net.connect(
           {
             port,
@@ -232,7 +471,7 @@ export class ProxyServer extends EventEmitter {
               conn.pipe(socket);
               socket.pipe(conn);
             });
-          }
+          },
         );
 
         conn.on('error', (err: any) => {
@@ -612,13 +851,17 @@ export class ProxyServer extends EventEmitter {
                 encoding: contentEncoding,
                 size: buffer.length,
                 firstBytes,
-                contentType: req.headers['content-type']
+                contentType: req.headers['content-type'],
               });
 
               try {
                 const decompressed = await decompress(buffer);
                 body = Buffer.from(decompressed).toString('utf8');
-                console.log('[Proxy] Successfully decompressed zstd request:', body.length, 'bytes');
+                console.log(
+                  '[Proxy] Successfully decompressed zstd request:',
+                  body.length,
+                  'bytes',
+                );
                 console.log('[Proxy] Decompressed content preview:', body.slice(0, 200));
               } catch (e) {
                 console.error('[Proxy] ZSTD decompress failed:', e);
@@ -635,11 +878,21 @@ export class ProxyServer extends EventEmitter {
                 if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/.test(body)) {
                   // Contains control characters, likely binary
                   // Show first 64 bytes as hex for debugging
-                  const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                  const hexPreview =
+                    buffer
+                      .slice(0, 64)
+                      .toString('hex')
+                      .match(/.{1,2}/g)
+                      ?.join(' ') || '';
                   body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}\n\nContent-Type: ${req.headers['content-type'] || 'unknown'}`;
                 }
               } catch {
-                const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                const hexPreview =
+                  buffer
+                    .slice(0, 64)
+                    .toString('hex')
+                    .match(/.{1,2}/g)
+                    ?.join(' ') || '';
                 body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}`;
               }
             } else if (!body) {
@@ -648,11 +901,21 @@ export class ProxyServer extends EventEmitter {
                 body = buffer.toString('utf8');
                 // Check if it looks like valid text
                 if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/.test(body)) {
-                  const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                  const hexPreview =
+                    buffer
+                      .slice(0, 64)
+                      .toString('hex')
+                      .match(/.{1,2}/g)
+                      ?.join(' ') || '';
                   body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}`;
                 }
               } catch {
-                const hexPreview = buffer.slice(0, 64).toString('hex').match(/.{1,2}/g)?.join(' ') || '';
+                const hexPreview =
+                  buffer
+                    .slice(0, 64)
+                    .toString('hex')
+                    .match(/.{1,2}/g)
+                    ?.join(' ') || '';
                 body = `[Binary Content - ${buffer.length} bytes]\n\nFirst 64 bytes (hex):\n${hexPreview}`;
               }
             }
@@ -684,12 +947,14 @@ export class ProxyServer extends EventEmitter {
               reject(new Error('dropped'));
             },
           });
-        }).then(() => {
-          console.log(`[Intercept] Resuming request ${requestId}`);
-          proceed();
-        }).catch(() => {
-          console.log(`[Intercept] Dropped request ${requestId}`);
-        });
+        })
+          .then(() => {
+            console.log(`[Intercept] Resuming request ${requestId}`);
+            proceed();
+          })
+          .catch(() => {
+            console.log(`[Intercept] Dropped request ${requestId}`);
+          });
       } else {
         proceed();
       }
@@ -897,6 +1162,105 @@ export class ProxyServer extends EventEmitter {
   private sendToRenderer(channel: string, data: any) {
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send(channel, data);
+    }
+  }
+
+  /**
+   * Parse a WebSocket frame and extract metadata
+   * Returns null if the data doesn't look like a valid WebSocket frame
+   */
+  private parseWebSocketFrame(
+    data: Buffer,
+    _direction: 'client' | 'server',
+  ): {
+    isBinary: boolean;
+    isControl: boolean;
+    payload: string | null;
+    opcode: number;
+  } | null {
+    try {
+      if (data.length < 2) return null;
+
+      const firstByte = data[0];
+      const secondByte = data[1];
+
+      // Check if this looks like a WebSocket frame (FIN + opcode in first byte)
+      const fin = (firstByte & 0x80) !== 0;
+      const opcode = firstByte & 0x0f;
+      const masked = (secondByte & 0x80) !== 0;
+      let payloadLength = secondByte & 0x7f;
+
+      // Valid opcodes: 0=continuation, 1=text, 2=binary, 8=close, 9=ping, 10=pong
+      const validOpcodes = [0, 1, 2, 8, 9, 10];
+      if (!validOpcodes.includes(opcode)) return null;
+
+      // If not FIN and not a valid continuation, might not be WebSocket
+      if (!fin && opcode === 0 && data.length < 2) return null;
+
+      let offset = 2;
+
+      // Extended payload length
+      if (payloadLength === 126) {
+        if (data.length < 4) return null;
+        payloadLength = data.readUInt16BE(2);
+        offset = 4;
+      } else if (payloadLength === 127) {
+        if (data.length < 10) return null;
+        // Read 64-bit, but cap to safe integer
+        const hi = data.readUInt32BE(2);
+        const lo = data.readUInt32BE(6);
+        if (hi > 0) {
+          // Payload too large, but still valid frame
+          payloadLength = 65535; // cap it
+        } else {
+          payloadLength = lo;
+        }
+        offset = 10;
+      }
+
+      // Masking key (client frames are masked)
+      let maskKey: Buffer | null = null;
+      if (masked) {
+        if (data.length < offset + 4) return null;
+        maskKey = data.slice(offset, offset + 4);
+        offset += 4;
+      }
+
+      // Extract payload
+      const payloadEnd = Math.min(offset + payloadLength, data.length);
+      let payload: Buffer;
+
+      if (maskKey) {
+        payload = Buffer.alloc(payloadEnd - offset);
+        for (let i = offset; i < payloadEnd; i++) {
+          payload[i - offset] = data[i] ^ maskKey[(i - offset) % 4];
+        }
+      } else {
+        payload = data.slice(offset, payloadEnd);
+      }
+
+      const isBinary = opcode === 2;
+      const isControl = opcode >= 8;
+
+      let payloadStr: string | null = null;
+      if (!isBinary && !isControl) {
+        try {
+          payloadStr = payload.toString('utf8');
+        } catch {
+          payloadStr = null;
+        }
+      } else if (isControl) {
+        payloadStr = `[${['', '', '', '', '', '', '', '', 'CLOSE', 'PING', 'PONG'][opcode] || 'UNKNOWN'}]`;
+        if (opcode === 8 && payload.length >= 2) {
+          const code = payload.readUInt16BE(0);
+          const reason = payload.length > 2 ? payload.slice(2).toString('utf8') : '';
+          payloadStr = `[CLOSE ${code}${reason ? ': ' + reason : ''}]`;
+        }
+      }
+
+      return { isBinary, isControl, payload: payloadStr, opcode };
+    } catch {
+      return null;
     }
   }
 }

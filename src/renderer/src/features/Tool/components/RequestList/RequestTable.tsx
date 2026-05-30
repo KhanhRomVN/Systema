@@ -138,7 +138,10 @@ export function RequestTable({
     output += '**Body:**\n';
     if (req.requestBody) {
       const trimmed = req.requestBody.trim();
-      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      if (
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))
+      ) {
         try {
           const parsed = JSON.parse(trimmed);
           output += '```json\n' + JSON.stringify(parsed, null, 2) + '\n```';
@@ -276,27 +279,31 @@ export function RequestTable({
 
           if (isPending) {
             return (
-              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <span className="text-warning font-bold animate-pulse text-[10px]">PAUSED</span>
+              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <svg className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+                <span className="text-amber-400 font-bold animate-pulse text-xs tracking-wider">HELD</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onForward?.(id);
                   }}
-                  className="px-2 py-0.5 bg-success/20 text-success hover:bg-success/30 rounded text-[10px] border border-success/50"
-                  title="Forward Request"
+                  className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded text-[10px] font-bold border border-emerald-500/40 transition-colors"
+                  title="Forward Request to Server"
                 >
-                  Fwd
+                  ▶ Fwd
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onDrop?.(id);
                   }}
-                  className="px-2 py-0.5 bg-error/20 text-error hover:bg-error/30 rounded text-[10px] border border-error/50"
+                  className="px-2 py-0.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded text-[10px] font-bold border border-red-500/40 transition-colors"
                   title="Drop Request"
                 >
-                  Drop
+                  ✕ Drop
                 </button>
               </div>
             );
@@ -328,7 +335,9 @@ export function RequestTable({
             (req.type && req.type.toLowerCase() === 'wasm') ||
             (req.responseHeaders &&
               Object.entries(req.responseHeaders).some(
-                ([k, v]) => k.toLowerCase() === 'content-type' && String(v).toLowerCase().includes('application/wasm')
+                ([k, v]) =>
+                  k.toLowerCase() === 'content-type' &&
+                  String(v).toLowerCase().includes('application/wasm'),
               ));
 
           if (isWasm) {
@@ -341,16 +350,19 @@ export function RequestTable({
 
           // Detect SSE (Server-Sent Events)
           const isSse =
-            (req.responseHeaders &&
-              Object.entries(req.responseHeaders).some(
-                ([k, v]) => k.toLowerCase() === 'content-type' && String(v).toLowerCase().includes('text/event-stream')
-              ));
+            req.responseHeaders &&
+            Object.entries(req.responseHeaders).some(
+              ([k, v]) =>
+                k.toLowerCase() === 'content-type' &&
+                String(v).toLowerCase().includes('text/event-stream'),
+            );
 
           if (isSse) {
             tags.push({
               label: 'SSE',
               tooltip: 'Server-Sent Events stream',
-              className: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold',
+              className:
+                'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold',
             });
           }
 
@@ -372,7 +384,7 @@ export function RequestTable({
               {tags.map((tag) => (
                 <span
                   key={tag.label}
-                  className={cn("px-1.5 py-0.5 rounded text-[10px] tracking-wide", tag.className)}
+                  className={cn('px-1.5 py-0.5 rounded text-[10px] tracking-wide', tag.className)}
                   title={tag.tooltip}
                 >
                   {tag.label}
@@ -395,13 +407,7 @@ export function RequestTable({
         cell: ({ row }) => <span className="text-text-secondary">{row.getValue('time')}</span>,
       },
     ],
-    [
-      pendingActionIds,
-      onForward,
-      onDrop,
-      highlightedIds,
-      toggleHighlight,
-    ],
+    [pendingActionIds, onForward, onDrop, highlightedIds, toggleHighlight],
   );
 
   // Memoized global filter function with pre-compiled regex
@@ -528,7 +534,7 @@ export function RequestTable({
     const scrollTop = container.scrollTop;
     const clientHeight = container.clientHeight;
 
-    const isOutOfView = rowTop < scrollTop + 16 || rowTop > (scrollTop + clientHeight - 48);
+    const isOutOfView = rowTop < scrollTop + 16 || rowTop > scrollTop + clientHeight - 48;
     setShowScrollToSelected(isOutOfView);
   }, [rows, selectedId]);
 
@@ -543,8 +549,37 @@ export function RequestTable({
     }
   };
 
-  return (
+return (
     <div className="h-full w-full flex flex-col bg-table-bodyBg text-sm overflow-hidden relative">
+      {/* Intercept pulse animation */}
+      <style>{`
+        @keyframes intercept-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+        @keyframes intercept-border-pulse {
+          0%, 100% { border-left-color: rgba(245, 158, 11, 0.4); }
+          50% { border-left-color: rgba(245, 158, 11, 0.9); }
+        }
+        .intercept-pending-row {
+          animation: intercept-border-pulse 1.5s ease-in-out infinite;
+        }
+      `}</style>
+      {/* Filter Bar */}
+      {/* Intercept pulse animation */}
+      <style>{`
+        @keyframes intercept-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+        @keyframes intercept-border-pulse {
+          0%, 100% { border-left-color: rgba(245, 158, 11, 0.4); }
+          50% { border-left-color: rgba(245, 158, 11, 0.9); }
+        }
+        .intercept-pending-row {
+          animation: intercept-border-pulse 1.5s ease-in-out infinite;
+        }
+      `}</style>
       {/* Filter Bar */}
       <div className="h-10 flex items-center px-2 border-b border-divider/40 gap-2 shrink-0">
         <Search className="w-4 h-4 text-text-secondary" />
@@ -593,8 +628,11 @@ export function RequestTable({
           </button>
         </div>
       </div>
-
-      <div ref={tableContainerRef} onScroll={handleScroll} className="flex-1 flex flex-col overflow-auto relative">
+      <div
+        ref={tableContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 flex flex-col overflow-auto relative"
+      >
         {/* Header - Moved inside scroll container for horizontal scrolling */}
         <div className="flex h-10 min-h-10 flex-shrink-0 bg-table-headerBg text-sm font-semibold text-text-secondary border-b border-divider/20 sticky top-0 z-10 w-full min-w-max">
           {table.getHeaderGroups().map((headerGroup) => (
@@ -662,11 +700,11 @@ export function RequestTable({
                     className={cn(
                       'flex items-center border-b border-divider/20 transition-colors cursor-pointer text-xs absolute left-0 top-0',
                       isPending
-                        ? 'bg-warning/10 hover:bg-warning/20'
+                        ? 'bg-amber-500/15 hover:bg-amber-500/25 border-l-4 border-l-amber-500 intercept-pending-row'
                         : isIntercepted
-                          ? 'bg-error/10 hover:bg-error/20'
+                          ? 'bg-red-500/15 hover:bg-red-500/25 border-l-4 border-l-red-500'
                           : isHighlighted
-                            ? 'bg-primary/10 hover:bg-primary/20 border-l-2 border-l-primary' // Highlight style
+                            ? 'bg-primary/10 hover:bg-primary/20 border-l-2 border-l-primary'
                             : 'hover:bg-table-hoverItemBodyBg',
                       row.original.id === selectedId &&
                         'bg-primary/15 text-text-primary hover:bg-primary/20 border-l-2 border-l-primary',
@@ -715,10 +753,16 @@ export function RequestTable({
                         <span>Copy Selected ({Object.keys(rowSelection).length})</span>
                       </ContextMenuSubTrigger>
                       <ContextMenuSubContent className="w-44 bg-zinc-950 border border-zinc-800 text-text-primary">
-                        <ContextMenuItem onClick={handleCopySelectedAsMarkdown} className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs">
+                        <ContextMenuItem
+                          onClick={handleCopySelectedAsMarkdown}
+                          className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
+                        >
                           Copy as Markdown
                         </ContextMenuItem>
-                        <ContextMenuItem onClick={handleCopySelectedAsJson} className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs">
+                        <ContextMenuItem
+                          onClick={handleCopySelectedAsJson}
+                          className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
+                        >
                           Copy as JSON
                         </ContextMenuItem>
                       </ContextMenuSubContent>
@@ -745,7 +789,12 @@ export function RequestTable({
                   </ContextMenuItem>
 
                   <ContextMenuItem onClick={() => toggleHighlight(row.original.id)}>
-                    <Star className={cn('mr-2 h-3.5 w-3.5', isHighlighted ? 'fill-warning text-warning' : '')} />
+                    <Star
+                      className={cn(
+                        'mr-2 h-3.5 w-3.5',
+                        isHighlighted ? 'fill-warning text-warning' : '',
+                      )}
+                    />
                     <span>{isHighlighted ? 'Unhighlight' : 'Highlight'}</span>
                   </ContextMenuItem>
 
@@ -778,17 +827,24 @@ export function RequestTable({
           <div className="w-[1px] h-3.5 bg-zinc-700" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                className="text-xs text-primary hover:text-primary-active font-semibold transition-colors flex items-center gap-1.5 focus:outline-none"
-              >
+              <button className="text-xs text-primary hover:text-primary-active font-semibold transition-colors flex items-center gap-1.5 focus:outline-none">
                 Copy Selected
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-44 bg-zinc-950 border border-zinc-800 text-text-primary z-50">
-              <DropdownMenuItem onClick={handleCopySelectedAsMarkdown} className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs">
+            <DropdownMenuContent
+              align="center"
+              className="w-44 bg-zinc-950 border border-zinc-800 text-text-primary z-50"
+            >
+              <DropdownMenuItem
+                onClick={handleCopySelectedAsMarkdown}
+                className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
+              >
                 Copy as Markdown
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleCopySelectedAsJson} className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs">
+              <DropdownMenuItem
+                onClick={handleCopySelectedAsJson}
+                className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
+              >
                 Copy as JSON
               </DropdownMenuItem>
             </DropdownMenuContent>
