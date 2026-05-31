@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronRight, ChevronLeft, X, Loader2, Brain } from 'lucide-react';
 import { cn } from '../../../../../../../shared/lib/utils';
+import { useI18n } from '../../../../../../../i18n/i18nContext';
 
 interface Provider {
   id: string;
@@ -30,6 +31,7 @@ function getFavicon(website?: string) {
 }
 
 export function QuickSwitchDrawer({ isOpen, onClose, providers, baseURL, anchorRef, onSelect }: QuickSwitchDrawerProps) {
+  const { t } = useI18n();
   const [step, setStep] = useState<'model' | 'account'>('model');
   const [modelSearch, setModelSearch] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
@@ -111,10 +113,10 @@ export function QuickSwitchDrawer({ isOpen, onClose, providers, baseURL, anchorR
             )}
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-bold text-foreground">
-                {step === 'model' ? 'Select Model' : 'Select Account'}
+                {step === 'model' ? t.agent.selectModel : t.agent.selectAccount}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {step === 'model' ? 'Choose a provider and model' : `${selectedModel?.provider_id}/${selectedModel?.id}`}
+                {step === 'model' ? t.agent.chooseProviderModel : `${selectedModel?.provider_id}/${selectedModel?.id}`}
               </p>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0">
@@ -129,7 +131,7 @@ export function QuickSwitchDrawer({ isOpen, onClose, providers, baseURL, anchorR
               <input
                 autoFocus
                 type="text"
-                placeholder={step === 'model' ? 'Search models...' : 'Search accounts...'}
+                placeholder={step === 'model' ? t.agent.searchModels : t.agent.searchAccounts}
                 value={step === 'model' ? modelSearch : accountSearch}
                 onChange={(e) => step === 'model' ? setModelSearch(e.target.value) : setAccountSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 text-sm bg-table-headerBg border border-border rounded-lg outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50"
@@ -141,7 +143,7 @@ export function QuickSwitchDrawer({ isOpen, onClose, providers, baseURL, anchorR
           <div className="flex-1 overflow-y-auto p-3">
             {step === 'model' ? (
               filteredProviders.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-10">No models available</p>
+                <p className="text-center text-sm text-muted-foreground py-10">{t.agent.noModelsAvailable}</p>
               ) : (
                 filteredProviders.map((provider) => (
                   <div key={provider.id} className="mb-5">
@@ -160,8 +162,8 @@ export function QuickSwitchDrawer({ isOpen, onClose, providers, baseURL, anchorR
                       >
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-foreground">{model.name}</span>
-                          {model.is_thinking && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/30">thinking</span>}
-                          {model.is_search && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">search</span>}
+                          {model.is_thinking && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 border border-violet-500/30">{t.agent.thinking}</span>}
+                          {model.is_search && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">{t.agent.search}</span>}
                         </div>
                         <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                       </button>
@@ -173,11 +175,11 @@ export function QuickSwitchDrawer({ isOpen, onClose, providers, baseURL, anchorR
               isLoadingAccounts ? (
                 <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm">Loading accounts...</span>
+                  <span className="text-sm">{t.agent.loadingAccounts}</span>
                 </div>
               ) : filteredAccounts.length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground py-10">
-                  {accounts.length === 0 ? 'No accounts for this provider' : 'No accounts match'}
+                  {accounts.length === 0 ? t.agent.noAccounts : t.agent.noAccountsMatch}
                 </p>
               ) : (
                 filteredAccounts.map((acc) => (

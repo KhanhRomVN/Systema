@@ -24,6 +24,7 @@ import {
   Check,
   Target,
   Zap,
+  Cookie,
 } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import {
@@ -43,6 +44,7 @@ import {
   DropdownMenuTrigger,
 } from '../../../../core/components/common/ui/dropdown-menu';
 import { addRequestToDefaultCollection } from '../../../../utils/collections';
+import { useI18n } from '../../../../i18n/i18nContext';
 
 interface RequestTableProps {
   requests: NetworkRequest[];
@@ -85,6 +87,7 @@ export function RequestTable({
   const [useRegex, setUseRegex] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [rowSelection, setRowSelection] = useState({});
+  const { t } = useI18n();
 
   // Feature: Highlighted Rows
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
@@ -235,8 +238,8 @@ export function RequestTable({
       },
       {
         accessorKey: 'method',
-        header: 'Method',
-        size: 80,
+        header: t.requestTable.method,
+        size: 100,
         cell: ({ row }) => {
           const method = row.getValue('method') as string;
           let colorClass = 'text-text-primary';
@@ -249,7 +252,7 @@ export function RequestTable({
       },
       {
         accessorKey: 'host',
-        header: 'Host',
+        header: t.requestTable.host,
         size: 200,
         cell: ({ row }) => (
           <span className="truncate block w-full" title={row.getValue('host')}>
@@ -259,7 +262,7 @@ export function RequestTable({
       },
       {
         accessorKey: 'path',
-        header: 'Path',
+        header: t.requestTable.path,
         size: 400,
         cell: ({ row }) => (
           <span className="truncate block w-full" title={row.getValue('path')}>
@@ -269,9 +272,9 @@ export function RequestTable({
       },
       {
         accessorKey: 'status',
-        header: 'Status',
+        header: t.requestTable.status,
         id: 'status', // Explicitly set ID for the column
-        size: 100,
+        size: 110,
         cell: ({ row }) => {
           const id = row.original.id;
           const isPending = pendingActionIds?.has(id);
@@ -284,7 +287,7 @@ export function RequestTable({
                   <rect x="6" y="5" width="4" height="14" rx="1" />
                   <rect x="14" y="5" width="4" height="14" rx="1" />
                 </svg>
-                <span className="text-amber-400 font-bold animate-pulse text-xs tracking-wider">HELD</span>
+                <span className="text-amber-400 font-bold animate-pulse text-xs tracking-wider">{t.requestTable.held}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -293,7 +296,7 @@ export function RequestTable({
                   className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded text-[10px] font-bold border border-emerald-500/40 transition-colors"
                   title="Forward Request to Server"
                 >
-                  ▶ Fwd
+                  ▶ {t.requestTable.fwd}
                 </button>
                 <button
                   onClick={(e) => {
@@ -303,7 +306,7 @@ export function RequestTable({
                   className="px-2 py-0.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded text-[10px] font-bold border border-red-500/40 transition-colors"
                   title="Drop Request"
                 >
-                  ✕ Drop
+                  ✕ {t.requestTable.drop}
                 </button>
               </div>
             );
@@ -313,21 +316,21 @@ export function RequestTable({
           if (status >= 200 && status < 300) colorClass = 'text-success';
           else if (status >= 300 && status < 400) colorClass = 'text-warning';
           else if (status >= 400) colorClass = 'text-error';
-          return <span className={colorClass}>{status || 'Pending'}</span>;
+          return <span className={colorClass}>{status || t.requestTable.pending}</span>;
         },
       },
       {
         accessorKey: 'type',
-        header: 'Type',
+        header: t.requestTable.type,
         size: 80,
       },
       {
         id: 'tags',
-        header: 'Tags',
+        header: t.requestTable.tags,
         size: 100,
         cell: ({ row }) => {
           const req = row.original;
-          const tags: { label: string; tooltip: string; className: string }[] = [];
+          const tags: { label: string; tooltip: string; className: string; icon?: React.ReactNode }[] = [];
 
           // Detect WASM
           const isWasm =
@@ -343,7 +346,7 @@ export function RequestTable({
           if (isWasm) {
             tags.push({
               label: 'WASM',
-              tooltip: 'WebAssembly binary file',
+              tooltip: t.requestTable.wasmTag,
               className: 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 font-bold',
             });
           }
@@ -360,9 +363,31 @@ export function RequestTable({
           if (isSse) {
             tags.push({
               label: 'SSE',
-              tooltip: 'Server-Sent Events stream',
+              tooltip: t.requestTable.sseTag,
               className:
                 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold',
+            });
+          }
+
+          // Detect Cookies
+          const hasCookies =
+            (req.requestCookies && Object.keys(req.requestCookies).length > 0) ||
+            (req.responseCookies && Object.keys(req.responseCookies).length > 0) ||
+            (req.requestHeaders &&
+              Object.keys(req.requestHeaders).some(
+                (k) => k.toLowerCase() === 'cookie',
+              )) ||
+            (req.responseHeaders &&
+              Object.keys(req.responseHeaders).some(
+                (k) => k.toLowerCase() === 'set-cookie',
+              ));
+
+          if (hasCookies) {
+            tags.push({
+              label: '',
+              tooltip: t.requestTable.cookieTag,
+              className: 'bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold',
+              icon: <Cookie className="w-3 h-3" />,
             });
           }
 
@@ -384,10 +409,11 @@ export function RequestTable({
               {tags.map((tag) => (
                 <span
                   key={tag.label}
-                  className={cn('px-1.5 py-0.5 rounded text-[10px] tracking-wide', tag.className)}
+                  className={cn('px-1.5 py-0.5 rounded text-[10px] tracking-wide inline-flex items-center gap-1', tag.className)}
                   title={tag.tooltip}
                 >
-                  {tag.label}
+                  {tag.icon}
+                  {tag.label ? <span>{tag.label}</span> : null}
                 </span>
               ))}
             </div>
@@ -396,18 +422,18 @@ export function RequestTable({
       },
       {
         accessorKey: 'size',
-        header: 'Size',
-        size: 80,
+        header: t.requestTable.size,
+        size: 95,
         cell: ({ row }) => <span className="text-text-secondary">{row.getValue('size')}</span>,
       },
       {
         accessorKey: 'time',
-        header: 'Time',
-        size: 80,
+        header: t.requestTable.time,
+        size: 95,
         cell: ({ row }) => <span className="text-text-secondary">{row.getValue('time')}</span>,
       },
     ],
-    [pendingActionIds, onForward, onDrop, highlightedIds, toggleHighlight],
+    [pendingActionIds, onForward, onDrop, highlightedIds, toggleHighlight, t],
   );
 
   // Memoized global filter function with pre-compiled regex
@@ -584,7 +610,7 @@ return (
       <div className="h-10 flex items-center px-2 border-b border-divider/40 gap-2 shrink-0">
         <Search className="w-4 h-4 text-text-secondary" />
         <input
-          placeholder="Filter requests..."
+          placeholder={t.requestList.filter}
           className="bg-transparent border-none outline-none text-xs flex-1"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -598,7 +624,7 @@ return (
                 ? 'bg-primary/20 text-primary hover:bg-primary/30'
                 : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
             )}
-            title="Match Case"
+            title={t.requestList.matchCase}
           >
             <CaseSensitive className="w-3.5 h-3.5" />
           </button>
@@ -610,7 +636,7 @@ return (
                 ? 'bg-indigo-500/20 text-indigo-500 hover:bg-indigo-500/30'
                 : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
             )}
-            title="Match Whole Word"
+            title={t.requestList.matchWholeWord}
           >
             <Type className="w-3.5 h-3.5" />
           </button>
@@ -622,7 +648,7 @@ return (
                 ? 'bg-success/20 text-success hover:bg-success/30'
                 : 'text-text-secondary hover:bg-secondary hover:text-text-primary',
             )}
-            title="Use Regular Expression"
+            title={t.requestList.useRegex}
           >
             <Regex className="w-3.5 h-3.5" />
           </button>
@@ -649,7 +675,7 @@ return (
                   <div
                     key={header.id}
                     className={cn(
-                      'h-full flex items-center shrink-0',
+                      'h-full flex items-center shrink-0 whitespace-nowrap overflow-hidden text-ellipsis',
                       header.id === 'select' ? 'px-2 justify-center' : 'px-4',
                     )}
                     style={{
@@ -744,26 +770,26 @@ return (
                 <ContextMenuContent className="w-64">
                   <ContextMenuItem onClick={() => handleCopySingle(row.original)}>
                     <Copy className="mr-2 h-3.5 w-3.5" />
-                    <span>Copy Request Details</span>
+                    <span>{t.requestTable.copyRequest}</span>
                   </ContextMenuItem>
                   {Object.keys(rowSelection).length > 0 && (
                     <ContextMenuSub>
                       <ContextMenuSubTrigger className="cursor-pointer text-xs">
                         <Copy className="mr-2 h-3.5 w-3.5 text-primary" />
-                        <span>Copy Selected ({Object.keys(rowSelection).length})</span>
+                        <span>{t.requestTable.copySelected.replace('{count}', String(Object.keys(rowSelection).length))}</span>
                       </ContextMenuSubTrigger>
                       <ContextMenuSubContent className="w-44 bg-zinc-950 border border-zinc-800 text-text-primary">
                         <ContextMenuItem
                           onClick={handleCopySelectedAsMarkdown}
                           className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
                         >
-                          Copy as Markdown
+                          {t.requestTable.copyMarkdown}
                         </ContextMenuItem>
                         <ContextMenuItem
                           onClick={handleCopySelectedAsJson}
                           className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
                         >
-                          Copy as JSON
+                          {t.requestTable.copyJson}
                         </ContextMenuItem>
                       </ContextMenuSubContent>
                     </ContextMenuSub>
@@ -771,21 +797,21 @@ return (
                   <ContextMenuSeparator />
 
                   <ContextMenuItem onClick={() => onSetCompare1(row.original)}>
-                    <span>Set as Compare 1</span>
+                    <span>{t.requestTable.setCompare1}</span>
                   </ContextMenuItem>
                   <ContextMenuItem onClick={() => onSetCompare2(row.original)}>
-                    <span>Set as Compare 2</span>
+                    <span>{t.requestTable.setCompare2}</span>
                   </ContextMenuItem>
                   <ContextMenuSeparator />
 
                   <ContextMenuItem onClick={() => onAnalyzeRequest?.(row.original)}>
                     <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
-                    <span>Analyze Request</span>
+                    <span>{t.requestTable.analyzeRequest}</span>
                   </ContextMenuItem>
 
                   <ContextMenuItem onClick={() => onSendToFuzzer?.(row.original)}>
                     <Zap className="mr-2 h-3.5 w-3.5 text-amber-400" />
-                    <span>Send to Fuzzer</span>
+                    <span>{t.requestTable.sendToFuzzer}</span>
                   </ContextMenuItem>
 
                   <ContextMenuItem onClick={() => toggleHighlight(row.original.id)}>
@@ -795,7 +821,7 @@ return (
                         isHighlighted ? 'fill-warning text-warning' : '',
                       )}
                     />
-                    <span>{isHighlighted ? 'Unhighlight' : 'Highlight'}</span>
+                    <span>{isHighlighted ? t.requestTable.unhighlight : t.requestTable.highlight}</span>
                   </ContextMenuItem>
 
                   <ContextMenuSeparator />
@@ -805,7 +831,7 @@ return (
                     className="text-error focus:text-error focus:bg-error/10"
                   >
                     <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    <span>Delete</span>
+                    <span>{t.requestTable.delete}</span>
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
@@ -815,20 +841,20 @@ return (
 
         {rows.length === 0 && (
           <div className="flex-1 flex items-center justify-center text-text-secondary w-full">
-            No requests found
+            {t.requestList.noRequests}
           </div>
         )}
       </div>
       {Object.keys(rowSelection).length > 0 && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700/80 rounded-full shadow-2xl px-4 py-2 flex items-center gap-3 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <span className="text-xs font-medium text-zinc-300">
-            {Object.keys(rowSelection).length} requests selected
+            {t.requestTable.selected.replace('{count}', String(Object.keys(rowSelection).length))}
           </span>
           <div className="w-[1px] h-3.5 bg-zinc-700" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="text-xs text-primary hover:text-primary-active font-semibold transition-colors flex items-center gap-1.5 focus:outline-none">
-                Copy Selected
+                {t.requestTable.copySelectedBtn}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -839,13 +865,13 @@ return (
                 onClick={handleCopySelectedAsMarkdown}
                 className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
               >
-                Copy as Markdown
+                {t.requestTable.copyMarkdown}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handleCopySelectedAsJson}
                 className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
               >
-                Copy as JSON
+                {t.requestTable.copyJson}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -853,7 +879,7 @@ return (
             onClick={() => setRowSelection({})}
             className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
           >
-            Deselect
+            {t.requestTable.deselect}
           </button>
         </div>
       )}

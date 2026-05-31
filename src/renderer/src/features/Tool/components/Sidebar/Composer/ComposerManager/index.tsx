@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Trash2, Plus, Search, Bookmark, X, GitBranch } from 'lucide-react';
 import { cn } from '../../../../../../shared/lib/utils';
+import { useI18n } from '../../../../../../i18n/i18nContext';
 import {
   getOrCreateDefaultCollection,
   deleteRequestFromCollection,
@@ -18,6 +19,7 @@ interface ComposerManagerProps {
 }
 
 export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps) {
+  const { t } = useI18n();
   const [collection, setCollection] = useState<RequestCollection | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,8 +79,8 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
             <Bookmark className="w-4 h-4 text-orange-400" />
           </div>
           <div className="flex-1">
-            <h2 className="text-base font-bold text-text-primary">Composers Manager</h2>
-            <p className="text-xs text-text-secondary mt-0.5">Save and manage your composed requests</p>
+            <h2 className="text-base font-bold text-text-primary">{t.composer.title}</h2>
+            <p className="text-xs text-text-secondary mt-0.5">{t.composer.desc}</p>
           </div>
         </div>
       </div>
@@ -89,7 +91,7 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
           <input
             type="text"
-            placeholder="Search saved requests..."
+            placeholder={t.composer.searchRequests}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
@@ -104,7 +106,7 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
               ? "bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary border-divider hover:border-primary/30"
               : "bg-zinc-800/50 text-zinc-600 border-zinc-800/80 cursor-not-allowed opacity-50"
           )}
-          title={appId ? "Add to collection" : "Select a target first"}
+          title={appId ? t.composer.addToCollection : t.composer.selectTargetFirst}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -116,8 +118,8 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
           {!hasRequests ? (
             <EmptyState
               icon={<Bookmark className="w-8 h-8" />}
-              title="No saved requests"
-              description="Click the + button to add requests to your collection"
+              title={t.composer.noRequests}
+              description={t.composer.noRequestsDesc}
               iconColor="text-orange-400"
               iconBgColor="bg-orange-500/15"
             />
@@ -162,7 +164,7 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
                       handleDeleteRequest(request.id);
                     }}
                     className="p-1.5 text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
-                    title="Delete"
+                    title={t.composer.deleteRequest}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -186,8 +188,8 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
                 <Plus className="w-4 h-4 text-orange-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-text-primary">Add to Collection</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Save a request to your collection</p>
+                <h3 className="text-base font-bold text-text-primary">{t.composer.addToCollection}</h3>
+                <p className="text-xs text-text-secondary mt-0.5">{t.composer.addToCollectionDesc}</p>
               </div>
               <button
                 onClick={() => setIsDrawerOpen(false)}
@@ -199,23 +201,23 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
 
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.composer.name}</label>
                 <input
                   type="text"
                   value={newCollectionName}
                   onChange={(e) => setNewCollectionName(e.target.value)}
-                  placeholder="e.g. API Endpoints, Login Flow..."
+                  placeholder={t.composer.namePlaceholder}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">
-                  DESCRIPTION <span className="text-text-secondary/50">(optional)</span>
+                  {t.composer.description} <span className="text-text-secondary/50">{t.composer.descOptional}</span>
                 </label>
                 <textarea
                   value={newCollectionDescription}
                   onChange={(e) => setNewCollectionDescription(e.target.value)}
-                  placeholder="Describe this collection..."
+                  placeholder={t.composer.descPlaceholder}
                   rows={3}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none"
                 />
@@ -227,14 +229,14 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
                 onClick={() => setIsDrawerOpen(false)}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
               >
-                Cancel
+                {t.composer.cancel}
               </button>
               <button
                 onClick={handleCreateCollection}
                 disabled={!newCollectionName.trim()}
                 className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
               >
-                Add to Collection
+                {t.composer.add}
               </button>
             </div>
           </div>
@@ -254,8 +256,8 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
                 <GitBranch className="w-4 h-4 text-blue-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-text-primary">New Diagram</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Create a new diagram composer</p>
+                <h3 className="text-base font-bold text-text-primary">{t.composer.newDiagram}</h3>
+                <p className="text-xs text-text-secondary mt-0.5">{t.composer.newDiagramDesc}</p>
               </div>
               <button
                 onClick={() => setIsDiagramDrawerOpen(false)}
@@ -266,21 +268,21 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.composer.name}</label>
                 <input
                   type="text"
                   value={diagramName}
                   onChange={(e) => setDiagramName(e.target.value)}
-                  placeholder="e.g. Auth Flow, Payment API..."
+                  placeholder={t.composer.diagramNamePlaceholder}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">DESCRIPTION</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.composer.description}</label>
                 <textarea
                   value={diagramDescription}
                   onChange={(e) => setDiagramDescription(e.target.value)}
-                  placeholder="Describe what this diagram represents..."
+                  placeholder={t.composer.diagramDescPlaceholder}
                   rows={3}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none"
                 />
@@ -291,7 +293,7 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
                 onClick={() => setIsDiagramDrawerOpen(false)}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
               >
-                Cancel
+                {t.composer.cancel}
               </button>
               <button
                 onClick={() => { setIsDiagramDrawerOpen(false); setTempDiagramOpen(true); }}

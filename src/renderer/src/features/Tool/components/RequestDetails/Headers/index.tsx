@@ -1,6 +1,6 @@
 import { NetworkRequest } from '../../../../../types/inspector';
 import { cn } from '../../../../../shared/lib/utils';
-
+import { useI18n } from '../../../../../i18n/i18nContext';
 import { HighlightText } from './HighlightText';
 
 interface HeadersDetailsProps {
@@ -10,6 +10,7 @@ interface HeadersDetailsProps {
 
 export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
   const analysis = request.analysis;
+  const { t } = useI18n();
 
   return (
     <div className="space-y-4">
@@ -17,7 +18,7 @@ export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
         {/* Request Headers */}
         <div className="space-y-3">
           <h3 className="text-[10px] font-bold text-text-secondary uppercase pb-1.5 border-b border-divider/50">
-            Request Headers
+            {t.requestDetails.requestHeaders}
           </h3>
           {analysis?.headers?.request ? (
             <div className="space-y-4">
@@ -69,7 +70,7 @@ export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
                           {h.parsed && Object.keys(h.parsed).length > 0 && (
                             <div className="mt-1.5 text-[10px] bg-secondary/30 p-1.5 rounded border border-divider/20">
                               <div className="font-semibold text-text-secondary/70 mb-1 pointer-events-none select-none">
-                                Parsed Values
+                                {t.requestDetails.parsedValues}
                               </div>
                               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
                                 {Object.entries(h.parsed).map(([k, v]) => (
@@ -89,14 +90,14 @@ export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
               ))}
             </div>
           ) : (
-            <div className="text-text-secondary italic text-xs">No request headers</div>
+            <div className="text-text-secondary italic text-xs">{t.requestDetails.noRequestHeaders}</div>
           )}
         </div>
 
         {/* Response Headers */}
         <div className="space-y-3">
           <h3 className="text-[10px] font-bold text-text-secondary uppercase pb-1.5 border-b border-divider/50">
-            Response Headers
+            {t.requestDetails.responseHeaders}
           </h3>
           {analysis?.headers?.response ? (
             <div className="space-y-4">
@@ -148,7 +149,7 @@ export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
                           {h.parsed && Object.keys(h.parsed).length > 0 && (
                             <div className="mt-1.5 text-[10px] bg-secondary/30 p-1.5 rounded border border-divider/20">
                               <div className="font-semibold text-text-secondary/70 mb-1 pointer-events-none select-none">
-                                Parsed Values
+                                {t.requestDetails.parsedValues}
                               </div>
                               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
                                 {Object.entries(h.parsed).map(([k, v]) => (
@@ -168,7 +169,7 @@ export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
               ))}
             </div>
           ) : (
-            <div className="text-text-secondary italic text-xs">No response headers</div>
+            <div className="text-text-secondary italic text-xs">{t.requestDetails.noResponseHeaders}</div>
           )}
         </div>
       </div>
@@ -176,7 +177,7 @@ export function HeadersDetails({ request, searchTerm }: HeadersDetailsProps) {
       {analysis?.headers?.missing && analysis.headers.missing.length > 0 && (
         <div>
           <h3 className="text-[10px] font-bold text-text-secondary uppercase mb-2 border-b border-divider/50 pb-1.5">
-            Missing Headers
+            {t.requestDetails.missingHeaders}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
             {analysis.headers.missing.map((h, i) => (

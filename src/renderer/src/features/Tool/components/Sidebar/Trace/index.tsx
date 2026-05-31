@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { cn } from '../../../../../shared/lib/utils';
 import { tracePanelNodeTypes, VALUE_COLORS } from '../../RequestDetails/Trace';
 import { NetworkRequest } from '../../../../../types/inspector';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 const nodeTypes = tracePanelNodeTypes;
 
@@ -101,6 +102,7 @@ function AttributeDrawer({
   onClose: () => void;
   initialAttribute?: { field: string; value: string };
 }) {
+  const { t } = useI18n();
   const dataItems = sourceRequest ? extractDataItems(sourceRequest) : [];
   const [query, setQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<DataItem | null>(() => {
@@ -159,9 +161,9 @@ function AttributeDrawer({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div>
-            <div className="text-sm font-medium">Add Attribute Nodes</div>
+            <div className="text-sm font-medium">{t.trace.addAttribute}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Select a field from this request, then pick matching requests to add as nodes.
+              {t.trace.addAttributeDesc}
             </div>
           </div>
           <button
@@ -180,7 +182,7 @@ function AttributeDrawer({
               ref={inputRef}
               value={query}
               onChange={(e) => { setQuery(e.target.value); setSelectedItem(null); setSelectedReqs(new Set()); }}
-              placeholder="Search field or value..."
+              placeholder={t.trace.searchField}
               className="w-full pl-9 pr-3 py-2.5 text-sm bg-muted/30 border border-border rounded outline-none focus:border-primary"
             />
           </div>
@@ -191,7 +193,7 @@ function AttributeDrawer({
           {!selectedItem && (
             <div className="p-2">
               {filteredItems.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No fields found</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t.trace.noFields}</p>
               )}
               {(['Header Req', 'Header Res', 'Body Req', 'Body Res'] as DataSection[]).map((section) => {
                 const sectionItems = filteredItems.filter((d) => d.section === section);
@@ -227,7 +229,7 @@ function AttributeDrawer({
                   onClick={() => { setSelectedItem(null); setSelectedReqs(new Set()); }}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  ← Back
+                  ← {t.trace.back}
                 </button>
                 <span className={cn('text-[10px] font-medium', SECTION_COLORS[selectedItem.section])}>
                   {selectedItem.section}
@@ -237,7 +239,7 @@ function AttributeDrawer({
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
                 {matchingRequests.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-4">No matching requests</p>
+                  <p className="text-xs text-muted-foreground text-center py-4">{t.compare.noMatching}</p>
                 )}
                 {matchingRequests.map((r) => (
                   <div
@@ -279,7 +281,7 @@ function AttributeDrawer({
               disabled={selectedReqs.size === 0}
               className="w-full py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              Add {selectedReqs.size > 0 ? `${selectedReqs.size} ` : ''}Node{selectedReqs.size !== 1 ? 's' : ''}
+              {t.trace.addNode}{selectedReqs.size > 0 ? ` (${selectedReqs.size})` : ''}
             </button>
           </div>
         )}
@@ -290,12 +292,13 @@ function AttributeDrawer({
 
 // ── Context Menu ──────────────────────────────────────────────────────────────
 function NodeContextMenu({
-  x, y, onDelete, onAddAttribute, onClose,
+  x, y, onDelete, onAddAttribute, onClose, t,
 }: {
   x: number; y: number;
   onDelete: () => void;
   onAddAttribute: () => void;
   onClose: () => void;
+  t: any;
 }) {
   return (
     <>
@@ -309,7 +312,7 @@ function NodeContextMenu({
           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors text-left"
         >
           <Tag className="w-3.5 h-3.5 text-primary" />
-          Add Attribute
+          {t.trace.addAttributeCtx}
         </button>
         <div className="h-px bg-border mx-2 my-1" />
         <button
@@ -317,7 +320,7 @@ function NodeContextMenu({
           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-500/10 text-red-500 transition-colors text-left"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          Delete Node
+          {t.trace.deleteNode}
         </button>
       </div>
     </>
@@ -325,12 +328,13 @@ function NodeContextMenu({
 }
 
 function AttributeContextMenu({
-  x, y, onDelete, onAddNode, onClose,
+  x, y, onDelete, onAddNode, onClose, t,
 }: {
   x: number; y: number;
   onDelete: () => void;
   onAddNode: () => void;
   onClose: () => void;
+  t: any;
 }) {
   return (
     <>
@@ -344,7 +348,7 @@ function AttributeContextMenu({
           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors text-left"
         >
           <Plus className="w-3.5 h-3.5 text-primary" />
-          Add Node
+          {t.trace.addNode}
         </button>
         <div className="h-px bg-border mx-2 my-1" />
         <button
@@ -352,7 +356,7 @@ function AttributeContextMenu({
           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-500/10 text-red-500 transition-colors text-left"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          Delete Attribute
+          {t.trace.deleteAttribute}
         </button>
       </div>
     </>
@@ -361,12 +365,13 @@ function AttributeContextMenu({
 
 // ── Diagram View ──────────────────────────────────────────────────────────────
 function DiagramView({
-  trace, onBack, requests, onSelectRequest,
+  trace, onBack, requests, onSelectRequest, t,
 }: {
   trace: Trace;
   onBack: () => void;
   requests: NetworkRequest[];
   onSelectRequest: (id: string) => void;
+  t: any;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -599,7 +604,7 @@ function DiagramView({
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Back
+          {t.trace.back}
         </button>
         <div className="h-4 w-px bg-border" />
         <GitBranch className="w-3.5 h-3.5 text-primary" />
@@ -634,6 +639,7 @@ function DiagramView({
             setAttrDrawerOpen(true);
           }}
           onClose={() => setCtxMenu(null)}
+          t={t}
         />
       )}
 
@@ -648,6 +654,7 @@ function DiagramView({
             setAttrDrawerOpen(true);
           }}
           onClose={() => setAttrCtxMenu(null)}
+          t={t}
         />
       )}
 
@@ -674,6 +681,7 @@ export function TraceTab({
   onSelectRequest?: (id: string) => void;
   appId?: string;
 }) {
+  const { t } = useI18n();
   const [traces, setTraces] = useState<Trace[]>(() => loadTraces(appId));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [traceName, setTraceName] = useState('');
@@ -711,6 +719,7 @@ export function TraceTab({
           onBack={() => setActiveTrace(null)}
           requests={requests}
           onSelectRequest={onSelectRequest ?? (() => {})}
+          t={t}
         />
       </ReactFlowProvider>
     );
@@ -729,8 +738,8 @@ export function TraceTab({
           <GitBranch className="w-4 h-4 text-pink-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-text-primary">Traces</h2>
-          <p className="text-xs text-text-secondary mt-0.5">Request flow diagrams</p>
+          <h2 className="text-base font-bold text-text-primary">{t.trace.title}</h2>
+          <p className="text-xs text-text-secondary mt-0.5">{t.trace.desc}</p>
         </div>
       </div>
 
@@ -740,7 +749,7 @@ export function TraceTab({
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
           <input
             type="text"
-            placeholder="Search traces..."
+            placeholder={t.trace.searchTraces}
             value={traceSearchTerm}
             onChange={(e) => setTraceSearchTerm(e.target.value)}
             className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
@@ -755,7 +764,7 @@ export function TraceTab({
               ? "bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary border-divider hover:border-primary/30"
               : "bg-zinc-800/50 text-zinc-600 border-zinc-800/80 cursor-not-allowed opacity-50"
           )}
-          title={appId ? "New Trace" : "Select a target first"}
+          title={appId ? t.trace.newTrace : t.trace.selectTargetFirst}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -767,16 +776,16 @@ export function TraceTab({
             <div className="w-16 h-16 rounded-xl bg-pink-500/15 flex items-center justify-center mb-4 border border-pink-500/25">
               <Search className="w-8 h-8 text-pink-400" />
             </div>
-            <p className="text-sm text-text-primary font-medium">No matching traces</p>
-            <p className="text-xs text-text-secondary mt-1">Try a different search term</p>
+            <p className="text-sm text-text-primary font-medium">{t.trace.noMatchingTraces}</p>
+            <p className="text-xs text-text-secondary mt-1">{t.trace.noMatchingTracesDesc}</p>
           </div>
         ) : filteredTraces.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="w-16 h-16 rounded-xl bg-pink-500/15 flex items-center justify-center mb-4 border border-pink-500/25">
               <GitBranch className="w-8 h-8 text-pink-400" />
             </div>
-            <p className="text-sm text-text-primary font-medium">No Traces Yet</p>
-            <p className="text-xs text-text-secondary mt-1">Click "New Trace" to create one</p>
+            <p className="text-sm text-text-primary font-medium">{t.trace.noTraces}</p>
+            <p className="text-xs text-text-secondary mt-1">{t.trace.noTracesDesc}</p>
           </div>
         ) : (
           filteredTraces.map((trace) => (
@@ -818,8 +827,8 @@ export function TraceTab({
                 <GitBranch className="w-4 h-4 text-pink-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-text-primary">New Trace</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Create a request flow diagram</p>
+                <h3 className="text-base font-bold text-text-primary">{t.trace.newTrace}</h3>
+                <p className="text-xs text-text-secondary mt-0.5">{t.trace.newTraceDesc}</p>
               </div>
               <button
                 onClick={() => setDrawerOpen(false)}
@@ -832,14 +841,14 @@ export function TraceTab({
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-5">
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">TRACE NAME</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.trace.traceName}</label>
                 <input
                   ref={inputRef}
                   type="text"
                   value={traceName}
                   onChange={(e) => setTraceName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                  placeholder="Enter trace name..."
+                  placeholder={t.trace.traceNamePlaceholder}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
                 />
               </div>
@@ -851,14 +860,14 @@ export function TraceTab({
                 onClick={() => setDrawerOpen(false)}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
               >
-                Cancel
+                {t.common.cancel}
               </button>
               <button
                 onClick={handleCreate}
                 disabled={!traceName.trim()}
                 className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
               >
-                Create Trace
+                {t.trace.createTrace}
               </button>
             </div>
           </div>

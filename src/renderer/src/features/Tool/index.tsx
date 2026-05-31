@@ -20,6 +20,7 @@ import {
   parseTime,
 } from './components/RequestDetails/Filter';
 import { DiffTab } from './components/Sidebar/Compare/DiffView';
+import { useI18n } from '../../i18n/i18nContext';
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function InspectorPage() {
@@ -567,6 +568,7 @@ export default function InspectorPage() {
   const [compareRequest2, setCompareRequest2] = useState<NetworkRequest | null>(null);
   const [analyzingRequest, setAnalyzingRequest] = useState<NetworkRequest | null>(null);
   const [activeSidebarTab, setActiveSidebarTab] = useState<string>('chat');
+  const { t } = useI18n();
 
   // TLS scan cache: host → issues (scanned once per host per session)
   const tlsScannedHosts = useRef<Set<string>>(new Set());
@@ -851,7 +853,7 @@ export default function InspectorPage() {
           ) : (
             <>
               <Globe className="w-3.5 h-3.5" />
-              <span className="text-text-secondary">No Target</span>
+              <span className="text-text-secondary">{t.topbar.noTarget}</span>
             </>
           )}
         </div>
@@ -878,55 +880,51 @@ export default function InspectorPage() {
                 <path d="M8 5v14l11-7z" />
               </svg>
             )}
-            <span>Intercept</span>
+            <span>{t.topbar.intercept}</span>
             <span className={cn(
               'font-bold',
               isIntercepting ? 'text-amber-400' : 'text-text-secondary',
             )}>
-              {isIntercepting ? 'ON' : 'OFF'}
+              {isIntercepting ? t.topbar.on : t.topbar.off}
             </span>
           </button>
         )}
 
         {platform === 'android' && (
           <div className="flex items-center gap-2 border-l border-divider/50 pl-2">
-            <span className="text-xs text-text-secondary">Frida:</span>
+            <span className="text-xs text-text-secondary">{t.topbar.frida}:</span>
             {fridaStatus === 'running' ? (
               <>
                 <span className="text-xs text-success font-medium flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                  Running
+                  {t.topbar.running}
                 </span>
                 <button
                   onClick={handleInjectBypass}
                   className="px-2 py-1 rounded text-xs bg-indigo-600/10 text-indigo-500 hover:bg-indigo-600/20 border border-indigo-500/30 transition-colors"
-                  title="Inject Universal SSL Pinning Bypass"
                 >
-                  SSL Bypass
+                  {t.topbar.sslBypass}
                 </button>
                 <button
                   onClick={handleInstallCert}
                   className="px-2 py-1 rounded text-xs bg-warning/10 text-warning hover:bg-warning/20 border border-warning/30 transition-colors"
-                  title="Install Proxy CA Certificate (Requires Root)"
                 >
-                  Install Cert
+                  {t.topbar.installCert}
                 </button>
               </>
             ) : fridaStatus === 'installed' ? (
               <button
                 onClick={handleStartFrida}
                 className="px-2 py-1 rounded text-xs bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors"
-                title="Start Frida Server"
               >
-                Start
+                {t.topbar.start}
               </button>
             ) : (
               <button
                 onClick={handleInstallFrida}
                 className="px-2 py-1 rounded text-xs bg-secondary hover:bg-secondary/80 border border-divider transition-colors"
-                title="Install Frida Server on Device"
               >
-                Install
+                {t.topbar.install}
               </button>
             )}
           </div>
@@ -1015,23 +1013,23 @@ export default function InspectorPage() {
         const errCount = requests.filter((r) => r.status >= 400).length;
         return (
           <div className="h-6 border-t border-divider flex items-center px-3 gap-4 bg-table-headerBg text-[10px] text-text-secondary select-none shrink-0">
-            <span>{requests.length} requests</span>
+            <span>{requests.length} {t.footer.requests}</span>
             <span className="text-divider">|</span>
-            <span>{httpsCount} HTTPS</span>
+            <span>{httpsCount} {t.footer.https}</span>
             <span className="text-divider">|</span>
-            <span>{sizeStr} transferred</span>
+            <span>{sizeStr} {t.footer.transferred}</span>
             <span className="text-divider">|</span>
-            <span>{avgTime > 0 ? `${avgTime}ms avg` : '—'}</span>
+            <span>{avgTime > 0 ? `${avgTime}ms ${t.footer.avg}` : '—'}</span>
             {errCount > 0 && (
               <>
                 <span className="text-divider">|</span>
-                <span className="text-red-400">{errCount} errors</span>
+                <span className="text-red-400">{errCount} {t.footer.errors}</span>
               </>
             )}
             {filteredRequests.length !== requests.length && (
               <>
                 <span className="text-divider">|</span>
-                <span className="text-warning">{filteredRequests.length} shown</span>
+                <span className="text-warning">{filteredRequests.length} {t.footer.shown}</span>
               </>
             )}
           </div>

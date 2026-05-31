@@ -4,6 +4,7 @@ import { cn } from '../../../../../shared/lib/utils';
 import { NetworkRequest } from '../../../../../types/inspector';
 import { InspectorContext } from '../index';
 import { DiffView } from './DiffView';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 interface ComparePanelProps {
   inspectorContext: InspectorContext;
@@ -33,6 +34,8 @@ function saveSavedCompares(compares: SavedCompare[]) {
 }
 
 export function ComparePanel({ inspectorContext }: ComparePanelProps) {
+  const { t } = useI18n();
+
   if (inspectorContext.compareRequest1 || inspectorContext.compareRequest2) {
     const handleSaveTempCompare = (name: string, desc: string) => {
       const req1 = inspectorContext.compareRequest1;
@@ -157,6 +160,7 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
     onChange: (url: string) => void;
     placeholder: string;
   }) => {
+    const { t: tc } = useI18n();
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -231,7 +235,7 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
             className="absolute z-50 w-full mt-1 bg-dialog-background border border-divider rounded-lg shadow-lg max-h-64 overflow-y-auto"
           >
             {filteredItems.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-text-secondary">No matching requests</div>
+              <div className="px-3 py-2 text-xs text-text-secondary">{tc.compare.noMatching}</div>
             ) : (
               filteredItems.map((item) => (
                 <button
@@ -281,8 +285,8 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
           <ArrowRightLeft className="w-4 h-4 text-purple-400" />
         </div>
         <div>
-          <h2 className="text-base font-bold text-text-primary">Compare Requests</h2>
-          <p className="text-xs text-text-secondary mt-0.5">Diff two requests side by side</p>
+          <h2 className="text-base font-bold text-text-primary">{t.compare.title}</h2>
+          <p className="text-xs text-text-secondary mt-0.5">{t.compare.desc}</p>
         </div>
         
       </div>
@@ -294,7 +298,7 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
             <input
               type="text"
-              placeholder="Search saved compares..."
+              placeholder={t.compare.searchSaved}
               value={savedSearchTerm}
               onChange={(e) => setSavedSearchTerm(e.target.value)}
               className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
@@ -309,7 +313,7 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
                 ? "bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary border-divider hover:border-primary/30"
                 : "bg-zinc-800/50 text-zinc-600 border-zinc-800/80 cursor-not-allowed opacity-50"
             )}
-            title={inspectorContext.appId ? "New Compare" : "Select a target first"}
+            title={inspectorContext.appId ? t.compare.newCompare : t.compare.newTarget}
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -343,9 +347,9 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
           <div className="w-16 h-16 rounded-xl bg-purple-500/15 flex items-center justify-center mx-auto mb-4 border border-purple-500/25">
             <ArrowRightLeft className="w-8 h-8 text-purple-400" />
           </div>
-          <p className="text-sm text-text-primary font-medium">No Saved Compares</p>
+          <p className="text-sm text-text-primary font-medium">{t.compare.noSaved}</p>
           <p className="text-xs text-text-secondary mt-1 text-center">
-            Click the + button to save a pair of requests
+            {t.compare.noSavedDesc}
           </p>
         </div>
       )}
@@ -364,8 +368,8 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
                 <Save className="w-4 h-4 text-purple-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-text-primary">Save Compare</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Name and select two requests</p>
+                <h3 className="text-base font-bold text-text-primary">{t.compare.saveCompare}</h3>
+                <p className="text-xs text-text-secondary mt-0.5">{t.compare.saveCompareDesc}</p>
               </div>
               <button
                 onClick={() => setDrawerOpen(false)}
@@ -378,46 +382,46 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">COMPARE NAME</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.compare.compareName}</label>
                 <input
                   ref={inputRef}
                   type="text"
                   value={newCompareName}
                   onChange={(e) => setNewCompareName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateCompare()}
-                  placeholder="e.g. Login API Comparison"
+                  placeholder={t.compare.compareNamePlaceholder}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">DESCRIPTION (OPTIONAL)</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.compare.descOptional}</label>
                 <textarea
                   value={newCompareDesc}
                   onChange={(e) => setNewCompareDesc(e.target.value)}
-                  placeholder="Add a description for this comparison..."
+                  placeholder={t.compare.descPlaceholder}
                   rows={3}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">REQUEST A (URL)</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.compare.requestA}</label>
                 <Combobox
                   items={uniqueUrls}
                   value={selectedUrl1}
                   onChange={setSelectedUrl1}
-                  placeholder="Search and select a request..."
+                  placeholder={t.compare.requestPlaceholder}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">REQUEST B (URL)</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.compare.requestB}</label>
                 <Combobox
                   items={uniqueUrls}
                   value={selectedUrl2}
                   onChange={setSelectedUrl2}
-                  placeholder="Search and select a request..."
+                  placeholder={t.compare.requestPlaceholder}
                 />
               </div>
             </div>
@@ -428,14 +432,14 @@ export function ComparePanel({ inspectorContext }: ComparePanelProps) {
                 onClick={() => setDrawerOpen(false)}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
               >
-                Cancel
+                {t.compare.cancel}
               </button>
               <button
                 onClick={handleCreateCompare}
                 disabled={!newCompareName.trim() || !selectedUrl1 || !selectedUrl2}
                 className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
               >
-                Save Compare
+                {t.compare.save}
               </button>
             </div>
           </div>

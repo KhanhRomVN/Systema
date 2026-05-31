@@ -12,6 +12,7 @@ import {
   KeyRound,
   Send,
   ShieldAlert,
+  Cookie,
 } from 'lucide-react';
 
 import { HeadersDetails } from './Headers';
@@ -23,6 +24,8 @@ import { InspectorFilter, NetworkFilter } from './Filter';
 import { ResizableSplit } from '../../../../core/components/common/ResizableSplit';
 import { CodeBlock } from '../../../../core/components/common/CodeBlock';
 import { Composer } from './Composer';
+import { CookieDetails } from './Cookie';
+import { useI18n } from '../../../../i18n/i18nContext';
 
 function Badge({ count, className }: { count: number; className?: string }) {
   if (count === 0) return null;
@@ -78,6 +81,7 @@ function TextSelectionMenu({
   onUseInSearch: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   useEffect(() => {
     const handleClickOutside = () => onClose();
     const handleEscape = (e: KeyboardEvent) => {
@@ -110,7 +114,7 @@ function TextSelectionMenu({
         className="w-full px-3 py-1.5 text-xs text-left hover:bg-pink-500/10 hover:text-pink-500 transition-colors flex items-center gap-2"
       >
         <KeyRound className="w-3 h-3" />
-        Add to Crypto
+        {t.requestDetails.addToCrypto}
       </button>
       <button
         onClick={() => {
@@ -120,7 +124,7 @@ function TextSelectionMenu({
         className="w-full px-3 py-1.5 text-xs text-left hover:bg-primary/10 hover:text-primary transition-colors flex items-center gap-2"
       >
         <Filter className="w-3 h-3" />
-        Use in Search
+        {t.requestDetails.useInSearch}
       </button>
     </div>
   );
@@ -148,6 +152,7 @@ export function RequestDetails({
 }: NetworkDetailsProps) {
   const [internalActiveTab, setInternalActiveTab] = useState('headers');
   const [isRawMode, setIsRawMode] = useState(false);
+  const { t } = useI18n();
 
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -318,7 +323,7 @@ export function RequestDetails({
   const tabs = [
     {
       id: 'headers',
-      label: 'Headers',
+      label: t.requestDetails.headers,
       icon: List,
       count: matches.headers,
       importantCount: 0,
@@ -332,7 +337,7 @@ export function RequestDetails({
     },
     {
       id: 'body',
-      label: 'Body',
+      label: t.requestDetails.body,
       icon: Box,
       count: matches.body,
       importantCount: 0,
@@ -346,7 +351,7 @@ export function RequestDetails({
     },
     {
       id: 'network',
-      label: 'Network',
+      label: t.requestDetails.network,
       icon: Globe,
       count: matches.network,
       importantCount: 0,
@@ -360,7 +365,7 @@ export function RequestDetails({
     },
     ...(showComposerTab ? [{
       id: 'composer',
-      label: 'Composer',
+      label: t.requestDetails.composer,
       icon: Send,
       count: 0,
       importantCount: 0,
@@ -374,7 +379,7 @@ export function RequestDetails({
     }] : []),
     ...(request?.protocol === 'https' && (request?.securityIssues?.length ?? 0) > 0 ? [{
       id: 'security',
-      label: 'Security',
+      label: t.requestDetails.security,
       icon: ShieldAlert,
       count: request.securityIssues!.length,
       importantCount: 0,
@@ -384,6 +389,25 @@ export function RequestDetails({
         badge: 'bg-red-500/20 text-red-400',
         hover: 'hover:bg-red-500/10',
         activeAction: 'bg-red-500/20 text-red-400',
+      },
+    }] : []),
+    ...(request?.protocol === 'https' && (
+      (request?.requestCookies && Object.keys(request.requestCookies).length > 0) ||
+      (request?.responseCookies && Object.keys(request.responseCookies).length > 0) ||
+      (request?.requestHeaders && Object.keys(request.requestHeaders).some(k => k.toLowerCase() === 'cookie')) ||
+      (request?.responseHeaders && Object.keys(request.responseHeaders).some(k => k.toLowerCase() === 'set-cookie'))
+    ) ? [{
+      id: 'cookies',
+      label: t.requestDetails.cookies,
+      icon: Cookie,
+      count: 0,
+      importantCount: 0,
+      colors: {
+        text: 'text-amber-400',
+        border: 'border-amber-400',
+        badge: 'bg-amber-500/20 text-amber-400',
+        hover: 'hover:bg-amber-500/10',
+        activeAction: 'bg-amber-500/20 text-amber-400',
       },
     }] : []),
   ] as const;
@@ -415,12 +439,13 @@ export function RequestDetails({
 
   const isComposerTab = activeTab === 'composer';
   const isSecurityTab = activeTab === 'security';
+  const isCookieTab = activeTab === 'cookies';
 
   const content = (
     <div className="flex-1 overflow-hidden h-full" onContextMenu={handleContextMenu}>
       {!request && !isComposerTab ? (
         <div className="h-full flex items-center justify-center text-text-secondary bg-table-bodyBg">
-          Select a request to view details
+          {t.requestDetails.selectRequest}
         </div>
       ) : isComposerTab ? (
         <div className="h-full w-full">
@@ -432,6 +457,10 @@ export function RequestDetails({
             setActiveTab(tab);
             if (onSearchTermChange) onSearchTermChange(term);
           }} />
+        </div>
+      ) : isCookieTab && request ? (
+        <div className="flex-1 overflow-auto h-full">
+          <CookieDetails request={request} />
         </div>
       ) : isRawMode ? (
         <CodeBlock
@@ -453,7 +482,7 @@ export function RequestDetails({
   );
 
   const currentTabHasMatches =
-    searchTerm && !isRawMode && !isComposerTab && !isSecurityTab && (matches[activeTab as keyof typeof matches] || 0) > 0;
+    searchTerm && !isRawMode && !isComposerTab && !isSecurityTab && !isCookieTab && (matches[activeTab as keyof typeof matches] || 0) > 0;
 
   return (
     <div className="h-full">
@@ -478,7 +507,7 @@ export function RequestDetails({
                     {tab.label}
                     <Badge count={tab.count} className={tab.colors.badge} />
 
-                    {tab.id !== 'composer' && tab.id !== 'security' && (
+                    {tab.id !== 'composer' && tab.id !== 'security' && tab.id !== 'cookies' && (
                       <div
                         className={cn(
                           'ml-2 pl-2 border-l flex items-center gap-1 transition-colors',
@@ -494,7 +523,7 @@ export function RequestDetails({
                               tab.colors.hover,
                               'animate-in fade-in zoom-in duration-200',
                             )}
-                            title="Next Match"
+                          title={t.requestDetails.nextMatch}
                           >
                             <ScanEye className="w-3.5 h-3.5" />
                           </button>
@@ -507,7 +536,7 @@ export function RequestDetails({
                             'hover:text-current',
                             tab.colors.hover,
                           )}
-                          title="Copy Tab Content"
+                          title={t.requestDetails.copyTab}
                         >
                           <Copy className="w-3.5 h-3.5" />
                         </button>
@@ -519,7 +548,7 @@ export function RequestDetails({
                             tab.colors.hover,
                             isRawMode && tab.colors.activeAction,
                           )}
-                          title="Toggle Raw View"
+                          title={t.requestDetails.toggleRaw}
                         >
                           <Flower2 className="w-3.5 h-3.5" />
                         </button>
@@ -552,17 +581,17 @@ export function RequestDetails({
                     ? 'border-primary text-primary bg-table-bodyBg'
                     : 'text-text-secondary',
                 )}
-                title={isFilterOpen ? 'Collapse Filters' : 'Expand Filters'}
+                title={isFilterOpen ? t.requestDetails.collapseFilters : t.requestDetails.expandFilters}
               >
                 <Filter className="w-3.5 h-3.5" />
-                Filter
+                {t.requestDetails.filter}
               </button>
             </div>
           )}
         </div>
 
         <div className="flex-1 overflow-hidden relative">
-          {isFilterOpen && activeTab !== 'composer' && activeTab !== 'security' ? (
+          {isFilterOpen && activeTab !== 'composer' && activeTab !== 'security' && activeTab !== 'cookies' ? (
             <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
               {content}
               <NetworkFilter filter={filter} onChange={onFilterChange} requests={requests} />

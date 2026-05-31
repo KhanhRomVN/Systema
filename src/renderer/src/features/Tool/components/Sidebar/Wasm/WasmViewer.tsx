@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Copy, Download, Code } from 'lucide-react';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 import wabt from 'wabt';
 
@@ -10,6 +11,7 @@ interface WasmViewerProps {
 }
 
 export function WasmViewer({ url, responseBody, onClose }: WasmViewerProps) {
+  const { t } = useI18n();
   const [watContent, setWatContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,10 +99,10 @@ export function WasmViewer({ url, responseBody, onClose }: WasmViewerProps) {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="font-medium text-sm truncate" title={url}>
-              Details: {url.split('/').pop()}
+              {t.wasm.details} {url.split('/').pop()}
             </span>
             <span className="text-xs text-muted-foreground truncate opacity-70">
-              Disassembled View (.wat)
+              {t.wasm.disassembledView}
             </span>
           </div>
         </div>
@@ -110,14 +112,14 @@ export function WasmViewer({ url, responseBody, onClose }: WasmViewerProps) {
               <button
                 onClick={handleCopy}
                 className="p-2 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-                title="Copy to Clipboard"
+                title={t.wasm.copyToClipboard}
               >
                 <Copy className="w-4 h-4" />
               </button>
               <button
                 onClick={handleDownload}
                 className="p-2 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-                title="Download .wat"
+                title={t.wasm.downloadWat}
               >
                 <Download className="w-4 h-4" />
               </button>
@@ -138,14 +140,14 @@ export function WasmViewer({ url, responseBody, onClose }: WasmViewerProps) {
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
             <div className="w-8 h-8 border-2 border-purple-500/50 border-t-purple-500 rounded-full animate-spin" />
-            <p>Disassembling WebAssembly...</p>
+            <p>{t.wasm.disassembling}</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full text-red-400 gap-4 p-8 text-center">
             <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
               <X className="w-6 h-6" />
             </div>
-            <p className="font-medium">Disassembly Failed</p>
+            <p className="font-medium">{t.wasm.disassemblyFailed}</p>
             <p className="text-sm opacity-70 max-w-lg font-sans">{error}</p>
           </div>
         ) : (

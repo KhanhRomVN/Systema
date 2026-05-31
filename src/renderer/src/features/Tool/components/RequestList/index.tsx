@@ -5,6 +5,7 @@ import { WebSocketTable } from './WebSocketTable';
 import { NetworkRequest, WebSocketConnection } from '../../../../types/inspector';
 import { InspectorFilter, initialFilterState } from '../RequestDetails/Filter';
 import { Tooltip } from '../Sidebar/Tooltip';
+import { useI18n } from '../../../../i18n/i18nContext';
 import { List, BarChart2, Wifi } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 
@@ -57,12 +58,13 @@ export function RequestList({
   onDeleteWsConnection,
 }: RequestListProps) {
   const [view, setView] = useState<'table' | 'timeline' | 'websocket'>('table');
+  const { t } = useI18n();
 
   return (
     <div className="h-full flex">
       {/* Left tab bar */}
       <div className="w-12 border-r border-border flex flex-col items-center py-3 gap-1.5 shrink-0 bg-table-headerBg z-10">
-        <Tooltip title="Table View" description="View HTTP/HTTPS requests in a table" side="right">
+        <Tooltip title={t.requestList.table} description={t.requestList.tableDesc} side="right">
           <button
             onClick={() => setView('table')}
             className={cn(
@@ -75,7 +77,7 @@ export function RequestList({
             <List className="w-4 h-4 shrink-0" />
           </button>
         </Tooltip>
-        <Tooltip title="Timeline View" description="Waterfall chart of request timing" side="right">
+        <Tooltip title={t.requestList.timeline} description={t.requestList.timelineDesc} side="right">
           <button
             onClick={() => setView('timeline')}
             className={cn(
@@ -88,7 +90,7 @@ export function RequestList({
             <BarChart2 className="w-4 h-4 shrink-0" />
           </button>
         </Tooltip>
-        <Tooltip title="WebSocket" description="View WebSocket connections and messages" side="right">
+        <Tooltip title={t.requestList.websocket} description={t.requestList.websocketDesc} side="right">
           <button
             onClick={() => setView('websocket')}
             className={cn(
@@ -110,12 +112,12 @@ export function RequestList({
       <div className="flex-1 flex flex-col min-w-0">
         {view === 'table' && filteredRequests.length === 0 && requests.length > 0 && (
           <div className="p-4 bg-warning/10 text-warning text-xs text-center border-b border-warning/20 shrink-0">
-            All {requests.length} requests are hidden by filters.
+            {t.requestList.allHidden.replace('{count}', String(requests.length))}
             <button
               onClick={() => setFilter({ ...initialFilterState })}
               className="ml-2 underline hover:text-warning"
             >
-              Reset Filters
+              {t.requestList.resetFilters}
             </button>
           </div>
         )}

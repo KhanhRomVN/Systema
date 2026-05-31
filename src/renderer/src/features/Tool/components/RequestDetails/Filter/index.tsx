@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { X, Globe, Link } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
 import { Favicon } from '../../../../../shared/utils/faviconUtils';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 export interface NetworkRequest {
   id: string;
@@ -188,6 +189,8 @@ interface NetworkFilterProps {
 }
 
 export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilterProps) {
+  const { t } = useI18n();
+
   // Extract all unique hosts and paths from requests
   const allHosts = Array.from(new Set(requests.map((r) => r.host).filter(Boolean)));
 
@@ -211,17 +214,17 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
   ).sort();
 
   const typeConfig: Record<string, { label: string; color: string }> = {
-    xhr: { label: 'Fetch/XHR', color: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10' },
-    js: { label: 'JS', color: 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10' },
-    css: { label: 'CSS', color: 'text-blue-400 border-blue-400/30 bg-blue-400/10' },
-    img: { label: 'Img', color: 'text-purple-400 border-purple-400/30 bg-purple-400/10' },
-    media: { label: 'Media', color: 'text-pink-400 border-pink-400/30 bg-pink-400/10' },
-    font: { label: 'Font', color: 'text-orange-400 border-orange-400/30 bg-orange-400/10' },
-    doc: { label: 'Doc', color: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10' },
-    ws: { label: 'WS', color: 'text-teal-400 border-teal-400/30 bg-teal-400/10' },
-    wasm: { label: 'Wasm', color: 'text-violet-400 border-violet-400/30 bg-violet-400/10' },
-    manifest: { label: 'Manifest', color: 'text-lime-400 border-lime-400/30 bg-lime-400/10' },
-    other: { label: 'Other', color: 'text-gray-400 border-gray-400/30 bg-gray-400/10' },
+    xhr: { label: t.networkFilter.types.xhr, color: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10' },
+    js: { label: t.networkFilter.types.js, color: 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10' },
+    css: { label: t.networkFilter.types.css, color: 'text-blue-400 border-blue-400/30 bg-blue-400/10' },
+    img: { label: t.networkFilter.types.img, color: 'text-purple-400 border-purple-400/30 bg-purple-400/10' },
+    media: { label: t.networkFilter.types.media, color: 'text-pink-400 border-pink-400/30 bg-pink-400/10' },
+    font: { label: t.networkFilter.types.font, color: 'text-orange-400 border-orange-400/30 bg-orange-400/10' },
+    doc: { label: t.networkFilter.types.doc, color: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10' },
+    ws: { label: t.networkFilter.types.ws, color: 'text-teal-400 border-teal-400/30 bg-teal-400/10' },
+    wasm: { label: t.networkFilter.types.wasm, color: 'text-violet-400 border-violet-400/30 bg-violet-400/10' },
+    manifest: { label: t.networkFilter.types.manifest, color: 'text-lime-400 border-lime-400/30 bg-lime-400/10' },
+    other: { label: t.networkFilter.types.other, color: 'text-gray-400 border-gray-400/30 bg-gray-400/10' },
   };
 
   const methodColors: Record<string, string> = {
@@ -242,11 +245,11 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
         {/* Method */}
         <section>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold">Method</h3>
+            <h3 className="text-xs font-semibold">{t.networkFilter.method}</h3>
             <div className="flex gap-2"></div>
           </div>
           {availableMethods.length === 0 ? (
-            <div className="text-xs text-muted-foreground italic px-2">No methods detected</div>
+            <div className="text-xs text-muted-foreground italic px-2">{t.networkFilter.noMethods}</div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {availableMethods.map((key) => {
@@ -271,7 +274,7 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
                         ? color
                         : 'text-muted-foreground border-border bg-transparent opacity-50',
                     )}
-                    title={isVisible ? 'Click to hide' : 'Click to show'}
+                    title={isVisible ? t.networkFilter.clickToHide : t.networkFilter.clickToShow}
                   >
                     {key}
                   </button>
@@ -283,7 +286,7 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
 
         {/* Host */}
         <ListFilterSection
-          title="Host"
+          title={t.networkFilter.host}
           lists={filter.host}
           onChange={(newHost) => onChange({ ...filter, host: newHost })}
           allItems={allHosts}
@@ -292,11 +295,11 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
         {/* Status */}
         <section>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold">Status (HTTPS)</h3>
+            <h3 className="text-xs font-semibold">{t.networkFilter.status}</h3>
             <div className="flex gap-2"></div>
           </div>
           {availableStatuses.length === 0 ? (
-            <div className="text-xs text-muted-foreground italic px-2">No statuses detected</div>
+            <div className="text-xs text-muted-foreground italic px-2">{t.networkFilter.noStatuses}</div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {availableStatuses.map((code) => {
@@ -330,7 +333,7 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
                         ? color
                         : 'text-muted-foreground border-border bg-transparent opacity-50',
                     )}
-                    title={isVisible ? 'Click to hide' : 'Click to show'}
+                    title={isVisible ? t.networkFilter.clickToHide : t.networkFilter.clickToShow}
                   >
                     {code}
                   </button>
@@ -343,11 +346,11 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
         {/* Type */}
         <section>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold">Type</h3>
+            <h3 className="text-xs font-semibold">{t.networkFilter.type}</h3>
             <div className="flex gap-2"></div>
           </div>
           {availableTypes.length === 0 ? (
-            <div className="text-xs text-muted-foreground italic px-2">No types detected</div>
+            <div className="text-xs text-muted-foreground italic px-2">{t.networkFilter.noTypes}</div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {availableTypes.map((key) => {
@@ -372,7 +375,7 @@ export function NetworkFilter({ filter, onChange, requests = [] }: NetworkFilter
                         ? config.color
                         : 'text-muted-foreground border-border bg-transparent opacity-50',
                     )}
-                    title={isVisible ? 'Click to hide' : 'Click to show'}
+                    title={isVisible ? t.networkFilter.clickToHide : t.networkFilter.clickToShow}
                   >
                     {config.label}
                   </button>
@@ -418,6 +421,7 @@ function ListFilterSection({
   onChange: (lists: { whitelist: string[] }) => void;
   allItems?: string[];
 }) {
+  const { t } = useI18n();
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -478,14 +482,14 @@ function ListFilterSection({
               onFocus={() => {
                 setShowSuggestions(true);
               }}
-              placeholder={`Filter ${title}...`}
+              placeholder={t.networkFilter.filterPlaceholder.replace('{title}', title)}
             />
           </div>
           {showSuggestions && (
             <button
               onClick={() => setShowSuggestions(false)}
               className="bg-zinc-800 hover:bg-red-500/10 border border-zinc-700 hover:border-red-500/40 rounded text-zinc-400 hover:text-red-500 w-10 h-10 flex items-center justify-center transition-colors shrink-0"
-              title="Close Suggestions"
+              title={t.networkFilter.closeSuggestions}
             >
               <X className="w-4 h-4" />
             </button>
@@ -557,7 +561,7 @@ function ListFilterSection({
                   <button
                     onClick={() => handleRemove(item)}
                     className="hover:bg-current/15 rounded-full p-0.5 opacity-70 hover:opacity-100 transition-all shrink-0"
-                    title="Remove filter"
+                    title={t.networkFilter.removeFilter}
                   >
                     <X className="w-3 h-3" />
                   </button>

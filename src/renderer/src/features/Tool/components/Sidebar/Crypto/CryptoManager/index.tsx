@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Plus, KeyRound, X, Search, FileText, Type, ShieldCheck, ShieldOff } from 'lucide-react';
 import { cn } from '../../../../../../shared/lib/utils';
+import { useI18n } from '../../../../../../i18n/i18nContext';
 
 type InputType = 'string' | 'file';
 export type CryptoMode = 'encode' | 'decode';
@@ -40,11 +41,12 @@ interface CryptoManagerProps {
 }
 
 const MODE_CONFIG = {
-  encode: { label: 'Encode', icon: ShieldCheck, color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-  decode: { label: 'Decode', icon: ShieldOff,  color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+  encode: { labelKey: 'encode' as const, icon: ShieldCheck, color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+  decode: { labelKey: 'decode' as const, icon: ShieldOff,  color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
 };
 
 export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
+  const { t } = useI18n();
   const [cards, setCards] = useState<CryptoCard[]>(loadCards);
   const [search, setSearch] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; cardId: string } | null>(null);
@@ -108,8 +110,8 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
             <KeyRound className="w-4 h-4 text-yellow-400" />
           </div>
           <div className="flex-1">
-            <h2 className="text-base font-bold text-text-primary">Crypto Manager</h2>
-            <p className="text-xs text-text-secondary mt-0.5">Save and manage crypto operations</p>
+            <h2 className="text-base font-bold text-text-primary">{t.crypto.title}</h2>
+            <p className="text-xs text-text-secondary mt-0.5">{t.crypto.desc}</p>
           </div>
         </div>
       </div>
@@ -118,7 +120,7 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
       <div className="px-3 py-2 border-b border-divider flex gap-2 items-center shrink-0">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search crypto cards..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t.crypto.searchCards}
             className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none" />
         </div>
         <button onClick={() => setIsDrawerOpen(true)}
@@ -133,8 +135,8 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-text-secondary">
             <KeyRound className="w-8 h-8 mb-2 opacity-30" />
-            <p className="text-xs">No crypto cards yet</p>
-            <p className="text-[10px] opacity-60">Click + to create one</p>
+            <p className="text-xs">{t.crypto.noCards}</p>
+            <p className="text-[10px] opacity-60">{t.crypto.noCardsDesc}</p>
           </div>
         ) : filtered.map(card => {
           const modeConf = MODE_CONFIG[card.mode ?? 'decode'];
@@ -150,11 +152,11 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="text-xs font-bold text-text-primary truncate flex-1">{card.name}</span>
                 <span className={cn('flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border shrink-0', modeConf.color)}>
-                  <ModeIcon className="w-2.5 h-2.5" />{modeConf.label}
+                  <ModeIcon className="w-2.5 h-2.5" />{t.crypto[modeConf.labelKey]}
                 </span>
                 {stepCount > 0 && (
                   <span className="text-[9px] text-text-secondary bg-muted/30 border border-divider/50 rounded px-1.5 py-0.5 shrink-0">
-                    {stepCount} step{stepCount > 1 ? 's' : ''}
+                    {t.crypto.stepCountPlural.replace('{count}', String(stepCount))}
                   </span>
                 )}
               </div>
@@ -198,8 +200,8 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
                 <Plus className="w-4 h-4 text-yellow-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-text-primary">New Crypto</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Create a new crypto operation card</p>
+                <h3 className="text-base font-bold text-text-primary">{t.crypto.newCrypto}</h3>
+                <p className="text-xs text-text-secondary mt-0.5">{t.crypto.newCryptoDesc}</p>
               </div>
               <button onClick={() => setIsDrawerOpen(false)} className="p-1.5 rounded-lg bg-secondary text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0">
                 <X className="w-4 h-4" />
@@ -208,20 +210,20 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
 
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. JWT Decoder, AES Encryptor..."
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.crypto.name}</label>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder={t.crypto.namePlaceholder}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary" />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">DESCRIPTION <span className="text-text-secondary/50">(optional)</span></label>
-                <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this card do?" rows={2}
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.crypto.description} <span className="text-text-secondary/50">{t.crypto.descOptional}</span></label>
+                <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t.crypto.descPlaceholder} rows={2}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none" />
               </div>
 
               {/* Mode */}
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">MODE</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.crypto.mode}</label>
                 <div className="flex gap-2">
                   {(['encode', 'decode'] as CryptoMode[]).map(m => {
                     const conf = MODE_CONFIG[m];
@@ -230,7 +232,7 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
                       <button key={m} onClick={() => setMode(m)}
                         className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-medium transition-all',
                           mode === m ? conf.color : 'bg-table-headerBg text-text-secondary border-input-border-default hover:border-primary/20')}>
-                        <Icon className="w-3.5 h-3.5" />{conf.label}
+                        <Icon className="w-3.5 h-3.5" />{t.crypto[conf.labelKey]}
                       </button>
                     );
                   })}
@@ -239,19 +241,19 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
 
               {/* Input type */}
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">INPUT TYPE</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.crypto.inputType}</label>
                 <div className="flex gap-2 mb-3">
-                  {(['string', 'file'] as InputType[]).map(t => (
-                    <button key={t} onClick={() => setInputType(t)}
+                  {(['string', 'file'] as InputType[]).map(type => (
+                    <button key={type} onClick={() => setInputType(type)}
                       className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-medium transition-all',
-                        inputType === t ? 'bg-primary/10 text-primary border-primary/30' : 'bg-table-headerBg text-text-secondary border-input-border-default hover:border-primary/20')}>
-                      {t === 'file' ? <FileText className="w-3 h-3" /> : <Type className="w-3 h-3" />}
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                        inputType === type ? 'bg-primary/10 text-primary border-primary/30' : 'bg-table-headerBg text-text-secondary border-input-border-default hover:border-primary/20')}>
+                      {type === 'file' ? <FileText className="w-3 h-3" /> : <Type className="w-3 h-3" />}
+                      {type === 'file' ? t.crypto.file : t.crypto.string}
                     </button>
                   ))}
                 </div>
                 {inputType === 'string' ? (
-                  <textarea value={inputString} onChange={e => setInputString(e.target.value)} placeholder="Paste your string here..." rows={4}
+                  <textarea value={inputString} onChange={e => setInputString(e.target.value)} placeholder={t.crypto.inputPlaceholder} rows={4}
                     className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none font-mono" />
                 ) : (
                   <div
@@ -264,7 +266,7 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
                     <FileText className={cn('w-8 h-8', isDragOver ? 'text-primary' : 'text-text-secondary/50')} />
                     {fileName
                       ? <span className="text-xs font-medium text-primary">{fileName}</span>
-                      : <><span className="text-xs text-text-secondary">Drop file here or click to browse</span><span className="text-[10px] text-text-secondary/50">Any text or binary file</span></>
+                      : <><span className="text-xs text-text-secondary">{t.crypto.dropFile}</span><span className="text-[10px] text-text-secondary/50">{t.crypto.anyFile}</span></>
                     }
                     <input ref={fileInputRef} type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) readFile(f); }} />
                   </div>
@@ -273,9 +275,9 @@ export function CryptoManager({ onOpenCard, targetApp }: CryptoManagerProps) {
             </div>
 
             <div className="px-5 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
-              <button onClick={() => setIsDrawerOpen(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors">Cancel</button>
+              <button onClick={() => setIsDrawerOpen(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors">{t.crypto.cancel}</button>
               <button onClick={handleCreate} disabled={!name.trim() || (inputType === 'string' ? !inputString.trim() : !fileContent)}
-                className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all">Create</button>
+                className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all">{t.crypto.create}</button>
             </div>
           </div>
         </>

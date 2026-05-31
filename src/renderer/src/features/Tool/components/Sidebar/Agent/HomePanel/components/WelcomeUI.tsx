@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Brain, MessageSquare, Zap, Activity } from 'lucide-react';
+import { useI18n } from '../../../../../../../i18n/i18nContext';
 
 const SLOGANS = [
   'Analyze network traffic with AI',
@@ -10,6 +11,7 @@ const SLOGANS = [
 ];
 
 export function WelcomeUI() {
+  const { t } = useI18n();
   const [sloganIndex, setSloganIndex] = useState(0);
   const [stats, setStats] = useState({ messages: 0, sessions: 0 });
 
@@ -33,7 +35,7 @@ export function WelcomeUI() {
         <div className="w-12 h-12 rounded-2xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
           <Brain className="w-6 h-6 text-violet-400" />
         </div>
-        <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Systema AI</h1>
+        <h1 className="text-2xl font-extrabold text-foreground tracking-tight">{t.agent.systemaAI}</h1>
         <div className="h-6 overflow-hidden">
           <p key={sloganIndex} className="text-xs text-muted-foreground animate-in slide-in-from-bottom-2 fade-in duration-300">
             {SLOGANS[sloganIndex]}
@@ -44,8 +46,8 @@ export function WelcomeUI() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 w-full mb-4">
         {[
-          { icon: MessageSquare, label: 'Total Messages', value: stats.messages, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-          { icon: Activity, label: 'Sessions', value: stats.sessions, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
+          { icon: MessageSquare, label: t.agent.totalMessages, value: stats.messages, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+          { icon: Activity, label: t.agent.sessions, value: stats.sessions, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className={`rounded-lg border p-3 flex items-center gap-2.5 ${bg}`}>
             <div className={`shrink-0 ${color}`}><Icon className="w-4 h-4" /></div>
@@ -61,11 +63,11 @@ export function WelcomeUI() {
       <div className="w-full rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3 flex items-start gap-2.5">
         <Zap className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          <strong className="text-yellow-500">Prerequisite:</strong> Ensure{' '}
+          <strong className="text-yellow-500">{t.agent.prerequisite}</strong>{' '}
           <a href="http://localhost:8888" className="text-blue-400 hover:underline font-semibold" target="_blank" rel="noreferrer">
             Elara
           </a>{' '}
-          is running locally before starting a chat session.
+          {t.agent.prerequisiteDesc}
         </p>
       </div>
     </div>

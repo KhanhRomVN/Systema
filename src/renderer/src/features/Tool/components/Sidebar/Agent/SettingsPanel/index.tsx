@@ -2,6 +2,7 @@ import { Settings, X, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { ProviderConfig, ProviderType, ElaraFreeConfig } from '../../../../../../types/provider-types';
 import { useHealthCheck } from '../hooks/useHealthCheck';
+import { useI18n } from '../../../../../../i18n/i18nContext';
 import { cn } from '../../../../../../shared/lib/utils';
 
 interface SettingsPanelProps {
@@ -13,12 +14,6 @@ interface SettingsPanelProps {
 const LANGUAGES = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
   { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
-  { code: 'zh', name: '中文', flag: '🇨🇳' },
-  { code: 'ja', name: '日本語', flag: '🇯🇵' },
-  { code: 'ko', name: '한국어', flag: '🇰🇷' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
 ];
 
 const STORAGE_KEY = 'systema-agent-ai-language';
@@ -26,6 +21,7 @@ const STORAGE_KEY = 'systema-agent-ai-language';
 export default function SettingsPanel({ onClose, currentProviderConfig, onUpdateProviderConfig }: SettingsPanelProps) {
   const [baseURL, setBaseURL] = useState('http://localhost:8888');
   const [aiLanguage, setAiLanguage] = useState(() => localStorage.getItem(STORAGE_KEY) || 'English');
+  const { t } = useI18n();
 
   useEffect(() => {
     if (currentProviderConfig?.type === ProviderType.ELARA_FREE) {
@@ -50,8 +46,8 @@ export default function SettingsPanel({ onClose, currentProviderConfig, onUpdate
             <Settings className="w-4 h-4" />
           </div>
           <div>
-            <span className="text-sm font-bold text-foreground block mb-0.5">Settings</span>
-            <p className="text-[11px] text-muted-foreground/70 leading-snug">Configure your AI provider</p>
+            <span className="text-sm font-bold text-foreground block mb-0.5">{t.agentSettings.title}</span>
+            <p className="text-[11px] text-muted-foreground/70 leading-snug">{t.agentSettings.description}</p>
           </div>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/40 transition-all shrink-0">
@@ -63,14 +59,14 @@ export default function SettingsPanel({ onClose, currentProviderConfig, onUpdate
         {/* API Base URL */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-foreground">API Base URL</label>
+            <label className="text-xs font-semibold text-foreground">{t.agentSettings.apiBaseUrl}</label>
             <div className="flex items-center gap-1.5 text-[10px]">
               {isChecking ? (
-                <><Loader2 className="w-3 h-3 animate-spin text-muted-foreground" /><span className="text-muted-foreground">Checking...</span></>
+                <><Loader2 className="w-3 h-3 animate-spin text-muted-foreground" /><span className="text-muted-foreground">{t.agentSettings.checking}</span></>
               ) : isConnected ? (
-                <><Wifi className="w-3 h-3 text-green-500" /><span className="text-green-500">Connected</span></>
+                <><Wifi className="w-3 h-3 text-green-500" /><span className="text-green-500">{t.agentSettings.connected}</span></>
               ) : (
-                <><WifiOff className="w-3 h-3 text-red-500" /><span className="text-red-500">Unreachable</span></>
+                <><WifiOff className="w-3 h-3 text-red-500" /><span className="text-red-500">{t.agentSettings.unreachable}</span></>
               )}
             </div>
           </div>
@@ -89,7 +85,7 @@ export default function SettingsPanel({ onClose, currentProviderConfig, onUpdate
 
         {/* AI Response Language */}
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-foreground">AI Response Language</label>
+          <label className="text-xs font-semibold text-foreground">{t.agentSettings.aiLanguage}</label>
           <select
             value={aiLanguage}
             onChange={(e) => { setAiLanguage(e.target.value); localStorage.setItem(STORAGE_KEY, e.target.value); }}
@@ -103,7 +99,7 @@ export default function SettingsPanel({ onClose, currentProviderConfig, onUpdate
       </div>
 
       <div className="p-4 border-t border-border bg-muted/10">
-        <p className="text-[10px] text-muted-foreground text-center">More advanced settings will be available soon.</p>
+        <p className="text-[10px] text-muted-foreground text-center">{t.agentSettings.moreSoon}</p>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { NetworkRequest } from '../../../../../types/inspector';
 import { FileCode, Download, Search, Cpu } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
+import { useI18n } from '../../../../../i18n/i18nContext';
 import { detectWasmModules, WasmItem } from '../../../../../utils/detectors';
 
 interface WasmPanelProps {
@@ -9,7 +10,7 @@ interface WasmPanelProps {
   onClose: () => void;
 }
 
-function WasmCard({ item, request }: { item: WasmItem; request?: NetworkRequest }) {
+function WasmCard({ item, request, t }: { item: WasmItem; request?: NetworkRequest; t: any }) {
   const isClickable = item.detectionMethod !== 'JS Heuristic';
 
   const handleDownload = (e: React.MouseEvent) => {
@@ -41,7 +42,7 @@ function WasmCard({ item, request }: { item: WasmItem; request?: NetworkRequest 
           <button
             onClick={handleDownload}
             className="p-1.5 rounded-lg text-text-secondary hover:text-purple-400 hover:bg-purple-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0"
-            title="Download .wasm"
+            title={t.wasm.download}
           >
             <Download className="w-3.5 h-3.5" />
           </button>
@@ -52,6 +53,7 @@ function WasmCard({ item, request }: { item: WasmItem; request?: NetworkRequest 
 }
 
 export function WasmPanel({ requests, onClose }: WasmPanelProps) {
+  const { t } = useI18n();
   const [wasmItems, setWasmItems] = useState<WasmItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -74,8 +76,8 @@ export function WasmPanel({ requests, onClose }: WasmPanelProps) {
           <FileCode className="w-4 h-4 text-purple-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-text-primary">WASM Manager</h2>
-          <p className="text-xs text-text-secondary mt-0.5">Web Assembly modules</p>
+          <h2 className="text-base font-bold text-text-primary">{t.wasm.title}</h2>
+          <p className="text-xs text-text-secondary mt-0.5">{t.wasm.desc}</p>
         </div>
         <button onClick={onClose} className="p-1.5 rounded text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all">
           ✕
@@ -88,7 +90,7 @@ export function WasmPanel({ requests, onClose }: WasmPanelProps) {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
           <input
             type="text"
-            placeholder="Search modules..."
+            placeholder={t.wasm.searchModules}
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
@@ -99,7 +101,7 @@ export function WasmPanel({ requests, onClose }: WasmPanelProps) {
       {/* List */}
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
         {filtered.map(item => (
-          <WasmCard key={item.id} item={item} request={requests.find(r => r.id === item.id)} />
+          <WasmCard key={item.id} item={item} request={requests.find(r => r.id === item.id)} t={t} />
         ))}
 
         {wasmItems.length === 0 && (
@@ -108,8 +110,8 @@ export function WasmPanel({ requests, onClose }: WasmPanelProps) {
               <FileCode className="w-7 h-7 text-purple-400/50" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-text-primary">No WASM Modules</p>
-              <p className="text-xs text-text-secondary mt-0.5">Navigate to a page that uses WebAssembly</p>
+              <p className="text-sm font-medium text-text-primary">{t.wasm.noModules}</p>
+              <p className="text-xs text-text-secondary mt-0.5">{t.wasm.noModulesDesc}</p>
             </div>
           </div>
         )}

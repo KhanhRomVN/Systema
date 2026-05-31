@@ -1,6 +1,7 @@
 import { X, ExternalLink, FileWarning } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 interface MediaModalProps {
   url: string;
@@ -10,6 +11,7 @@ interface MediaModalProps {
 }
 
 export function MediaModal({ url, filename, type, onClose }: MediaModalProps) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hlsError, setHlsError] = useState<string | null>(null);
 
@@ -70,7 +72,7 @@ export function MediaModal({ url, filename, type, onClose }: MediaModalProps) {
           <div className="flex flex-col">
             <span className="text-sm font-semibold truncate max-w-[400px]">{filename}</span>
             <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider">
-              {isTS ? 'MPEG-TS Video' : type}
+              {isTS ? t.media.mpegtsVideo : type}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -79,14 +81,14 @@ export function MediaModal({ url, filename, type, onClose }: MediaModalProps) {
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground"
-              title="Open in new tab"
+              title={t.media.openInNewTab}
             >
               <ExternalLink className="w-4 h-4" />
             </a>
             <button
               onClick={onClose}
               className="p-2 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground"
-              title="Close"
+              title={t.common.close}
             >
               <X className="w-5 h-5" />
             </button>

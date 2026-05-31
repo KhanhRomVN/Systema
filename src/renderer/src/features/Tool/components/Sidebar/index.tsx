@@ -1,7 +1,8 @@
 import { useState, useEffect, memo, useCallback, useRef } from 'react';
 import { HomePanel } from './Agent/HomePanel';
 import { ChatPanel } from './Agent/ChatPanel';
-import SettingsPanel from './Agent/SettingsPanel';
+import AgentSettingsPanel from './Agent/SettingsPanel';
+import { SettingsPanel as AppSettingsPanel } from './Settings/SettingsPanel';
 import { InspectorFilter } from '../RequestDetails/Filter';
 import { NetworkRequest } from '../../../../types/inspector';
 import { SourcesPanel } from './Source';
@@ -17,7 +18,21 @@ import { TargetSelector } from './Target';
 import { ConfirmSwitchDrawer } from './Target/ConfirmSwitchDrawer';
 import { FuzzerPanel } from './Fuzzer';
 import { Tooltip } from './Tooltip';
-import { MessageSquare, FileCode, TerminalSquare, BookmarkPlus, GitBranch, KeyRound, ArrowRightLeft, Image, Cpu, Crosshair, Zap } from 'lucide-react';
+import { useI18n } from '../../../../i18n/i18nContext';
+import {
+  MessageSquare,
+  FileCode,
+  TerminalSquare,
+  BookmarkPlus,
+  GitBranch,
+  KeyRound,
+  ArrowRightLeft,
+  Image,
+  Cpu,
+  Crosshair,
+  Zap,
+  Settings,
+} from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 import { DiffTab } from './Compare/DiffView';
 import { ProviderConfig, ProviderType } from '../../../../types/provider-types';
@@ -53,7 +68,12 @@ export interface InspectorContext {
   onSetActiveSidebarTab?: (tab: string) => void;
   onNodeClick?: (request: NetworkRequest) => void;
   // Target selector
-  onSelectApp?: (appName: string, proxyUrl: string, customUrl?: string, mode?: 'browser' | 'electron' | 'native') => Promise<void>;
+  onSelectApp?: (
+    appName: string,
+    proxyUrl: string,
+    customUrl?: string,
+    mode?: 'browser' | 'electron' | 'native',
+  ) => Promise<void>;
   onStopSession?: () => Promise<void>;
   onLoadProfile?: (profile: any) => void;
   // Confirm switch drawer
@@ -77,6 +97,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
   const [activeTab, setActiveTab] = useState<string>('chat');
   const inspectorContextRef = useRef(inspectorContext);
   inspectorContextRef.current = inspectorContext;
+  const { t } = useI18n();
   // Lifted state from TabPanel
   // History removed, using single active session or similar if needed.
   // For now just tracking selected ID is enough if we generate it on demand?
@@ -176,7 +197,10 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
           onSelectApp={inspectorContext.onSelectApp || (async () => {})}
           onStopSession={inspectorContext.onStopSession || (async () => {})}
           onLoadProfile={inspectorContext.onLoadProfile || (() => {})}
-          platform={inspectorContext.requests.find(r => r.id === inspectorContext.selectedRequestId)?.protocol as any}
+          platform={
+            inspectorContext.requests.find((r) => r.id === inspectorContext.selectedRequestId)
+              ?.protocol as any
+          }
           onOpenStopConfirm={inspectorContext.onOpenStopConfirm}
         />
       );
@@ -187,15 +211,28 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     }
 
     if (activeTab === 'media') {
-      return <MediaPanel requests={inspectorContext.requests} onClose={() => setActiveTab('chat')} />;
+      return (
+        <MediaPanel requests={inspectorContext.requests} onClose={() => setActiveTab('chat')} />
+      );
     }
 
     if (activeTab === 'wasm') {
-      return <WasmPanel requests={inspectorContext.requests} onClose={() => setActiveTab('chat')} />;
+      return (
+        <WasmPanel requests={inspectorContext.requests} onClose={() => setActiveTab('chat')} />
+      );
     }
 
     if (activeTab === 'fuzzer') {
-      return <FuzzerPanel requests={inspectorContext.requests} isTargetRunning={!!inspectorContext.appId} />;
+      return (
+        <FuzzerPanel
+          requests={inspectorContext.requests}
+          isTargetRunning={!!inspectorContext.appId}
+        />
+      );
+    }
+
+    if (activeTab === 'settings') {
+      return <AppSettingsPanel />;
     }
 
     if (activeTab === 'compare') {
@@ -243,7 +280,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
 
     if (showSettings) {
       return (
-        <SettingsPanel
+        <AgentSettingsPanel
           onClose={() => setShowSettings(false)}
           currentProviderConfig={providerConfig}
           onUpdateProviderConfig={(newConfig) => {
@@ -292,22 +329,107 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
   };
 
   const allTabs = [
-    { id: 'chat', label: 'Chat', icon: MessageSquare, color: 'blue', description: 'AI-powered chat assistant for debugging and analysis', showAlways: true },
-    { id: 'target', label: 'Target', icon: Crosshair, color: 'emerald', description: 'Select and manage target applications', showAlways: true },
-    { id: 'sources', label: 'Sources', icon: FileCode, color: 'purple', description: 'View and analyze source code files', platforms: ['web'] as Array<'web' | 'pc' | 'android' | 'cli'> },
-    { id: 'logs', label: 'Log', icon: TerminalSquare, color: 'green', description: 'Real-time log viewer and filter', platforms: ['android'] as Array<'web' | 'pc' | 'android' | 'cli'> },
-    { id: 'collections', label: 'Composers Manager', icon: BookmarkPlus, color: 'orange', description: 'Save and organize HTTP requests', showAlways: true },
-    { id: 'trace', label: 'Trace', icon: GitBranch, color: 'pink', description: 'Request trace and call hierarchy', showAlways: true },
-    { id: 'compare', label: 'Compare', icon: ArrowRightLeft, color: 'indigo', description: 'Compare two requests side by side', showAlways: true },
-    { id: 'crypto', label: 'Crypto', icon: KeyRound, color: 'yellow', description: 'Cryptographic tools and analysis', showAlways: true },
-    { id: 'media', label: 'Media', icon: Image, color: 'blue', description: 'Media files and assets viewer', showAlways: true },
-    { id: 'wasm', label: 'WASM', icon: Cpu, color: 'purple', description: 'WebAssembly module analyzer', showAlways: true },
-    { id: 'fuzzer', label: 'Fuzzer', icon: Zap, color: 'amber', description: 'Spam HTTPS với nhiều payload', showAlways: true },
+    {
+      id: 'chat',
+      label: t.sidebar.chat,
+      icon: MessageSquare,
+      color: 'blue',
+      description: t.sidebar.chatDesc,
+      showAlways: true,
+    },
+    {
+      id: 'target',
+      label: t.sidebar.target,
+      icon: Crosshair,
+      color: 'emerald',
+      description: t.sidebar.targetDesc,
+      showAlways: true,
+    },
+    {
+      id: 'sources',
+      label: t.sidebar.sources,
+      icon: FileCode,
+      color: 'purple',
+      description: t.sidebar.sourcesDesc,
+      platforms: ['web'] as Array<'web' | 'pc' | 'android' | 'cli'>,
+    },
+    {
+      id: 'logs',
+      label: t.sidebar.log,
+      icon: TerminalSquare,
+      color: 'green',
+      description: t.sidebar.logDesc,
+      platforms: ['android'] as Array<'web' | 'pc' | 'android' | 'cli'>,
+    },
+    {
+      id: 'collections',
+      label: t.sidebar.collections,
+      icon: BookmarkPlus,
+      color: 'orange',
+      description: t.sidebar.collectionsDesc,
+      showAlways: true,
+    },
+    {
+      id: 'trace',
+      label: t.sidebar.trace,
+      icon: GitBranch,
+      color: 'pink',
+      description: t.sidebar.traceDesc,
+      showAlways: true,
+    },
+    {
+      id: 'compare',
+      label: t.sidebar.compare,
+      icon: ArrowRightLeft,
+      color: 'indigo',
+      description: t.sidebar.compareDesc,
+      showAlways: true,
+    },
+    {
+      id: 'crypto',
+      label: t.sidebar.crypto,
+      icon: KeyRound,
+      color: 'yellow',
+      description: t.sidebar.cryptoDesc,
+      showAlways: true,
+    },
+    {
+      id: 'media',
+      label: t.sidebar.media,
+      icon: Image,
+      color: 'blue',
+      description: t.sidebar.mediaDesc,
+      showAlways: true,
+    },
+    {
+      id: 'wasm',
+      label: t.sidebar.wasm,
+      icon: Cpu,
+      color: 'purple',
+      description: t.sidebar.wasmDesc,
+      showAlways: true,
+    },
+    {
+      id: 'fuzzer',
+      label: t.sidebar.fuzzer,
+      icon: Zap,
+      color: 'amber',
+      description: t.sidebar.fuzzerDesc,
+      showAlways: true,
+    },
+    {
+      id: 'settings',
+      label: t.sidebar.settings,
+      icon: Settings,
+      color: 'gray',
+      description: t.sidebar.settingsDesc,
+      showAlways: true,
+    },
   ] as const;
 
   const platform = inspectorContext.platform;
-  
-  const tabs = allTabs.filter(tab => {
+
+  const tabs = allTabs.filter((tab) => {
     if ('showAlways' in tab && tab.showAlways) return true;
     if ('platforms' in tab && tab.platforms && platform) {
       return tab.platforms.includes(platform);
@@ -319,7 +441,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
 
   // Auto-switch về 'chat' nếu tab hiện tại bị ẩn
   useEffect(() => {
-    const isTabVisible = tabs.some(t => t.id === activeTab);
+    const isTabVisible = tabs.some((t) => t.id === activeTab);
     if (!isTabVisible) {
       setActiveTab('chat');
     }
@@ -335,6 +457,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     indigo: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
     yellow: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
     amber: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    gray: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
   };
 
   return (
@@ -364,9 +487,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-hidden relative min-w-0">
-        {renderContent()}
-      </div>
+      <div className="flex-1 overflow-hidden relative min-w-0">{renderContent()}</div>
 
       <ConfirmSwitchDrawer
         isOpen={inspectorContext.isConfirmSwitchOpen || false}

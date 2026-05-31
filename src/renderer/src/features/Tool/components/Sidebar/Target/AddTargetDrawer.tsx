@@ -15,6 +15,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 type DrawerPlatform = 'web' | 'pc' | 'android' | 'cli';
 
@@ -79,6 +80,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
   >({});
 
   const isEdit = !!editApp;
+  const { t } = useI18n();
 
   // Real-time duplicate checking
   const [duplicateError, setDuplicateError] = useState<{ name?: string; value?: string }>({});
@@ -540,12 +542,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-bold text-text-primary">
-              {isEdit ? `Edit ${platformMeta.label}` : `Add ${platformMeta.label}`}
+              {isEdit
+                ? (platform === 'web' ? t.addTarget.editWeb : platform === 'pc' ? t.addTarget.editPc : platform === 'android' ? t.addTarget.editAndroid : t.addTarget.editCli)
+                : (platform === 'web' ? t.addTarget.addWeb : platform === 'pc' ? t.addTarget.addPc : platform === 'android' ? t.addTarget.addAndroid : t.addTarget.addCli)}
             </h3>
             <p className="text-xs text-text-secondary mt-0.5">
-              {isEdit
-                ? 'Update target details'
-                : `Configure a new ${platformMeta.label.toLowerCase()} target`}
+              {isEdit ? t.addTarget.updateDetails : t.addTarget.configure.replace('{platform}', platformMeta.label.toLowerCase())}
             </p>
           </div>
           <button
@@ -564,7 +566,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
               {/* Warning Cards for Duplicate Targets */}
               {suggestions.length > 0 && (
                 <div className="mb-2">
-                  <label className="block text-xs font-bold text-red-400 mb-2">DUPLICATE TARGET</label>
+                  <label className="block text-xs font-bold text-red-400 mb-2">{t.addTarget.duplicate}</label>
                   <div className="space-y-2">
                     {suggestions.map((suggestion, idx) => {
                       const faviconUrl = suggestion.url ? `https://www.google.com/s2/favicons?domain=${new URL(suggestion.url).hostname}&sz=32` : null;
@@ -601,12 +603,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
               )}
               
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.addTarget.name}</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. My API Server"
+                  placeholder={t.addTarget.namePlaceholder}
                   className={cn(
                     "w-full bg-table-headerBg border rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary",
                     duplicateError.name ? "border-red-500" : "border-input-border-default"
@@ -617,12 +619,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                 )}
               </div>
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">URL</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.addTarget.url}</label>
                 <input
                   type="text"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
+                  placeholder={t.addTarget.urlPlaceholder}
                   className={cn(
                     "w-full bg-table-headerBg border rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary",
                     duplicateError.value ? "border-red-500" : "border-input-border-default"
@@ -639,7 +641,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
           {platform === 'cli' && (
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.addTarget.name}</label>
                 <input
                   type="text"
                   value={name}
@@ -656,12 +658,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-bold text-text-secondary mb-1.5">
-                  COMMAND
+                  {t.addTarget.command}
                 </label>
                 <textarea
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
-                  placeholder="e.g. npm run start"
+                  placeholder={t.addTarget.commandPlaceholder}
                   rows={3}
                   className={cn(
                     "w-full bg-table-headerBg border rounded-lg px-3 py-2.5 text-sm font-mono text-text-primary outline-none focus:border-primary resize-none",
@@ -672,7 +674,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   <p className="text-xs text-red-400 mt-1.5">{duplicateError.value}</p>
                 )}
                 <p className="text-[10px] text-text-secondary mt-1.5 italic">
-                  Proxy env vars will be auto-injected.
+                  {t.addTarget.proxyNote}
                 </p>
               </div>
             </div>
@@ -686,7 +688,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
                   <input
                     type="text"
-                    placeholder="Search apps..."
+                    placeholder={t.addTarget.searchApps}
                     value={pcSearch}
                     onChange={(e) => setPcSearch(e.target.value)}
                     className="w-full bg-table-headerBg border border-input-border-default rounded-lg pl-8 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary/50"
@@ -705,7 +707,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                 {pcLoading && !discoveredApps.length ? (
                   <div className="flex flex-col items-center justify-center h-full gap-2">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <p className="text-sm text-text-secondary">Scanning...</p>
+                    <p className="text-sm text-text-secondary">{t.addTarget.scanning}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
@@ -742,7 +744,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                               {app.name}
                             </div>
                             <div className="text-[10px] text-text-secondary truncate">
-                              {app.description || 'System App'}
+                              {app.description || t.addTarget.systemApp}
                             </div>
                           </div>
                         </button>
@@ -764,7 +766,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
                       <input
                         type="text"
-                        placeholder="Search devices..."
+                        placeholder={t.addTarget.searchDevices}
                         value={androidSearch}
                         onChange={(e) => setAndroidSearch(e.target.value)}
                         className="w-full bg-table-headerBg border border-input-border-default rounded-lg pl-8 pr-3 py-2 text-sm text-text-primary outline-none focus:border-primary/50"
@@ -861,12 +863,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                               </div>
                               <div className="text-[10px] text-text-secondary mt-0.5">
                                 {isWireless
-                                  ? 'Wireless'
+                                  ? t.addTarget.wireless
                                   : device.type === 'physical'
-                                    ? 'USB'
+                                    ? t.addTarget.usb
                                     : device.type === 'running-vm'
-                                      ? 'Running VM'
-                                      : 'Stopped VM'}
+                                      ? t.addTarget.runningVm
+                                      : t.addTarget.stoppedVm}
                               </div>
                               {status?.message && !status?.ip && (
                                 <div className="mt-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded text-[9px] text-yellow-400">
@@ -887,11 +889,11 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                     className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary"
                   >
                     <X className="w-3.5 h-3.5" />
-                    Back to device list
+                    {t.addTarget.backToList}
                   </button>
                   <div>
                     <label className="block text-xs font-bold text-text-secondary mb-1.5">
-                      DEVICE IP
+                      {t.addTarget.deviceIp}
                     </label>
                     <input
                       type="text"
@@ -903,7 +905,7 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-text-secondary mb-1.5">
-                      PORT
+                      {t.addTarget.port}
                     </label>
                     <input
                       type="text"
@@ -934,12 +936,12 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
                     {isConnecting ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting...
+                        {t.addTarget.connecting}
                       </>
                     ) : (
                       <>
                         <Check className="w-4 h-4" />
-                        Connect
+                        {t.addTarget.connect}
                       </>
                     )}
                   </button>
@@ -955,14 +957,14 @@ export const AddTargetDrawer: React.FC<AddTargetDrawerProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors"
           >
-            Cancel
+            {t.addTarget.cancel}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
             className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
           >
-            {isEdit ? 'Save Changes' : 'Add Target'}
+            {isEdit ? t.addTarget.save : t.addTarget.add}
           </button>
         </div>
       </div>

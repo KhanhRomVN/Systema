@@ -11,8 +11,8 @@ import {
   ChevronDown,
   Search,
 } from 'lucide-react';
+import { useI18n } from '../../../../../i18n/i18nContext';
 import { MediaModal } from './MediaModal';
-
 interface MediaPanelProps {
   requests: NetworkRequest[];
   onClose: () => void;
@@ -31,6 +31,7 @@ interface MediaItem {
 }
 
 export function MediaPanel({ requests }: MediaPanelProps) {
+  const { t } = useI18n();
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
@@ -173,8 +174,8 @@ export function MediaPanel({ requests }: MediaPanelProps) {
           <ImageIcon className="w-4 h-4 text-blue-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-text-primary">Media Inspector</h2>
-          <p className="text-xs text-text-secondary mt-0.5">Images, video and audio in traffic</p>
+          <h2 className="text-base font-bold text-text-primary">{t.media.title}</h2>
+          <p className="text-xs text-text-secondary mt-0.5">{t.media.desc}</p>
         </div>
       </div>
 
@@ -184,7 +185,7 @@ export function MediaPanel({ requests }: MediaPanelProps) {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
           <input
             type="text"
-            placeholder="Search media files..."
+            placeholder={t.media.searchMedia}
             value={mediaSearchTerm}
             onChange={(e) => setMediaSearchTerm(e.target.value)}
             className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none"
@@ -199,7 +200,7 @@ export function MediaPanel({ requests }: MediaPanelProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-blue-400" />
-                <span className="font-medium text-sm">Filter by Format</span>
+                <span className="font-medium text-sm">{t.media.filterByFormat}</span>
               </div>
               <button
                 onClick={() => setShowFilterSettings(false)}
@@ -221,7 +222,7 @@ export function MediaPanel({ requests }: MediaPanelProps) {
                 />
                 <span className="flex items-center gap-1.5">
                   <ImageIcon className="w-3 h-3 text-blue-400" />
-                  Show Images
+                  {t.media.showImages}
                 </span>
               </label>
               <label className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer transition-colors">
@@ -235,7 +236,7 @@ export function MediaPanel({ requests }: MediaPanelProps) {
                 />
                 <span className="flex items-center gap-1.5">
                   <Film className="w-3 h-3 text-purple-400" />
-                  Show Videos
+                  {t.media.showVideos}
                 </span>
               </label>
               <label className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer transition-colors">
@@ -249,27 +250,29 @@ export function MediaPanel({ requests }: MediaPanelProps) {
                 />
                 <span className="flex items-center gap-1.5">
                   <Music className="w-3 h-3 text-green-400" />
-                  Show Audio
+                  {t.media.showAudio}
                 </span>
               </label>
             </div>
 
             <div className="pt-2 border-t border-border/50 text-[10px] text-muted-foreground">
-              Filter media resources by their format type.
+              {t.media.filterInfo}
             </div>
 
             {mediaFilters.videos && videoSources.length > 1 && (
               <div className="pt-3 border-t border-border/50 space-y-2">
                 <div className="text-xs font-medium flex items-center gap-2">
                   <Film className="w-3 h-3 text-purple-400" />
-                  Filter by Video Source
+                  {t.media.filterBySource}
                 </div>
                 <select
                   value={selectedSource}
                   onChange={(e) => setSelectedSource(e.target.value)}
                   className="w-full bg-muted border border-border rounded px-2 py-1.5 text-[10px] outline-none focus:border-blue-500/50"
                 >
-                  <option value="all">All Video Sources ({videoSources.length})</option>
+                  <option value="all">
+                    {t.media.allSources.replace('{count}', String(videoSources.length))}
+                  </option>
                   {videoSources.map((src) => {
                     let displaySource = src;
                     try {
@@ -321,12 +324,16 @@ export function MediaPanel({ requests }: MediaPanelProps) {
                 ) : item.type === 'video' ? (
                   <div className="text-muted-foreground flex flex-col items-center">
                     <Film className="w-8 h-8 opacity-50 mb-2" />
-                    <span className="text-[10px] uppercase font-bold opacity-50">Video</span>
+                    <span className="text-[10px] uppercase font-bold opacity-50">
+                      {t.media.video}
+                    </span>
                   </div>
                 ) : (
                   <div className="text-muted-foreground flex flex-col items-center">
                     <Music className="w-8 h-8 opacity-50 mb-2" />
-                    <span className="text-[10px] uppercase font-bold opacity-50">Audio</span>
+                    <span className="text-[10px] uppercase font-bold opacity-50">
+                      {t.media.audio}
+                    </span>
                   </div>
                 )}
 
@@ -343,7 +350,7 @@ export function MediaPanel({ requests }: MediaPanelProps) {
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <span className="text-white text-xs font-medium flex items-center gap-1">
                     <ExternalLink className="w-3 h-3" />
-                    Preview
+                    {t.media.preview}
                   </span>
                 </div>
               </div>
@@ -379,8 +386,8 @@ export function MediaPanel({ requests }: MediaPanelProps) {
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
                 <Filter className="w-8 h-8 opacity-50" />
               </div>
-              <p>No media matches current filters.</p>
-              <p className="text-xs opacity-70 mt-1">Try adjusting your filter settings.</p>
+              <p>{t.media.noMatch}</p>
+              <p className="text-xs opacity-70 mt-1">{t.media.adjustFilters}</p>
             </div>
           )}
 
@@ -389,10 +396,8 @@ export function MediaPanel({ requests }: MediaPanelProps) {
               <div className="w-16 h-16 rounded-xl bg-blue-500/15 flex items-center justify-center mb-4 border border-blue-500/25">
                 <ImageIcon className="w-8 h-8 text-blue-400" />
               </div>
-              <p className="text-sm text-text-primary font-medium">No Media Files</p>
-              <p className="text-xs text-text-secondary mt-1">
-                Navigate to a page with images, videos, or audio
-              </p>
+              <p className="text-sm text-text-primary font-medium">{t.media.noMedia}</p>
+              <p className="text-xs text-text-secondary mt-1">{t.media.noMediaDesc}</p>
             </div>
           )}
         </div>

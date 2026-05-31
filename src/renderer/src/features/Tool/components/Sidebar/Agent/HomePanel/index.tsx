@@ -4,6 +4,7 @@ import { WelcomeUI } from './components/WelcomeUI';
 import { QuickSwitchDrawer } from './components/QuickSwitchDrawer';
 import { useHealthCheck } from '../hooks/useHealthCheck';
 import { useState, useEffect, useRef } from 'react';
+import { useI18n } from '../../../../../../i18n/i18nContext';
 
 // TabList removed
 // ChatSession defined locally now since TabList is gone
@@ -70,6 +71,7 @@ export function HomePanel({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [showModelDrawer, setShowModelDrawer] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
 
   const baseURL = (currentProviderConfig as ElaraFreeConfig)?.baseURL || 'http://localhost:8888';
   const { isConnected } = useHealthCheck(baseURL);
@@ -321,10 +323,10 @@ export function HomePanel({
     const newId = Math.random().toString(36).substr(2, 9);
     const newSession: ChatSession = {
       id: newId,
-      title: 'Agentic AI',
+      title: t.agent.title,
       timestamp: Date.now(),
       messageCount: 0,
-      preview: 'Start analyzing network traffic...',
+      preview: t.agent.tagline,
       status: 'free',
       provider: currentProviderConfig?.type || 'deepseek',
       containerName: 'Container #01',
@@ -415,22 +417,22 @@ export function HomePanel({
             <Brain className="w-4 h-4 text-violet-400" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-foreground">Agentic AI</h2>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">AI-powered traffic analysis</p>
+            <h2 className="text-sm font-bold text-foreground">{t.agent.title}</h2>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">{t.agent.tagline}</p>
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => setIsHistoryOpen(true)}
             className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-            title="History"
+            title={t.agent.history}
           >
             <History className="w-4 h-4" />
           </button>
           <button
             onClick={onOpenSettings}
             className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-            title="Settings"
+            title={t.agentSettings.title}
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -491,7 +493,7 @@ export function HomePanel({
           modelBadge={{
             label: selectedSubProvider && currentProviderConfig?.model
               ? `${selectedSubProvider}/${currentProviderConfig.model}`
-              : 'Select Model',
+              : t.agent.selectModel,
             faviconUrl: selectedSubProvider
               ? subProviders.find((p) => p.id === selectedSubProvider)?.website
                 ? `https://www.google.com/s2/favicons?domain=${subProviders.find((p) => p.id === selectedSubProvider)?.website}&sz=64`

@@ -5,6 +5,7 @@ import { cn } from '../../../../../shared/lib/utils';
 import { loadProfiles, InspectorProfile, deleteProfilesByAppId } from '../../../../../utils/profiles';
 import { AddTargetDrawer } from './AddTargetDrawer';
 import { ConfirmDeleteDrawer } from './ConfirmDeleteDrawer';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 export interface TargetSelectorProps {
   activeAppId: string;
@@ -54,6 +55,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ appId: string; x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
 
   const fetchApps = async () => {
     try { setApps(await window.api.invoke('apps:get-all')); }
@@ -203,8 +205,8 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
           <Crosshair className="w-3.5 h-3.5 text-primary" />
         </div>
         <div>
-          <h2 className="text-base font-bold text-text-primary">Select Target</h2>
-          <p className="text-xs text-text-secondary mt-0.5">Choose an app or website to inspect traffic</p>
+          <h2 className="text-base font-bold text-text-primary">{t.target.selectTarget}</h2>
+          <p className="text-xs text-text-secondary mt-0.5">{t.target.chooseApp}</p>
         </div>
       </div>
 
@@ -231,13 +233,13 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
       <div className="px-3 py-2 border-b border-divider flex gap-2 items-center shrink-0">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
-          <input type="text" placeholder={`Search ${activePlatform.label}...`} value={searchQuery}
+          <input type="text" placeholder={t.target.search.replace('{platform}', activePlatform.label)} value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-11 bg-input-background border border-input-border-default rounded-lg pl-8 pr-3 text-sm text-text-primary focus:border-primary/50 outline-none" />
         </div>
         <button onClick={openAddDrawer}
           className="flex items-center justify-center w-11 h-11 bg-secondary hover:bg-primary/20 hover:text-primary text-text-secondary rounded-lg border border-divider hover:border-primary/30 transition-all active:scale-95 shrink-0"
-          title="Add target">
+          title={t.target.addTarget}>
           <Plus className="w-4 h-4" />
         </button>
       </div>
@@ -267,8 +269,8 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
               <Globe className="w-5 h-5 text-sky-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-text-primary">All Websites</div>
-              <div className="text-xs text-text-secondary mt-0.5">Inspect any website without a specific target</div>
+              <div className="text-sm font-semibold text-text-primary">{t.target.allWebsites}</div>
+              <div className="text-xs text-text-secondary mt-0.5">{t.target.allWebsitesDesc}</div>
             </div>
             {activeAppId === '__all_websites__' && (
               <button
@@ -282,7 +284,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                 }}
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 rounded-lg transition-all active:scale-95 shrink-0"
               >
-                <Square className="w-3 h-3 fill-current" /> Stop
+                <Square className="w-3 h-3 fill-current" /> {t.target.stop}
               </button>
             )}
           </div>
@@ -357,7 +359,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
         })}
         {filteredApps.length === 0 && (
           <div className="text-center text-text-secondary py-12 text-sm">
-            No {activePlatform.label} targets.<br /><span className="text-xs">Click + to add one.</span>
+            {t.target.noTargets.replace('{platform}', activePlatform.label)}<br /><span className="text-xs">{t.target.clickToAdd}</span>
           </div>
         )}
       </div>
@@ -370,8 +372,8 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
           {/* App info */}
           {contextMenu.appId === '__all_websites__' ? (
             <div className="px-4 py-2 border-b border-divider mb-1">
-              <div className="text-sm font-semibold text-text-primary truncate">All Websites</div>
-              <div className="text-xs text-text-secondary truncate mt-0.5">Inspect any website</div>
+              <div className="text-sm font-semibold text-text-primary truncate">{t.target.allWebsites}</div>
+              <div className="text-xs text-text-secondary truncate mt-0.5">{t.target.allWebsitesDesc}</div>
             </div>
           ) : (
             <div className="px-4 py-2 border-b border-divider mb-1">
@@ -384,30 +386,30 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
           {contextMenu.appId === '__all_websites__' ? (
             <button onClick={() => { recordUsage('__all_websites__'); onSelectApp('__all_websites__', 'http://127.0.0.1:8081', undefined, 'browser'); setContextMenu(null); }} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Globe className="w-4 h-4 text-sky-400" />Launch Browser (All Websites)
+              <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowserAll}
             </button>
           ) : contextMenuApp!.platform === 'web' && (
             <button onClick={() => handleLaunchApp(contextMenuApp!, 'browser')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Globe className="w-4 h-4 text-sky-400" />Launch Browser
+              <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowser}
             </button>
           )}
           {contextMenuApp && contextMenuApp.platform === 'pc' && (
             <button onClick={() => handleLaunchApp(contextMenuApp, 'electron')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Monitor className="w-4 h-4 text-violet-400" />Launch App
+              <Monitor className="w-4 h-4 text-violet-400" />{t.target.launchApp}
             </button>
           )}
           {contextMenuApp && contextMenuApp.platform === 'android' && (
             <button onClick={() => handleLaunchApp(contextMenuApp, 'electron')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Smartphone className="w-4 h-4 text-emerald-400" />Connect & Inspect
+              <Smartphone className="w-4 h-4 text-emerald-400" />{t.target.connectInspect}
             </button>
           )}
           {contextMenuApp && contextMenuApp.platform === 'cli' && (
             <button onClick={() => handleLaunchApp(contextMenuApp, 'native')} disabled={isLaunching}
               className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Terminal className="w-4 h-4 text-amber-400" />Run in Terminal
+              <Terminal className="w-4 h-4 text-amber-400" />{t.target.runTerminal}
             </button>
           )}
 
@@ -418,8 +420,8 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
             return (
               <button onClick={() => { onLoadProfile(profile); alert(`Restored ${profile.metadata.totalRequests} requests!`); setContextMenu(null); }}
                 className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-                <FolderOpen className="w-4 h-4 text-primary" />Restore Last Session
-                <span className="ml-auto text-[10px] text-primary font-bold">{profile.metadata.totalRequests} reqs</span>
+                <FolderOpen className="w-4 h-4 text-primary" />{t.target.restoreSession}
+                <span className="ml-auto text-[10px] text-primary font-bold">{profile.metadata.totalRequests} {t.target.reqs}</span>
               </button>
             );
           })()}
@@ -428,11 +430,11 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
             <div className="border-t border-divider mt-1 pt-1">
               <button onClick={() => openEditDrawer(contextMenuApp)}
                 className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-                <Pencil className="w-4 h-4 text-text-secondary" />Edit Target
+                <Pencil className="w-4 h-4 text-text-secondary" />{t.target.editTarget}
               </button>
               <button onClick={() => openDeleteDrawer(contextMenuApp.id, contextMenuApp.name)}
                 className="w-full px-4 py-2 text-sm text-left hover:bg-red-500/10 text-red-400 flex items-center gap-2.5">
-                <Trash2 className="w-4 h-4" />Delete Target
+                <Trash2 className="w-4 h-4" />{t.target.deleteTarget}
               </button>
             </div>
           )}
@@ -465,10 +467,10 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
           className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors"
         >
           <Zap className="w-3.5 h-3.5 text-amber-400" />
-          <span className="flex-1 text-left">Breakpoints</span>
+          <span className="flex-1 text-left">{t.target.breakpoints}</span>
           {bpRules.filter(r => r.enabled).length > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold">
-              {bpRules.filter(r => r.enabled).length} active
+              {bpRules.filter(r => r.enabled).length} {t.target.active}
             </span>
           )}
           <span className="text-[10px]">{bpExpanded ? '▲' : '▼'}</span>
@@ -482,7 +484,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                 value={bpPattern}
                 onChange={e => setBpPattern(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addBpRule()}
-                placeholder="URL pattern (regex)"
+                placeholder={t.target.addBreakpoint}
                 className="flex-1 h-8 bg-input-background border border-input-border-default rounded-lg px-2.5 text-xs text-text-primary focus:border-amber-500/50 outline-none"
               />
               <select
@@ -490,9 +492,9 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                 onChange={e => setBpPhase(e.target.value as any)}
                 className="h-8 bg-input-background border border-input-border-default rounded-lg px-2 text-xs text-text-primary outline-none"
               >
-                <option value="both">Both</option>
-                <option value="request">Req</option>
-                <option value="response">Res</option>
+                <option value="both">{t.target.phase.both}</option>
+                <option value="request">{t.target.phase.request}</option>
+                <option value="response">{t.target.phase.response}</option>
               </select>
               <button
                 onClick={addBpRule}
@@ -517,7 +519,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
             ))}
 
             {bpRules.length === 0 && (
-              <p className="text-xs text-text-secondary text-center py-2">No breakpoints. Add a URL pattern above.</p>
+              <p className="text-xs text-text-secondary text-center py-2">{t.target.noBreakpoints}</p>
             )}
           </div>
         )}

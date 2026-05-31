@@ -1,5 +1,6 @@
 import { X, Shield, Zap, Power, Ban } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useI18n } from '../../../../../../../i18n/i18nContext';
 
 export type ToolPermission = 'always' | 'auto' | 'off';
 
@@ -10,22 +11,23 @@ interface AgentOptionDrawerProps {
   onPermissionChange: (tool: string, value: ToolPermission) => void;
 }
 
-const TOOLS = [
-  { id: 'list_requests', label: 'List Requests', description: 'Fetch recent network logs' },
-  { id: 'search_requests', label: 'Search Requests', description: 'Filter by query/path' },
-  { id: 'get_request_details', label: 'Get Details', description: 'Inspect headers & body' },
-  { id: 'set_filter', label: 'Set Filter', description: 'Apply active view filters' },
-  { id: 'export_har', label: 'Export HAR', description: 'Download traffic dumps' },
-  { id: 'generate_table', label: 'Generate Table', description: 'Create data tables' },
-];
-
 export function AgentOptionDrawer({
   isOpen,
   onClose,
   permissions,
   onPermissionChange,
 }: AgentOptionDrawerProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(false);
+
+  const TOOLS = [
+    { id: 'list_requests', label: t.agent.tools.listRequests, description: t.agent.tools.listRequestsDesc },
+    { id: 'search_requests', label: t.agent.tools.searchRequests, description: t.agent.tools.searchRequestsDesc },
+    { id: 'get_request_details', label: t.agent.tools.getRequestDetails, description: t.agent.tools.getRequestDetailsDesc },
+    { id: 'set_filter', label: t.agent.tools.setFilter, description: t.agent.tools.setFilterDesc },
+    { id: 'export_har', label: t.agent.tools.exportHar, description: t.agent.tools.exportHarDesc },
+    { id: 'generate_table', label: t.agent.tools.generateTable, description: t.agent.tools.generateTableDesc },
+  ];
 
   useEffect(() => {
     if (isOpen) {
@@ -49,7 +51,7 @@ export function AgentOptionDrawer({
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold">Agent Capabilities</h3>
+            <h3 className="text-sm font-semibold">{t.agent.agentCapabilities}</h3>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-muted rounded-md transition-colors">
             <X className="w-4 h-4" />
@@ -80,10 +82,10 @@ export function AgentOptionDrawer({
                         ? 'bg-destructive/10 text-destructive shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
-                    title="Disable Tool"
+                    title={t.agent.disableTool}
                   >
                     <Ban className="w-3 h-3" />
-                    Off
+                    {t.agent.off}
                   </button>
 
                   <div className="w-px h-4 bg-border/40 mx-1" />
@@ -96,10 +98,10 @@ export function AgentOptionDrawer({
                         ? 'bg-orange-500/10 text-orange-500 shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
-                    title="Require Approval"
+                    title={t.agent.requireApproval}
                   >
                     <Power className="w-3 h-3" />
-                    Auto
+                    {t.agent.auto}
                   </button>
 
                   <div className="w-px h-4 bg-border/40 mx-1" />
@@ -112,10 +114,10 @@ export function AgentOptionDrawer({
                         ? 'bg-emerald-500/10 text-emerald-500 shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
-                    title="Always Allow"
+                    title={t.agent.alwaysAllow}
                   >
                     <Zap className="w-3 h-3" />
-                    Always
+                    {t.agent.always}
                   </button>
                 </div>
               </div>

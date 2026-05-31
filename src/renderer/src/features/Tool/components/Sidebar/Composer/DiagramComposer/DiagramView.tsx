@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { NetworkRequest } from '../../../../../../types/inspector';
 import { X, GitBranch, Save } from 'lucide-react';
 import { DiagramNode } from './DiagramNode';
+import { useI18n } from '../../../../../../i18n/i18nContext';
 
 const nodeTypes = { request: DiagramNode };
 
@@ -205,6 +206,7 @@ function DiagramViewInner({ request, onNodeClick }: DiagramViewProps) {
 }
 
 export function DiagramView(props: DiagramViewProps) {
+  const { t } = useI18n();
   const { request, onClose, composerName, composerDescription, isTemp } = props;
   const [isSaveDrawerOpen, setIsSaveDrawerOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
@@ -220,14 +222,14 @@ export function DiagramView(props: DiagramViewProps) {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-text-primary">
-                {composerName || (isTemp ? <span className="text-text-secondary italic">Untitled Diagram</span> : 'Diagram Composer')}
+                {composerName || (isTemp ? <span className="text-text-secondary italic">{t.composer.untitled}</span> : t.composer.diagramComposer)}
               </h2>
               {isTemp && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-warning/15 text-warning border border-warning/30">TEMP</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-warning/15 text-warning border border-warning/30">{t.composer.temp}</span>
               )}
             </div>
             <p className="text-xs text-text-secondary">
-              {composerDescription || (isTemp ? <span className="italic">No description</span> : (request ? `${request.method} ${request.host}` : 'No request selected'))}
+              {composerDescription || (isTemp ? <span className="italic">{t.composer.noDescription}</span> : (request ? `${request.method} ${request.host}` : t.composer.noRequestSelected))}
             </p>
           </div>
         </div>
@@ -238,7 +240,7 @@ export function DiagramView(props: DiagramViewProps) {
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-all"
             >
               <Save className="w-3.5 h-3.5" />
-              Save
+              {t.composer.save}
             </button>
           )}
           {onClose && (
@@ -262,8 +264,8 @@ export function DiagramView(props: DiagramViewProps) {
                 <Save className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-bold text-text-primary">Save Diagram</h3>
-                <p className="text-xs text-text-secondary mt-0.5">Give this diagram a name and description</p>
+                <h3 className="text-base font-bold text-text-primary">{t.composer.saveDiagram}</h3>
+                <p className="text-xs text-text-secondary mt-0.5">{t.composer.saveDiagramDesc}</p>
               </div>
               <button onClick={() => setIsSaveDrawerOpen(false)} className="p-1.5 rounded-lg bg-secondary text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0">
                 <X className="w-4 h-4" />
@@ -271,21 +273,21 @@ export function DiagramView(props: DiagramViewProps) {
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">NAME</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.composer.name}</label>
                 <input
                   type="text"
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
-                  placeholder="e.g. Auth Flow, Payment API..."
+                  placeholder={t.composer.diagramNamePlaceholder}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1.5">DESCRIPTION</label>
+                <label className="block text-xs font-bold text-text-secondary mb-1.5">{t.composer.description}</label>
                 <textarea
                   value={saveDesc}
                   onChange={(e) => setSaveDesc(e.target.value)}
-                  placeholder="Describe what this diagram represents..."
+                  placeholder={t.composer.diagramDescPlaceholder}
                   rows={3}
                   className="w-full bg-table-headerBg border border-input-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary outline-none focus:border-primary resize-none"
                 />
@@ -293,14 +295,14 @@ export function DiagramView(props: DiagramViewProps) {
             </div>
             <div className="px-5 py-4 border-t border-divider flex justify-end gap-3 shrink-0">
               <button onClick={() => setIsSaveDrawerOpen(false)} className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-sidebar-itemHover transition-colors">
-                Cancel
+                {t.composer.cancel}
               </button>
               <button
                 onClick={() => setIsSaveDrawerOpen(false)}
                 disabled={!saveName.trim()}
                 className="px-5 py-2 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 transition-all"
               >
-                Save Diagram
+                {t.composer.saveDiagram}
               </button>
             </div>
           </div>

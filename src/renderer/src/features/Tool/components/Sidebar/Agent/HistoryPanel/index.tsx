@@ -3,6 +3,7 @@ import { Search, Trash2, FolderOpen, Loader2, X, Zap, History } from 'lucide-rea
 import { cn } from '../../../../../../shared/lib/utils';
 import { ChatSession } from '../HomePanel/index';
 import { ConversationService } from '../../../../../../services/ConversationService';
+import { useI18n } from '../../../../../../i18n/i18nContext';
 
 // Keep localStorage helpers for backward compat (addToHistory still used by HomePanel for metadata)
 const STORAGE_KEY = 'khanhromvn-systema-agent-history';
@@ -64,6 +65,7 @@ export function HistoryPanel({ isOpen, onClose, onLoadSession }: HistoryPanelPro
   const [searchQuery, setSearchQuery] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const { t } = useI18n();
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -127,18 +129,18 @@ export function HistoryPanel({ isOpen, onClose, onLoadSession }: HistoryPanelPro
           </div>
           <div>
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-sm font-bold text-foreground">History</span>
+              <span className="text-sm font-bold text-foreground">{t.agent.history}</span>
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/15 border border-indigo-500/30 text-indigo-400">
                 {sessions.length}
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground/70 leading-snug">Browse past conversations</p>
+            <p className="text-[11px] text-muted-foreground/70 leading-snug">{t.agent.historyDesc}</p>
           </div>
         </div>
         <button
           onClick={onClose}
           className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/40 transition-all shrink-0"
-          title="Close"
+          title={t.agent.close}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -150,7 +152,7 @@ export function HistoryPanel({ isOpen, onClose, onLoadSession }: HistoryPanelPro
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search conversations..."
+            placeholder={t.agent.searchConversations}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted border border-border rounded-md outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50"
@@ -159,7 +161,7 @@ export function HistoryPanel({ isOpen, onClose, onLoadSession }: HistoryPanelPro
         <button
           onClick={() => setShowConfirm(true)}
           className="p-1.5 rounded-md text-muted-foreground hover:text-yellow-400 hover:bg-yellow-500/10 border border-transparent hover:border-yellow-500/40 transition-all shrink-0"
-          title="Clear all history"
+          title={t.agent.clearHistory}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -169,14 +171,14 @@ export function HistoryPanel({ isOpen, onClose, onLoadSession }: HistoryPanelPro
       {showConfirm && (
         <div className="absolute inset-0 z-[100] bg-black/50 flex items-center justify-center">
           <div className="bg-popover border border-border rounded-xl p-5 w-[calc(100%-32px)] flex flex-col gap-3">
-            <p className="text-sm font-semibold text-foreground">Clear all history?</p>
-            <p className="text-xs text-muted-foreground">This will permanently delete all conversations.</p>
+            <p className="text-sm font-semibold text-foreground">{t.agent.clearHistory}</p>
+            <p className="text-xs text-muted-foreground">{t.agent.clearHistoryDesc}</p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowConfirm(false)} className="px-3 py-1.5 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted/50 transition-colors">
-                Cancel
+                {t.common.cancel}
               </button>
               <button onClick={handleClearAll} className="px-3 py-1.5 text-xs rounded-md border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors">
-                Delete All
+                {t.agent.deleteAll}
               </button>
             </div>
           </div>
@@ -188,14 +190,14 @@ export function HistoryPanel({ isOpen, onClose, onLoadSession }: HistoryPanelPro
         {isLoading ? (
           <div className="flex items-center justify-center h-40 gap-2 text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
-            <span className="text-xs">Loading...</span>
+            <span className="text-xs">{t.agent.loading}</span>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-3">
             <FolderOpen className="w-10 h-10 opacity-20" />
             <div className="text-center">
-              <p className="text-xs font-medium opacity-70">{searchQuery ? 'No results found' : 'No conversations yet'}</p>
-              <p className="text-[10px] opacity-50 mt-1">{searchQuery ? 'Try a different search term' : 'Start a new chat to begin'}</p>
+              <p className="text-xs font-medium opacity-70">{searchQuery ? t.agent.noResults : t.agent.noConversations}</p>
+              <p className="text-[10px] opacity-50 mt-1">{searchQuery ? t.agent.tryDifferent : t.agent.startChat}</p>
             </div>
           </div>
         ) : (
@@ -245,7 +247,7 @@ export function HistoryPanel({ isOpen, onClose, onLoadSession }: HistoryPanelPro
             className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
             onClick={() => { handleDelete(contextMenu.id); setContextMenu(null); }}
           >
-            <Trash2 className="w-3.5 h-3.5" /> Delete
+            <Trash2 className="w-3.5 h-3.5" /> {t.agent.delete}
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@ import { NetworkRequest } from '../../../../../types/inspector';
 import { CodeBlock, CodeBlockRef } from '../../../../../core/components/common/CodeBlock';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { HexViewer } from './HexViewer';
+import { useI18n } from '../../../../../i18n/i18nContext';
 
 interface BodyDetailsProps {
   request: NetworkRequest;
@@ -29,6 +30,7 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
     const requestBlockRef = useRef<CodeBlockRef>(null);
     const responseBlockRef = useRef<CodeBlockRef>(null);
     const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+    const { t } = useI18n();
 
     useImperativeHandle(ref, () => ({
       nextMatch: () => {
@@ -83,7 +85,7 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
           {/* Request Body */}
           <div className="flex flex-col h-full space-y-1.5 overflow-hidden">
             <div className="flex justify-between items-center border-b border-divider/50 pb-1.5 flex-shrink-0">
-              <h3 className="text-[10px] font-bold text-text-secondary uppercase">Request Body</h3>
+              <h3 className="text-[10px] font-bold text-text-secondary uppercase">{t.requestDetails.requestBody}</h3>
               <div className="flex gap-1.5 text-[10px] items-center">
                 <button
                   onClick={() => requestBlockRef.current?.format()}
@@ -124,7 +126,7 @@ export const BodyDetails = forwardRef<BodyDetailsRef, BodyDetailsProps>(
           {/* Response Body */}
           <div className="flex flex-col h-full space-y-1.5 overflow-hidden">
             <div className="flex justify-between items-center border-b border-divider/50 pb-1.5 flex-shrink-0">
-              <h3 className="text-[10px] font-bold text-text-secondary uppercase">Response Body</h3>
+              <h3 className="text-[10px] font-bold text-text-secondary uppercase">{t.requestDetails.responseBody}</h3>
               <div className="flex gap-1.5 text-[10px] items-center">
                 {!isResponseBinary && (
                   <button
