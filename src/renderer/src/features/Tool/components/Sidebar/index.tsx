@@ -9,7 +9,6 @@ import { SourcesPanel } from './Source';
 import { LogViewer } from './Log';
 import { ComposerManager } from './Composer/ComposerManager';
 import { DiagramViewMemo as DiagramView } from './Composer/DiagramComposer';
-import { TraceTab } from './Trace';
 import { CryptoTab } from './Crypto';
 import { ComparePanel } from './Compare';
 import { WasmPanel } from './Wasm';
@@ -24,7 +23,6 @@ import {
   FileCode,
   TerminalSquare,
   BookmarkPlus,
-  GitBranch,
   KeyRound,
   ArrowRightLeft,
   Image,
@@ -67,6 +65,9 @@ export interface InspectorContext {
   activeSidebarTab?: string;
   onSetActiveSidebarTab?: (tab: string) => void;
   onNodeClick?: (request: NetworkRequest) => void;
+  // BrowserView
+  browserViewUrl?: string | null;
+  onOpenBrowserView?: (url: string) => void;
   // Target selector
   onSelectApp?: (
     appName: string,
@@ -202,6 +203,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
               ?.protocol as any
           }
           onOpenStopConfirm={inspectorContext.onOpenStopConfirm}
+          onOpenBrowserView={inspectorContext.onOpenBrowserView}
         />
       );
     }
@@ -239,21 +241,11 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
       return <ComparePanel inspectorContext={inspectorContext} />;
     }
 
-    if (activeTab === 'trace') {
-      return (
-        <TraceTab
-          requests={inspectorContext.requests}
-          onSelectRequest={inspectorContext.onSelectRequest}
-          appId={inspectorContext.appId || 'global'}
-        />
-      );
-    }
-
     if (activeTab === 'collections') {
       return (
         <ComposerManager
           onSelectRequest={inspectorContext.onSelectSavedRequest || (() => {})}
-          appId={inspectorContext.appId || 'unknown'}
+          appId={inspectorContext.appId || ''}
           requests={inspectorContext.requests}
         />
       );
@@ -370,14 +362,6 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
       showAlways: true,
     },
     {
-      id: 'trace',
-      label: t.sidebar.trace,
-      icon: GitBranch,
-      color: 'pink',
-      description: t.sidebar.traceDesc,
-      showAlways: true,
-    },
-    {
       id: 'compare',
       label: t.sidebar.compare,
       icon: ArrowRightLeft,
@@ -439,8 +423,9 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
     return true; // Hiển thị nếu không có điều kiện
   });
 
-  // Auto-switch về 'chat' nếu tab hiện tại bị ẩn
+  // Auto-switch về 'chat' nếu tab hiện tại bị ẩn (bỏ qua tab tạm 'composer')
   useEffect(() => {
+    if (activeTab === 'composer') return;
     const isTabVisible = tabs.some((t) => t.id === activeTab);
     if (!isTabVisible) {
       setActiveTab('chat');
@@ -467,7 +452,10 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
         {tabs.map(({ id, label, icon: Icon, color, description }) => (
           <Tooltip key={id} title={label} description={description}>
             <button
-              onClick={() => setActiveTab(id)}
+              onClick={() => {
+                setActiveTab(id);
+                inspectorContext.onSetActiveSidebarTab?.(id);
+              }}
               className={cn(
                 'relative flex items-center justify-center w-8 h-8 rounded-md transition-all border',
                 activeTab === id

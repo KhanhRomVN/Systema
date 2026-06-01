@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { UserApp, AppPlatform, MobileEmulator } from '../../../../../types/apps';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Square, Terminal, History, FolderOpen, Crosshair, Pencil, Zap, X } from 'lucide-react';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Square, Terminal, History, FolderOpen, Crosshair, Pencil, Zap, X, Loader2, LayoutTemplate } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
 import { loadProfiles, InspectorProfile, deleteProfilesByAppId } from '../../../../../utils/profiles';
 import { AddTargetDrawer } from './AddTargetDrawer';
 import { ConfirmDeleteDrawer } from './ConfirmDeleteDrawer';
+import { ConfirmLaunchDrawer } from './ConfirmLaunchDrawer';
 import { useI18n } from '../../../../../i18n/i18nContext';
 
 export interface TargetSelectorProps {
@@ -16,12 +17,120 @@ export interface TargetSelectorProps {
   platform?: 'web' | 'pc' | 'android';
   // Stop confirmation drawer
   onOpenStopConfirm?: () => void;
+  // BrowserView
+  onOpenBrowserView?: (url: string) => void;
 }
+
+const FAVICON_CACHE_KEY = 'systema-favicon-cache';
+
+// In-memory cache for instant access
+const faviconMemoryCache = new Map<string, string>();
+
+// Load persisted cache from localStorage on module init
+try {
+  const stored = localStorage.getItem(FAVICON_CACHE_KEY);
+  if (stored) {
+    const parsed = JSON.parse(stored) as Record<string, string>;
+    for (const [key, value] of Object.entries(parsed)) {
+      faviconMemoryCache.set(key, value);
+    }
+  }
+} catch { /* ignore */ }
+
+const persistFaviconCache = () => {
+  try {
+    const obj: Record<string, string> = {};
+    faviconMemoryCache.forEach((v, k) => { obj[k] = v; });
+    localStorage.setItem(FAVICON_CACHE_KEY, JSON.stringify(obj));
+  } catch { /* ignore */ }
+};
 
 const getFaviconUrl = (url?: string) => {
   if (!url) return null;
   try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`; }
   catch { return null; }
+};
+
+const getFaviconCacheKey = (url?: string) => {
+  if (!url) return null;
+  try { return new URL(url).hostname; }
+  catch { return null; }
+};
+
+// Component that handles favicon with caching
+const FaviconImage: React.FC<{ app: UserApp }> = ({ app }) => {
+  const [cachedSrc, setCachedSrc] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const cacheKey = getFaviconCacheKey(app.url);
+
+  useEffect(() => {
+    if (!cacheKey) {
+      setIsLoading(false);
+      setHasError(true);
+      return;
+    }
+
+    // Check in-memory cache first
+    const cached = faviconMemoryCache.get(cacheKey);
+    if (cached) {
+      setCachedSrc(cached);
+      setIsLoading(false);
+      return;
+    }
+
+    // Fetch from Google's favicon service and cache it
+    const faviconUrl = getFaviconUrl(app.url);
+    if (!faviconUrl) {
+      setIsLoading(false);
+      setHasError(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    const img = new Image();
+    // Note: Do NOT set crossOrigin here — Google S2 favicon service doesn't
+    // return Access-Control-Allow-Origin, so crossOrigin triggers CORS errors.
+    // Simple <img> display works fine without it.
+    img.onload = () => {
+      if (cancelled) return;
+      // Cache the URL directly (browser will handle actual image caching)
+      faviconMemoryCache.set(cacheKey, faviconUrl);
+      persistFaviconCache();
+      setCachedSrc(faviconUrl);
+      setIsLoading(false);
+    };
+    img.onerror = () => {
+      if (!cancelled) {
+        setHasError(true);
+        setIsLoading(false);
+      }
+    };
+    img.src = faviconUrl;
+
+    return () => { cancelled = true; };
+  }, [cacheKey, app.url]);
+
+  if (hasError) {
+    return <span className="text-text-secondary text-sm">{app.name.slice(0, 2).toUpperCase()}</span>;
+  }
+
+  if (isLoading) {
+    return <Loader2 className="w-4 h-4 text-text-secondary animate-spin" />;
+  }
+
+  return (
+    <img
+      src={cachedSrc || undefined}
+      alt={app.name}
+      className="w-full h-full object-cover p-1.5"
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+        setHasError(true);
+      }}
+    />
+  );
 };
 
 const PLATFORM_TABS: { id: AppPlatform; icon: React.ElementType; label: string; activeColor: string }[] = [
@@ -35,6 +144,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
   activeAppId, activeAppName, onSelectApp, onStopSession, onLoadProfile,
   platform: activeSessionPlatform,
   onOpenStopConfirm,
+  onOpenBrowserView,
 }) => {
   const [activeTab, setActiveTab] = useState<AppPlatform>('web');
   const [apps, setApps] = useState<UserApp[]>([]);
@@ -51,6 +161,12 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
   const [deleteDrawerOpen, setDeleteDrawerOpen] = useState(false);
   const [deleteAppId, setDeleteAppId] = useState<string | null>(null);
   const [deleteAppName, setDeleteAppName] = useState<string>('');
+
+  // Launch confirmation drawer (when session data exists)
+  const [confirmLaunchDrawer, setConfirmLaunchDrawer] = useState<{
+    isOpen: boolean;
+    app: UserApp | null;
+  }>({ isOpen: false, app: null });
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ appId: string; x: number; y: number } | null>(null);
@@ -127,6 +243,18 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
       console.log('[TargetSelector] Already launching, ignoring duplicate click');
       return;
     }
+
+    // For web targets, check if there's existing session data (profile)
+    if (app.platform === 'web' && mode === 'browser') {
+      const profile = getAppProfile(app.id, app.name);
+      if (profile) {
+        console.log(`[TargetSelector] Existing profile found for "${app.name}", showing confirm launch drawer`);
+        setConfirmLaunchDrawer({ isOpen: true, app });
+        setContextMenu(null);
+        return;
+      }
+    }
+
     console.log(`[TargetSelector] handleLaunchApp: app="${app.name}", mode="${mode}"`);
     setIsLaunching(true);
     recordUsage(app.id);
@@ -142,6 +270,37 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
       setIsLaunching(false);
     }
     setContextMenu(null);
+  };
+
+  const handleClearAndLaunch = async () => {
+    const app = confirmLaunchDrawer.app;
+    if (!app) return;
+    console.log(`[TargetSelector] Clearing profile and launching: "${app.name}"`);
+    deleteProfilesByAppId(app.id);
+    setIsLaunching(true);
+    recordUsage(app.id);
+    try {
+      await onSelectApp(app.id, 'http://127.0.0.1:8081', app.url, 'browser');
+    } catch (e) {
+      console.error('[TargetSelector] Error in handleClearAndLaunch:', e);
+    } finally {
+      setIsLaunching(false);
+    }
+  };
+
+  const handleKeepAndLaunch = async () => {
+    const app = confirmLaunchDrawer.app;
+    if (!app) return;
+    console.log(`[TargetSelector] Keeping profile and launching: "${app.name}"`);
+    setIsLaunching(true);
+    recordUsage(app.id);
+    try {
+      await onSelectApp(app.id, 'http://127.0.0.1:8081', app.url, 'browser');
+    } catch (e) {
+      console.error('[TargetSelector] Error in handleKeepAndLaunch:', e);
+    } finally {
+      setIsLaunching(false);
+    }
   };
 
   const openAddDrawer = () => {
@@ -303,7 +462,6 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
           }
           return sortedApps;
         })().map((app) => {
-          const favicon = getFaviconUrl(app.url);
           const isActive = app.id === activeAppId;
           return (
             <div
@@ -325,8 +483,8 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
               )}
             >
               <div className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
-                {app.platform === 'web' && favicon ? (
-                  <img src={favicon} alt={app.name} className="w-full h-full object-cover p-1.5" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                {app.platform === 'web' ? (
+                  <FaviconImage app={app} />
                 ) : app.icon && app.platform === 'pc' ? (
                   <img src={`media://${app.icon}`} alt={app.name} className="w-full h-full object-contain p-1.5" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                 ) : (
@@ -384,15 +542,31 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
 
           {/* Launch actions */}
           {contextMenu.appId === '__all_websites__' ? (
-            <button onClick={() => { recordUsage('__all_websites__'); onSelectApp('__all_websites__', 'http://127.0.0.1:8081', undefined, 'browser'); setContextMenu(null); }} disabled={isLaunching}
-              className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowserAll}
-            </button>
+            <>
+              <button onClick={() => { recordUsage('__all_websites__'); onSelectApp('__all_websites__', 'http://127.0.0.1:8081', undefined, 'browser'); setContextMenu(null); }} disabled={isLaunching}
+                className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+                <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowserAll}
+              </button>
+              {onOpenBrowserView && (
+                <button onClick={() => { onOpenBrowserView('https://google.com'); setContextMenu(null); }} disabled={isLaunching}
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+                  <LayoutTemplate className="w-4 h-4 text-sky-400" />Open in BrowserView
+                </button>
+              )}
+            </>
           ) : contextMenuApp!.platform === 'web' && (
-            <button onClick={() => handleLaunchApp(contextMenuApp!, 'browser')} disabled={isLaunching}
-              className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-              <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowser}
-            </button>
+            <>
+              <button onClick={() => handleLaunchApp(contextMenuApp!, 'browser')} disabled={isLaunching}
+                className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+                <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowser}
+              </button>
+              {onOpenBrowserView && contextMenuApp!.url && (
+                <button onClick={() => { onOpenBrowserView(contextMenuApp!.url!); setContextMenu(null); }} disabled={isLaunching}
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+                  <LayoutTemplate className="w-4 h-4 text-sky-400" />Open in BrowserView
+                </button>
+              )}
+            </>
           )}
           {contextMenuApp && contextMenuApp.platform === 'pc' && (
             <button onClick={() => handleLaunchApp(contextMenuApp, 'electron')} disabled={isLaunching}
@@ -458,6 +632,15 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
         onClose={() => { setDeleteDrawerOpen(false); setDeleteAppId(null); setDeleteAppName(''); }}
         onConfirm={() => deleteAppId && handleDeleteApp(deleteAppId)}
         appName={deleteAppName}
+      />
+
+      {/* Launch Confirmation Drawer (when session data exists) */}
+      <ConfirmLaunchDrawer
+        isOpen={confirmLaunchDrawer.isOpen}
+        onClose={() => setConfirmLaunchDrawer({ isOpen: false, app: null })}
+        onClearAndLaunch={handleClearAndLaunch}
+        onKeepAndLaunch={handleKeepAndLaunch}
+        appName={confirmLaunchDrawer.app?.name || ''}
       />
 
       {/* Breakpoint Rules */}

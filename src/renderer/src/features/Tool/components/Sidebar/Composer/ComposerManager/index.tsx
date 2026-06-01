@@ -36,7 +36,7 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
     const handleUpdate = () => loadData();
     window.addEventListener(COLLECTIONS_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(COLLECTIONS_UPDATED_EVENT, handleUpdate);
-  }, []);
+  }, [appId]);
 
   const loadData = () => {
     setCollection(getOrCreateDefaultCollection(appId));
@@ -114,8 +114,8 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
 
       {/* Collection List */}
       <div className="flex-1 overflow-auto p-2">
-        <div className="space-y-2">
-          {!hasRequests ? (
+        {!hasRequests ? (
+          <div className="flex items-center justify-center h-full">
             <EmptyState
               icon={<Bookmark className="w-8 h-8" />}
               title={t.composer.noRequests}
@@ -123,8 +123,10 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
               iconColor="text-orange-400"
               iconBgColor="bg-orange-500/15"
             />
-          ) : (
-            filteredCollectionRequests.map((request) => (
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredCollectionRequests.map((request) => (
               <div
                 key={request.id}
                 className={cn(
@@ -170,9 +172,9 @@ export function ComposerManager({ onSelectRequest, appId }: ComposerManagerProps
                   </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Add to Collection Drawer */}

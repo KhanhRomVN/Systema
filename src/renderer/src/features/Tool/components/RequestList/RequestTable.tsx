@@ -12,19 +12,26 @@ import { NetworkRequest } from '../../../../types/inspector';
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { cn } from '../../../../shared/lib/utils';
 import {
+  ArrowLeft,
+  ArrowLeftRight,
   ArrowUpDown,
-  Search,
-  CaseSensitive,
-  Type,
-  Regex,
   BookmarkPlus,
-  Star,
-  Trash2,
-  Copy,
+  Box,
+  CaseSensitive,
   Check,
-  Target,
-  Zap,
+  ChevronRight,
   Cookie,
+  Copy,
+  Globe,
+  List,
+  Regex,
+  Search,
+  ShieldAlert,
+  Star,
+  Target,
+  Trash2,
+  Type,
+  Zap,
 } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import {
@@ -40,7 +47,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../../../core/components/common/ui/dropdown-menu';
 import { addRequestToDefaultCollection } from '../../../../utils/collections';
@@ -62,6 +68,7 @@ interface RequestTableProps {
   onSetCompare2: (req: NetworkRequest) => void;
   onAnalyzeRequest?: (req: NetworkRequest) => void;
   onSendToFuzzer?: (req: NetworkRequest) => void;
+  onSelectionChange?: (selectedIds: string[]) => void;
 }
 
 export function RequestTable({
@@ -80,6 +87,7 @@ export function RequestTable({
   onSetCompare2,
   onAnalyzeRequest,
   onSendToFuzzer,
+  onSelectionChange,
 }: RequestTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [matchCase, setMatchCase] = useState(false);
@@ -87,6 +95,8 @@ export function RequestTable({
   const [useRegex, setUseRegex] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [rowSelection, setRowSelection] = useState({});
+  const [contextMenuPage, setContextMenuPage] = useState<string | null>(null);
+  const [contextMenuTarget, setContextMenuTarget] = useState<NetworkRequest | null>(null);
   const { t } = useI18n();
 
   // Feature: Highlighted Rows
@@ -161,6 +171,33 @@ export function RequestTable({
     return output;
   };
 
+  const formatRequestToJson = (req: NetworkRequest): string => {
+    const entry: any = {
+      method: req.method,
+      host: req.host,
+      path: req.path,
+      protocol: req.protocol,
+      url: req.url,
+      status: req.status,
+      type: req.type,
+    };
+    if (req.requestHeaders && Object.keys(req.requestHeaders).length > 0) {
+      entry.requestHeaders = req.requestHeaders;
+    }
+    if (req.requestBody) {
+      entry.requestBody = req.requestBody;
+    }
+    return JSON.stringify(entry, null, 2);
+  };
+
+  const handleCopySingleAsMarkdown = (req: NetworkRequest) => {
+    navigator.clipboard.writeText(formatRequestToMarkdown(req));
+  };
+
+  const handleCopySingleAsJson = (req: NetworkRequest) => {
+    navigator.clipboard.writeText(formatRequestToJson(req));
+  };
+
   const handleCopySelectedAsMarkdown = () => {
     const selectedRows = table.getSelectedRowModel().rows;
     if (selectedRows.length === 0) return;
@@ -178,6 +215,117 @@ export function RequestTable({
 
     const selectedData = selectedRows.map((row) => row.original);
     navigator.clipboard.writeText(JSON.stringify(selectedData, null, 2));
+  };
+
+  // Copy Selected with section options
+  const [copySections, setCopySections] = useState({
+    status: true,
+    headers: true,
+    body: true,
+    security: true,
+  });
+  const [copyFormat, setCopyFormat] = useState<'json' | 'markdown'>('json');
+
+  const toggleCopySection = (section: keyof typeof copySections) => {
+    setCopySections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const formatSelectedWithOptions = (): string => {
+    const selectedRows = table.getSelectedRowModel().rows;
+    if (selectedRows.length === 0) return '';
+
+    const selectedRequests = selectedRows.map((row) => row.original);
+
+    if (copyFormat === 'json') {
+      const data = selectedRequests.map((req) => {
+        const entry: any = {};
+        if (copySections.status) {
+          entry.status = req.status;
+          entry.type = req.type;
+          entry.host = req.host;
+          entry.path = req.path;
+          entry.method = req.method;
+          entry.protocol = req.protocol;
+        }
+        if (copySections.headers) {
+          entry.requestHeaders = req.requestHeaders;
+          entry.responseHeaders = req.responseHeaders;
+        }
+        if (copySections.body) {
+          entry.requestBody = req.requestBody || '';
+          entry.responseBody = req.responseBody || '';
+        }
+        if (copySections.security) {
+          entry.securityIssues = req.securityIssues || [];
+        }
+        return entry;
+      });
+      return JSON.stringify(data, null, 2);
+    }
+
+    // Markdown format
+    return selectedRequests
+      .map((req) => {
+        let md = '';
+        if (copySections.status) {
+          md += `### \`${req.method}\` ${req.protocol}://${req.host}${req.path}\n\n`;
+          md += `| Status | Type |\n|--------|------|\n| ${req.status} | ${req.type} |\n\n`;
+        }
+        if (copySections.headers) {
+          md += '**Request Headers:**\n```http\n';
+          md += req.requestHeaders && Object.keys(req.requestHeaders).length > 0
+            ? Object.entries(req.requestHeaders).map(([k, v]) => `${k}: ${v}`).join('\n')
+            : '(No headers)';
+          md += '\n```\n\n';
+          md += '**Response Headers:**\n```http\n';
+          md += req.responseHeaders && Object.keys(req.responseHeaders).length > 0
+            ? Object.entries(req.responseHeaders).map(([k, v]) => `${k}: ${v}`).join('\n')
+            : '(No headers)';
+          md += '\n```\n\n';
+        }
+        if (copySections.body) {
+          md += '**Request Body:**\n```\n';
+          md += req.requestBody || '(No body)';
+          md += '\n```\n\n';
+          md += '**Response Body:**\n```\n';
+          if (req.responseBody) {
+            const trimmed = req.responseBody.trim();
+            if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+              try {
+                md += JSON.stringify(JSON.parse(trimmed), null, 2);
+              } catch {
+                md += req.responseBody;
+              }
+            } else {
+              md += req.responseBody;
+            }
+          } else {
+            md += '(No body)';
+          }
+          md += '\n```\n\n';
+        }
+        if (copySections.security) {
+          md += '**Security Issues:**\n';
+          const issues = req.securityIssues || [];
+          if (issues.length > 0) {
+            issues.forEach((issue) => {
+              md += `- **${issue.severity.toUpperCase()}**: ${issue.title} - ${issue.description}\n`;
+            });
+          } else {
+            md += '*(No security issues)*\n';
+          }
+          md += '\n';
+        }
+        return md;
+      })
+      .join('\n---\n\n');
+  };
+
+  const handleCopySelectedWithOptions = () => {
+    const text = formatSelectedWithOptions();
+    if (text) {
+      navigator.clipboard.writeText(text);
+    }
   };
 
   // Debounce search term to reduce re-renders
@@ -327,7 +475,8 @@ export function RequestTable({
       {
         id: 'tags',
         header: t.requestTable.tags,
-        size: 100,
+        size: 150,
+        minSize: 100,
         cell: ({ row }) => {
           const req = row.original;
           const tags: { label: string; tooltip: string; className: string; icon?: React.ReactNode }[] = [];
@@ -568,6 +717,10 @@ export function RequestTable({
     handleScroll();
   }, [selectedId, handleScroll]);
 
+  useEffect(() => {
+    onSelectionChange?.(Object.keys(rowSelection));
+  }, [rowSelection, onSelectionChange]);
+
   const scrollToSelected = () => {
     const idx = rows.findIndex((row) => row.original.id === selectedId);
     if (idx !== -1) {
@@ -710,7 +863,15 @@ return (
             const isHighlighted = highlightedIds.has(row.original.id);
 
             return (
-              <ContextMenu key={row.id}>
+              <ContextMenu
+                key={row.id}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setContextMenuPage(null);
+                    setContextMenuTarget(null);
+                  }
+                }}
+              >
                 <ContextMenuTrigger asChild>
                   <div
                     data-state={row.getValue('id') === selectedId ? 'selected' : undefined}
@@ -767,72 +928,134 @@ return (
                     })}
                   </div>
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-64">
-                  <ContextMenuItem onClick={() => handleCopySingle(row.original)}>
-                    <Copy className="mr-2 h-3.5 w-3.5" />
-                    <span>{t.requestTable.copyRequest}</span>
-                  </ContextMenuItem>
-                  {Object.keys(rowSelection).length > 0 && (
-                    <ContextMenuSub>
-                      <ContextMenuSubTrigger className="cursor-pointer text-xs">
-                        <Copy className="mr-2 h-3.5 w-3.5 text-primary" />
-                        <span>{t.requestTable.copySelected.replace('{count}', String(Object.keys(rowSelection).length))}</span>
-                      </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="w-44 bg-zinc-950 border border-zinc-800 text-text-primary">
-                        <ContextMenuItem
-                          onClick={handleCopySelectedAsMarkdown}
-                          className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
-                        >
-                          {t.requestTable.copyMarkdown}
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                          onClick={handleCopySelectedAsJson}
-                          className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
-                        >
-                          {t.requestTable.copyJson}
-                        </ContextMenuItem>
-                      </ContextMenuSubContent>
-                    </ContextMenuSub>
+                <ContextMenuContent className="w-56">
+                  {contextMenuPage === 'copy' && contextMenuTarget ? (
+                    <>
+                      <ContextMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setContextMenuPage(null);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <ArrowLeft className="mr-2 h-3.5 w-3.5 text-text-secondary" />
+                        <span className="text-text-secondary">Back</span>
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={() => {
+                          handleCopySingleAsMarkdown(contextMenuTarget);
+                          setContextMenuPage(null);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {t.requestTable.copyMarkdown}
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        onClick={() => {
+                          handleCopySingleAsJson(contextMenuTarget);
+                          setContextMenuPage(null);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {t.requestTable.copyJson}
+                      </ContextMenuItem>
+                    </>
+                  ) : contextMenuPage === 'compare' && contextMenuTarget ? (
+                    <>
+                      <ContextMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setContextMenuPage(null);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <ArrowLeft className="mr-2 h-3.5 w-3.5 text-text-secondary" />
+                        <span className="text-text-secondary">Back</span>
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={() => {
+                          onSetCompare1(contextMenuTarget);
+                          setContextMenuPage(null);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {t.requestTable.setCompare1}
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        onClick={() => {
+                          onSetCompare2(contextMenuTarget);
+                          setContextMenuPage(null);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {t.requestTable.setCompare2}
+                      </ContextMenuItem>
+                    </>
+                  ) : (
+                    <>
+                      <ContextMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setContextMenuPage('copy');
+                          setContextMenuTarget(row.original);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Copy className="mr-2 h-3.5 w-3.5 text-blue-400" />
+                        <span>{t.common.copy}</span>
+                        <ChevronRight className="ml-auto h-3.5 w-3.5 text-text-secondary" />
+                      </ContextMenuItem>
+
+                      <ContextMenuSeparator />
+
+                      <ContextMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setContextMenuPage('compare');
+                          setContextMenuTarget(row.original);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <ArrowLeftRight className="mr-2 h-3.5 w-3.5 text-emerald-400" />
+                        <span>{t.requestTable.sendToCompare}</span>
+                        <ChevronRight className="ml-auto h-3.5 w-3.5 text-text-secondary" />
+                      </ContextMenuItem>
+
+                      <ContextMenuSeparator />
+
+                      <ContextMenuItem onClick={() => onAnalyzeRequest?.(row.original)}>
+                        <BookmarkPlus className="mr-2 h-3.5 w-3.5 text-indigo-400" />
+                        <span>{t.requestTable.analyzeRequest}</span>
+                      </ContextMenuItem>
+
+                      <ContextMenuItem onClick={() => onSendToFuzzer?.(row.original)}>
+                        <Zap className="mr-2 h-3.5 w-3.5 text-amber-400" />
+                        <span>{t.requestTable.sendToFuzzer}</span>
+                      </ContextMenuItem>
+
+                      <ContextMenuItem onClick={() => toggleHighlight(row.original.id)}>
+                        <Star
+                          className={cn(
+                            'mr-2 h-3.5 w-3.5',
+                            isHighlighted ? 'fill-warning text-warning' : 'text-yellow-400',
+                          )}
+                        />
+                        <span>{isHighlighted ? t.requestTable.unhighlight : t.requestTable.highlight}</span>
+                      </ContextMenuItem>
+
+                      <ContextMenuSeparator />
+
+                      <ContextMenuItem
+                        onClick={() => onDelete?.(row.original.id)}
+                        className="text-error focus:text-error focus:bg-error/10"
+                      >
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        <span>{t.requestTable.delete}</span>
+                      </ContextMenuItem>
+                    </>
                   )}
-                  <ContextMenuSeparator />
-
-                  <ContextMenuItem onClick={() => onSetCompare1(row.original)}>
-                    <span>{t.requestTable.setCompare1}</span>
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => onSetCompare2(row.original)}>
-                    <span>{t.requestTable.setCompare2}</span>
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-
-                  <ContextMenuItem onClick={() => onAnalyzeRequest?.(row.original)}>
-                    <BookmarkPlus className="mr-2 h-3.5 w-3.5" />
-                    <span>{t.requestTable.analyzeRequest}</span>
-                  </ContextMenuItem>
-
-                  <ContextMenuItem onClick={() => onSendToFuzzer?.(row.original)}>
-                    <Zap className="mr-2 h-3.5 w-3.5 text-amber-400" />
-                    <span>{t.requestTable.sendToFuzzer}</span>
-                  </ContextMenuItem>
-
-                  <ContextMenuItem onClick={() => toggleHighlight(row.original.id)}>
-                    <Star
-                      className={cn(
-                        'mr-2 h-3.5 w-3.5',
-                        isHighlighted ? 'fill-warning text-warning' : '',
-                      )}
-                    />
-                    <span>{isHighlighted ? t.requestTable.unhighlight : t.requestTable.highlight}</span>
-                  </ContextMenuItem>
-
-                  <ContextMenuSeparator />
-
-                  <ContextMenuItem
-                    onClick={() => onDelete?.(row.original.id)}
-                    className="text-error focus:text-error focus:bg-error/10"
-                  >
-                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                    <span>{t.requestTable.delete}</span>
-                  </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
             );
@@ -859,20 +1082,118 @@ return (
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="center"
-              className="w-44 bg-zinc-950 border border-zinc-800 text-text-primary z-50"
+              sideOffset={10}
+              className="min-w-[340px]"
             >
-              <DropdownMenuItem
-                onClick={handleCopySelectedAsMarkdown}
-                className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
-              >
-                {t.requestTable.copyMarkdown}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleCopySelectedAsJson}
-                className="cursor-pointer hover:bg-zinc-900 focus:bg-zinc-900 text-xs"
-              >
-                {t.requestTable.copyJson}
-              </DropdownMenuItem>
+              {/* Header */}
+              <div className="flex items-center gap-2 px-2.5 py-2">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                  <Copy className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-zinc-200">
+                    {t.requestTable.copySelectedBtn}
+                  </div>
+                  <div className="text-[10px] text-zinc-500">
+                    {Object.keys(rowSelection).length} {t.requestTable.selected.replace('{count}', '')}
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-zinc-800/60 mx-1" />
+
+              {/* Sections */}
+              <div className="px-2 pt-2 pb-1">
+                <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">
+                  {t.requestTable.copySections || 'Sections'}
+                </div>
+                <div className="space-y-0.5">
+                  {([
+                    { key: 'status' as const, label: t.requestTable.copySectionStatus || 'Status + Type + Host + Path', icon: Globe },
+                    { key: 'headers' as const, label: t.requestTable.copySectionHeaders || 'Headers', icon: List },
+                    { key: 'body' as const, label: t.requestTable.copySectionBody || 'Body', icon: Box },
+                    { key: 'security' as const, label: t.requestTable.copySectionSecurity || 'Security', icon: ShieldAlert },
+                  ]).map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleCopySection(key); }}
+                      className={cn(
+                        'w-full flex items-center gap-5 px-2.5 py-2 rounded-lg transition-all duration-150 text-xs',
+                        copySections[key]
+                          ? 'bg-zinc-800/80 text-zinc-200'
+                          : 'text-zinc-500 hover:text-zinc-400 hover:bg-zinc-800/40',
+                      )}
+                    >
+                      <Icon className={cn(
+                        'w-3.5 h-3.5 shrink-0 transition-colors',
+                        copySections[key] ? 'text-primary' : 'text-zinc-600',
+                      )} />
+                      <span className="flex-1 text-left">{label}</span>
+                      <div className={cn(
+                        'w-7 h-4 rounded-md relative transition-all duration-200 shrink-0',
+                        copySections[key]
+                          ? 'bg-primary/40 border border-primary/50'
+                          : 'bg-zinc-700/50 border border-zinc-600/50',
+                      )}>
+                        <div className={cn(
+                          'absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-sm transition-all duration-200 shadow-sm',
+                          copySections[key]
+                            ? 'left-[calc(100%-0.85rem)] bg-primary'
+                            : 'left-0.5 bg-zinc-400',
+                        )} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="h-px bg-zinc-800/60 mx-1 mt-1" />
+
+              {/* Format */}
+              <div className="px-2 pt-2 pb-1">
+                <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">
+                  {t.requestTable.copyFormatLabel || 'Format'}
+                </div>
+                <div className="flex gap-1 p-0.5 bg-zinc-900 rounded-lg border border-zinc-800">
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCopyFormat('json'); }}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150',
+                      copyFormat === 'json'
+                        ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                        : 'text-zinc-500 hover:text-zinc-400',
+                    )}
+                  >
+                    <span className="text-[10px] font-mono font-bold bg-primary/10 text-primary px-1 rounded">&#123;&#125;</span>
+                    JSON
+                  </button>
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCopyFormat('markdown'); }}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150',
+                      copyFormat === 'markdown'
+                        ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                        : 'text-zinc-500 hover:text-zinc-400',
+                    )}
+                  >
+                    <span className="text-[10px] font-mono font-bold text-amber-400/80">M↓</span>
+                    Markdown
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-px bg-zinc-800/60 mx-1 mt-1" />
+
+              {/* Copy Button */}
+              <div className="px-2 py-2">
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCopySelectedWithOptions(); }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-semibold transition-all duration-150 active:scale-[0.98] shadow-sm shadow-primary/20"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {t.requestTable.copyToClipboard || 'Copy to Clipboard'}
+                </button>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
           <button

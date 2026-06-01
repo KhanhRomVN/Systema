@@ -567,7 +567,9 @@ export default function InspectorPage() {
   const [compareRequest1, setCompareRequest1] = useState<NetworkRequest | null>(null);
   const [compareRequest2, setCompareRequest2] = useState<NetworkRequest | null>(null);
   const [analyzingRequest, setAnalyzingRequest] = useState<NetworkRequest | null>(null);
+  const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
   const [activeSidebarTab, setActiveSidebarTab] = useState<string>('chat');
+  const [browserViewUrl, setBrowserViewUrl] = useState<string | null>(null);
   const { t } = useI18n();
 
   // TLS scan cache: host → issues (scanned once per host per session)
@@ -756,6 +758,10 @@ export default function InspectorPage() {
   }, [displayedRequests, filter]);
 
   const selectedRequest = displayedRequests.find((r) => r.id === selectedId) || null;
+
+  const selectedRequests = useMemo(() => {
+    return requests.filter((r) => selectedRequestIds.includes(r.id));
+  }, [requests, selectedRequestIds]);
   const appName = currentAppName || selectedApp;
 
   const handleSelectSavedRequest = useCallback((request: NetworkRequest) => {
@@ -778,6 +784,10 @@ export default function InspectorPage() {
   const handleNodeClick = useCallback((request: NetworkRequest) => {
     setAnalyzingRequest(request);
     setDetailsTab('composer');
+  }, []);
+
+  const handleOpenBrowserView = useCallback((url: string) => {
+    setBrowserViewUrl(url);
   }, []);
 
   const inspectorContext = useMemo<InspectorContext>(() => {
@@ -818,6 +828,8 @@ export default function InspectorPage() {
       onConfirmStop: handleConfirmStop,
       onOpenStopConfirm: handleOpenStopConfirm,
       onNodeClick: handleNodeClick,
+      browserViewUrl,
+      onOpenBrowserView: handleOpenBrowserView,
     };
   }, [
     requests, filteredRequests, selectedId, filter, handleDeleteRequest,
@@ -829,167 +841,181 @@ export default function InspectorPage() {
     isConfirmSwitchOpen, handleCloseConfirmSwitch, handleConfirmSwitch,
     currentAppName, pendingSwitchData?.appName, isConfirmStopOpen,
     handleCloseConfirmStop, handleConfirmStop, handleOpenStopConfirm, handleNodeClick,
+    browserViewUrl, handleOpenBrowserView,
   ]);
 
   return (
     <div className="h-screen w-screen bg-background">
-      {/* ── Topbar ── */}
-      <div className="h-10 border-b border-divider flex items-center px-3 bg-table-headerBg gap-3 select-none">
-        <span className="text-base font-bold text-text-primary">Systema</span>
-        <div className="h-4 w-px bg-divider/50" />
-        <div
-          className={cn(
-            'text-xs px-2.5 py-0.5 rounded font-medium flex items-center gap-1.5 border select-none',
-            'bg-table-headerBg brightness-125 text-text-primary border-divider/50',
-          )}
-        >
-          {selectedApp ? (
-            <>
-              <Globe className="w-3.5 h-3.5 shrink-0 text-text-secondary" />
-              <span className="font-semibold">{appName}</span>
-              <span className="text-text-secondary">|</span>
-              <span className="text-text-secondary truncate max-w-[200px]">{targetUrl}</span>
-            </>
-          ) : (
-            <>
-              <Globe className="w-3.5 h-3.5" />
-              <span className="text-text-secondary">{t.topbar.noTarget}</span>
-            </>
-          )}
-        </div>
-
-        <div className="flex-1" />
-
-        {selectedApp && (
-          <button
-            onClick={handleToggleIntercept}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-medium transition-all',
-              isIntercepting
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-                : 'bg-table-headerBg brightness-110 text-text-secondary border-divider/50 hover:brightness-125 hover:text-text-primary',
-            )}
-          >
-            {isIntercepting ? (
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="5" width="4" height="14" rx="1" />
-                <rect x="14" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-            <span>{t.topbar.intercept}</span>
-            <span className={cn(
-              'font-bold',
-              isIntercepting ? 'text-amber-400' : 'text-text-secondary',
-            )}>
-              {isIntercepting ? t.topbar.on : t.topbar.off}
-            </span>
-          </button>
-        )}
-
-        {platform === 'android' && (
-          <div className="flex items-center gap-2 border-l border-divider/50 pl-2">
-            <span className="text-xs text-text-secondary">{t.topbar.frida}:</span>
-            {fridaStatus === 'running' ? (
-              <>
-                <span className="text-xs text-success font-medium flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                  {t.topbar.running}
-                </span>
-                <button
-                  onClick={handleInjectBypass}
-                  className="px-2 py-1 rounded text-xs bg-indigo-600/10 text-indigo-500 hover:bg-indigo-600/20 border border-indigo-500/30 transition-colors"
-                >
-                  {t.topbar.sslBypass}
-                </button>
-                <button
-                  onClick={handleInstallCert}
-                  className="px-2 py-1 rounded text-xs bg-warning/10 text-warning hover:bg-warning/20 border border-warning/30 transition-colors"
-                >
-                  {t.topbar.installCert}
-                </button>
-              </>
-            ) : fridaStatus === 'installed' ? (
-              <button
-                onClick={handleStartFrida}
-                className="px-2 py-1 rounded text-xs bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors"
-              >
-                {t.topbar.start}
-              </button>
-            ) : (
-              <button
-                onClick={handleInstallFrida}
-                className="px-2 py-1 rounded text-xs bg-secondary hover:bg-secondary/80 border border-divider transition-colors"
-              >
-                {t.topbar.install}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* ── Main Layout ── */}
-      <div className="h-[calc(100vh-2.5rem-1.5rem)] w-full bg-background text-text-primary overflow-hidden">
+      <div className="h-[calc(100vh-1.5rem)] w-full bg-background text-text-primary overflow-hidden">
         <ResizableSplit direction="horizontal" initialSize={70} minSize={30} maxSize={80}>
-          <ResizableSplit direction="vertical" initialSize={50} minSize={10} maxSize={90}>
-            <RequestList
-              filteredRequests={filteredRequests}
-              requests={requests}
-              selectedId={selectedId}
-              onSelectRequest={setSelectedId}
-              searchTerm={searchTerm}
-              onSearchTermChange={setSearchTerm}
-              interceptedIds={interceptedIds}
-              pendingActionIds={pendingActionIds}
-              onForward={handleForward}
-              onDrop={handleDrop}
-              onDeleteRequest={handleDeleteRequest}
-              appId={selectedApp || 'unknown'}
-              onSetCompare1={setCompareRequest1}
-              onSetCompare2={setCompareRequest2}
-              setFilter={setFilter}
-              onAnalyzeRequest={(req) => {
-                setAnalyzingRequest(req);
-                setActiveSidebarTab('composer');
-              }}
-              onSendToFuzzer={(req) => {
-                window.dispatchEvent(new CustomEvent('fuzzer:send-request', { detail: req }));
-                setActiveSidebarTab('fuzzer');
-              }}
-              wsConnections={wsConnections}
-              selectedWsId={selectedWsId}
-              onSelectWsConnection={setSelectedWsId}
-              onDeleteWsConnection={handleDeleteWsConnection}
-            />
+          {/* Left side: Topbar + RequestList + RequestDetails */}
+          <div className="flex flex-col h-full">
+            {/* ── Topbar ── */}
+            <div className="h-10 border-b border-divider flex items-center px-3 bg-table-headerBg gap-3 select-none shrink-0">
+              <span className="text-base font-bold text-text-primary">Systema</span>
+              <div className="h-4 w-px bg-divider/50" />
+              <div
+                className={cn(
+                  'text-xs px-2.5 py-0.5 rounded font-medium flex items-center gap-1.5 border select-none',
+                  'bg-table-headerBg brightness-125 text-text-primary border-divider/50',
+                )}
+              >
+                {selectedApp ? (
+                  <>
+                    <Globe className="w-3.5 h-3.5 shrink-0 text-text-secondary" />
+                    <span className="font-semibold">{appName}</span>
+                    <span className="text-text-secondary">|</span>
+                    <span className="text-text-secondary truncate max-w-[200px]">{targetUrl}</span>
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-3.5 h-3.5" />
+                    <span className="text-text-secondary">{t.topbar.noTarget}</span>
+                  </>
+                )}
+              </div>
 
-            {/* ── RequestDetails (DetailSection) ── */}
-            <RequestDetails
-              request={selectedRequest}
-              searchTerm={searchTerm}
-              activeTab={detailsTab}
-              onTabChange={setDetailsTab}
-              onToggleFilter={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-              isFilterOpen={isFilterPanelOpen}
-              filter={filter}
-              onFilterChange={setFilter}
-              requests={requests}
-              onSearchTermChange={setSearchTerm}
-              onSelectRequest={setSelectedId}
-              onJumpToValue={handleJumpToValue}
-              onCompareRequests={handleCompareRequests}
-              onSetCompare1={setCompareRequest1}
-              onSetCompare2={setCompareRequest2}
-              appId={selectedApp}
-              initialComposerRequest={analyzingRequest}
-              showComposerTab={activeSidebarTab === 'composer'}
-            />
-          </ResizableSplit>
+              <div className="flex-1" />
+
+              {selectedApp && (
+                <button
+                  onClick={handleToggleIntercept}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-medium transition-all',
+                    isIntercepting
+                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                      : 'bg-table-headerBg brightness-110 text-text-secondary border-divider/50 hover:brightness-125 hover:text-text-primary',
+                  )}
+                >
+                  {isIntercepting ? (
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <rect x="6" y="5" width="4" height="14" rx="1" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
+                  <span>{t.topbar.intercept}</span>
+                  <span className={cn(
+                    'font-bold',
+                    isIntercepting ? 'text-amber-400' : 'text-text-secondary',
+                  )}>
+                    {isIntercepting ? t.topbar.on : t.topbar.off}
+                  </span>
+                </button>
+              )}
+
+              {platform === 'android' && (
+                <div className="flex items-center gap-2 border-l border-divider/50 pl-2">
+                  <span className="text-xs text-text-secondary">{t.topbar.frida}:</span>
+                  {fridaStatus === 'running' ? (
+                    <>
+                      <span className="text-xs text-success font-medium flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                        {t.topbar.running}
+                      </span>
+                      <button
+                        onClick={handleInjectBypass}
+                        className="px-2 py-1 rounded text-xs bg-indigo-600/10 text-indigo-500 hover:bg-indigo-600/20 border border-indigo-500/30 transition-colors"
+                      >
+                        {t.topbar.sslBypass}
+                      </button>
+                      <button
+                        onClick={handleInstallCert}
+                        className="px-2 py-1 rounded text-xs bg-warning/10 text-warning hover:bg-warning/20 border border-warning/30 transition-colors"
+                      >
+                        {t.topbar.installCert}
+                      </button>
+                    </>
+                  ) : fridaStatus === 'installed' ? (
+                    <button
+                      onClick={handleStartFrida}
+                      className="px-2 py-1 rounded text-xs bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors"
+                    >
+                      {t.topbar.start}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleInstallFrida}
+                      className="px-2 py-1 rounded text-xs bg-secondary hover:bg-secondary/80 border border-divider transition-colors"
+                    >
+                      {t.topbar.install}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-h-0">
+              <ResizableSplit direction="vertical" initialSize={50} minSize={10} maxSize={90}>
+                <RequestList
+                  filteredRequests={filteredRequests}
+                  requests={requests}
+                  selectedId={selectedId}
+                  onSelectRequest={setSelectedId}
+                  searchTerm={searchTerm}
+                  onSearchTermChange={setSearchTerm}
+                  interceptedIds={interceptedIds}
+                  pendingActionIds={pendingActionIds}
+                  onForward={handleForward}
+                  onDrop={handleDrop}
+                  onDeleteRequest={handleDeleteRequest}
+                  appId={selectedApp || 'unknown'}
+                  onSetCompare1={setCompareRequest1}
+                  onSetCompare2={setCompareRequest2}
+                  setFilter={setFilter}
+                  onAnalyzeRequest={(req) => {
+                    setAnalyzingRequest(req);
+                    setActiveSidebarTab('composer');
+                  }}
+                  onSendToFuzzer={(req) => {
+                    window.dispatchEvent(new CustomEvent('fuzzer:send-request', { detail: req }));
+                    setActiveSidebarTab('fuzzer');
+                  }}
+                  wsConnections={wsConnections}
+                  selectedWsId={selectedWsId}
+                  onSelectWsConnection={setSelectedWsId}
+                  onDeleteWsConnection={handleDeleteWsConnection}
+                  onSelectionChange={setSelectedRequestIds}
+                  browserViewUrl={browserViewUrl}
+                />
+
+                {/* ── RequestDetails (DetailSection) ── */}
+                <RequestDetails
+                  request={selectedRequest}
+                  searchTerm={searchTerm}
+                  activeTab={detailsTab}
+                  onTabChange={setDetailsTab}
+                  onToggleFilter={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+                  isFilterOpen={isFilterPanelOpen}
+                  filter={filter}
+                  onFilterChange={setFilter}
+                  requests={requests}
+                  onSearchTermChange={setSearchTerm}
+                  onSelectRequest={setSelectedId}
+                  onJumpToValue={handleJumpToValue}
+                  onCompareRequests={handleCompareRequests}
+                  onSetCompare1={setCompareRequest1}
+                  onSetCompare2={setCompareRequest2}
+                  appId={selectedApp}
+                  initialComposerRequest={analyzingRequest}
+                  showComposerTab={activeSidebarTab === 'composer'}
+                />
+              </ResizableSplit>
+            </div>
+          </div>
 
           {/* ── Sidebar (RightPanel) ── */}
-          <ChatContainer inspectorContext={inspectorContext} />
+          <div className="flex flex-col h-full">
+            <div className="h-10 border-b border-divider bg-table-headerBg shrink-0" />
+            <div className="flex-1 min-h-0">
+              <ChatContainer inspectorContext={inspectorContext} />
+            </div>
+          </div>
         </ResizableSplit>
       </div>
 

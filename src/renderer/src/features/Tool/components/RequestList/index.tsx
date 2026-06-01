@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RequestTable } from './RequestTable';
 import { WaterfallView } from './WaterfallView';
 import { WebSocketTable } from './WebSocketTable';
+import { BrowserViewPanel } from './BrowserViewPanel';
 import { NetworkRequest, WebSocketConnection } from '../../../../types/inspector';
 import { InspectorFilter, initialFilterState } from '../RequestDetails/Filter';
 import { Tooltip } from '../Sidebar/Tooltip';
 import { useI18n } from '../../../../i18n/i18nContext';
-import { List, BarChart2, Wifi } from 'lucide-react';
+import { List, BarChart2, Wifi, LayoutTemplate } from 'lucide-react';
 import { cn } from '../../../../shared/lib/utils';
 
 interface RequestListProps {
@@ -27,11 +28,14 @@ interface RequestListProps {
   setFilter: (filter: InspectorFilter) => void;
   onAnalyzeRequest?: (req: NetworkRequest) => void;
   onSendToFuzzer?: (req: NetworkRequest) => void;
+  onSelectionChange?: (selectedIds: string[]) => void;
   // WebSocket
   wsConnections: WebSocketConnection[];
   selectedWsId: string | null;
   onSelectWsConnection: (id: string | null) => void;
   onDeleteWsConnection: (id: string) => void;
+  // BrowserView
+  browserViewUrl: string | null;
 }
 
 export function RequestList({
@@ -52,13 +56,22 @@ export function RequestList({
   setFilter,
   onAnalyzeRequest,
   onSendToFuzzer,
+  onSelectionChange,
   wsConnections,
   selectedWsId,
   onSelectWsConnection,
   onDeleteWsConnection,
+  browserViewUrl,
 }: RequestListProps) {
-  const [view, setView] = useState<'table' | 'timeline' | 'websocket'>('table');
+  const [view, setView] = useState<'table' | 'timeline' | 'websocket' | 'browser'>('table');
   const { t } = useI18n();
+
+  // Auto-switch to browser view when URL is set from Target selector
+  useEffect(() => {
+    if (browserViewUrl) {
+      setView('browser');
+    }
+  }, [browserViewUrl]);
 
   return (
     <div className="h-full flex">
@@ -106,6 +119,19 @@ export function RequestList({
             )}
           </button>
         </Tooltip>
+        <Tooltip title={t.requestList.browserView || 'Browser View'} description={t.requestList.browserViewDesc || 'View website in embedded browser'} side="right">
+          <button
+            onClick={() => setView('browser')}
+            className={cn(
+              'relative flex items-center justify-center w-8 h-8 rounded-md transition-all border',
+              view === 'browser'
+                ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent',
+            )}
+          >
+            <LayoutTemplate className="w-4 h-4 shrink-0" />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Content */}
@@ -138,6 +164,7 @@ export function RequestList({
             onSetCompare2={onSetCompare2}
             onAnalyzeRequest={onAnalyzeRequest}
             onSendToFuzzer={onSendToFuzzer}
+            onSelectionChange={onSelectionChange}
           />
         ) : view === 'websocket' ? (
           <WebSocketTable
@@ -148,6 +175,8 @@ export function RequestList({
             searchTerm={searchTerm}
             onSearchTermChange={onSearchTermChange}
           />
+        ) : view === 'browser' ? (
+          <BrowserViewPanel url={browserViewUrl} />
         ) : (
           <WaterfallView
             requests={filteredRequests}

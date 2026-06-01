@@ -44,7 +44,9 @@ export const getFaviconSources = (url?: string, size: number = 32): string[] => 
 export const validateImageUrl = (url: string): Promise<boolean> => {
   return new Promise((resolve) => {
     const img = new Image()
-    img.crossOrigin = 'anonymous'
+    // Note: Do NOT set crossOrigin here — many favicon services (like Google S2)
+    // don't return Access-Control-Allow-Origin headers, which causes CORS errors
+    // and false negatives. Simple <img> display doesn't need CORS.
 
     const timeout = setTimeout(() => {
       img.onload = null

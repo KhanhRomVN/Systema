@@ -447,9 +447,14 @@ export class ProxyServer extends EventEmitter {
         'google-analytics.com',
       ];
 
-      const shouldBypass = bypassList.some(
-        (domain) => host.endsWith(domain) || host.includes(domain),
-      );
+      const shouldBypass = bypassList.some((domain) => {
+        // Exact host match or subdomain match (e.g., "cloudflare.com" matches
+        // "cloudflare.com" and "challenges.cloudflare.com", but NOT
+        // "notcloudflare.com" or "cloudflare.com.evil.com")
+        if (host === domain) return true;
+        if (host.endsWith('.' + domain)) return true;
+        return false;
+      });
 
       if (shouldBypass) {
         console.log(`[ProxyServer Connect] Bypassing SSL decryption (tunneling) for: ${hostUrl}`);
