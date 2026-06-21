@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { UserApp, AppPlatform, MobileEmulator } from '../../../../../types/apps';
-import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Square, Terminal, History, FolderOpen, Crosshair, Pencil, Zap, X, Loader2, LayoutTemplate } from 'lucide-react';
+import { Plus, Globe, Monitor, Smartphone, Search, Trash2, Square, Terminal, History, FolderOpen, Crosshair, Pencil, Zap, X, Loader2, LayoutTemplate, RadioTower } from 'lucide-react';
 import { cn } from '../../../../../shared/lib/utils';
 import { loadProfiles, InspectorProfile, deleteProfilesByAppId } from '../../../../../utils/profiles';
 import { AddTargetDrawer } from './AddTargetDrawer';
@@ -12,6 +12,7 @@ export interface TargetSelectorProps {
   activeAppId: string;
   activeAppName: string;
   onSelectApp: (appName: string, proxyUrl: string, customUrl?: string, mode?: 'browser' | 'electron' | 'native') => Promise<void>;
+  onLaunchCdp?: (appName: string, customUrl?: string) => Promise<void>;
   onStopSession: () => Promise<void>;
   onLoadProfile: (profile: InspectorProfile) => void;
   platform?: 'web' | 'pc' | 'android';
@@ -141,7 +142,7 @@ const PLATFORM_TABS: { id: AppPlatform; icon: React.ElementType; label: string; 
 ];
 
 export const TargetSelector: React.FC<TargetSelectorProps> = ({
-  activeAppId, activeAppName, onSelectApp, onStopSession, onLoadProfile,
+  activeAppId, activeAppName, onSelectApp, onLaunchCdp, onStopSession, onLoadProfile,
   platform: activeSessionPlatform,
   onOpenStopConfirm,
   onOpenBrowserView,
@@ -547,10 +548,16 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                 className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
                 <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowserAll}
               </button>
+              {onLaunchCdp && (
+                <button onClick={async () => { recordUsage('__all_websites__'); await onLaunchCdp('__all_websites__'); setContextMenu(null); }} disabled={isLaunching}
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+                  <RadioTower className="w-4 h-4 text-emerald-400" />{t.target.launchBrowserViaCDPAll}
+                </button>
+              )}
               {onOpenBrowserView && (
                 <button onClick={() => { onOpenBrowserView('https://google.com'); setContextMenu(null); }} disabled={isLaunching}
                   className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-                  <LayoutTemplate className="w-4 h-4 text-sky-400" />Open in BrowserView
+                  <LayoutTemplate className="w-4 h-4 text-sky-400" />{t.target.openInBrowserView}
                 </button>
               )}
             </>
@@ -560,10 +567,16 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                 className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
                 <Globe className="w-4 h-4 text-sky-400" />{t.target.launchBrowser}
               </button>
+              {onLaunchCdp && contextMenuApp!.url && (
+                <button onClick={async () => { await onLaunchCdp(contextMenuApp!.id, contextMenuApp!.url); setContextMenu(null); }} disabled={isLaunching}
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
+                  <RadioTower className="w-4 h-4 text-emerald-400" />{t.target.launchBrowserViaCDP}
+                </button>
+              )}
               {onOpenBrowserView && contextMenuApp!.url && (
                 <button onClick={() => { onOpenBrowserView(contextMenuApp!.url!); setContextMenu(null); }} disabled={isLaunching}
                   className="w-full px-4 py-2 text-sm text-left hover:bg-sidebar-itemHover/50 flex items-center gap-2.5">
-                  <LayoutTemplate className="w-4 h-4 text-sky-400" />Open in BrowserView
+                  <LayoutTemplate className="w-4 h-4 text-sky-400" />{t.target.openInBrowserView}
                 </button>
               )}
             </>

@@ -1,5 +1,5 @@
 {
-  "name": "DefaultDark",
+  "name": "Obsidian",
   "monaco": {
     "base": "vs-dark",
     "inherit": true,

@@ -106,34 +106,39 @@ export function ThemeProvider({
   const applyPresetTheme = (preset: ThemeConfig) => {
     applyCSSVariables(preset);
     setCurrentPreset(preset);
-    // Save preset name without "Light" or "Dark" suffix to maintain consistency across modes
-    const baseName = preset.name.replace(/Light$|Dark$/, '');
-    localStorage.setItem(`${storageKey}-preset-name`, baseName);
+    localStorage.setItem(`${storageKey}-preset-name`, preset.name);
   };
 
-  const loadPresetForMode = (mode: 'light' | 'dark') => {
-    const savedPresetName = localStorage.getItem(`${storageKey}-preset-name`);
-    if (savedPresetName) {
-      // Try to find the preset for the current mode
-      const targetName = `${savedPresetName}${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
-      const preset = PRESET_THEMES[mode].find((p) => p.name === targetName);
-      if (preset) {
-        applyCSSVariables(preset);
-        setCurrentPreset(preset);
+  // Load saved preset on init, fallback to first available
+  const loadSavedPreset = () => {
+    const savedName = localStorage.getItem(`${storageKey}-preset-name`);
+    if (savedName) {
+      const found = PRESET_THEMES.find((p) => p.name === savedName);
+      if (found) {
+        applyCSSVariables(found);
+        setCurrentPreset(found);
         return;
       }
     }
-    // Fallback if no specific preset saved or found
-    const defaultPreset = PRESET_THEMES[mode][0];
-    applyCSSVariables(defaultPreset);
-    setCurrentPreset(defaultPreset);
+    // Fallback: first theme
+    const fallback = PRESET_THEMES[0];
+    if (fallback) {
+      applyCSSVariables(fallback);
+      setCurrentPreset(fallback);
+    }
   };
 
+  // Init
+  useEffect(() => {
+    loadSavedPreset();
+  }, []);
+
+  // Sync dark/light class on root
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
 
-    let effectiveMode: 'light' | 'dark' = 'dark'; // Default
+    let effectiveMode: 'light' | 'dark' = 'dark';
 
     if (theme === 'system') {
       effectiveMode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -142,7 +147,6 @@ export function ThemeProvider({
     }
 
     root.classList.add(effectiveMode);
-    loadPresetForMode(effectiveMode);
   }, [theme]);
 
   const value = {

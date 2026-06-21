@@ -464,6 +464,81 @@ app.whenReady().then(async () => {
     return true;
   });
 
+  // Helper to launch browser via CDP (no MITM proxy - direct capture via Chrome DevTools Protocol)
+  const launchBrowserViaCDP = async (url: string, profileName: string): Promise<boolean> => {
+    const userDataDir = path.join(app.getPath('userData'), 'profiles', `cdp-${profileName}`);
+    fs.mkdirSync(userDataDir, { recursive: true });
+
+    // Find browser (Linux)
+    const browsers = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'];
+    let executable = '';
+    for (const b of browsers) {
+      try {
+        execSync(`which ${b}`);
+        executable = b;
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    if (!executable) {
+      console.error('[LaunchBrowserViaCDP] No browser found');
+      return false;
+    }
+
+    const debugPort = await findAvailablePort(9222);
+    console.log(`[LaunchBrowserViaCDP] CDP Debug Port: ${debugPort}`);
+
+    const child = spawn(
+      executable,
+      [
+        `--remote-debugging-port=${debugPort}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+        `--user-data-dir=${userDataDir}`,
+        url,
+      ],
+      {
+        detached: true,
+        stdio: 'ignore',
+      },
+    );
+    activeChildProcess = child;
+    console.log(`[LaunchBrowserViaCDP] Spawned browser PID: ${child.pid}, profile: ${profileName}, debugPort: ${debugPort}`);
+
+    child.on('exit', (code, signal) => {
+      console.log(`[LaunchBrowserViaCDP] Browser exited: PID=${child.pid}, code=${code}, signal=${signal}, profile=${profileName}`);
+      if (activeChildProcess === child) {
+        activeChildProcess = null;
+      }
+      // Notify renderer that the browser was closed
+      const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+      if (win) {
+        console.log(`[LaunchBrowserViaCDP] Sending app:process-exit for "${profileName}"`);
+        win.webContents.send('app:process-exit', profileName);
+      }
+    });
+
+    child.unref();
+
+    // Connect CDP after short delay to let browser start
+    setTimeout(async () => {
+      try {
+        const connected = await cdpManager.connect(debugPort);
+        if (connected) {
+          console.log(`[LaunchBrowserViaCDP] CDP connected successfully for "${profileName}"`);
+        } else {
+          console.error(`[LaunchBrowserViaCDP] Failed to connect CDP for "${profileName}"`);
+        }
+      } catch (e) {
+        console.error('[LaunchBrowserViaCDP] CDP connection error:', e);
+      }
+    }, 2000);
+
+    return true;
+  };
+
   // Helper to launch browser
   const launchBrowser = (url: string, profileName: string, proxyUrl: string) => {
     activeProxyUrl = proxyUrl;
@@ -528,6 +603,85 @@ app.whenReady().then(async () => {
     child.unref();
     return true;
   };
+
+  // App Launcher IPC - CDP Mode (no MITM proxy)
+  ipcMain.handle(
+    'app:launch-cdp',
+    async (
+      _,
+      appName: string,
+      customUrl?: string,
+    ): Promise<boolean> => {
+      console.log(`[IPC] app:launch-cdp called for "${appName}", url: "${customUrl}"`);
+
+      // All Websites
+      if (appName === '__all_websites__') {
+        return await launchBrowserViaCDP('https://google.com', appName);
+      }
+
+      // Web Apps mapping
+      const webApps: Record<string, string> = {
+        'deepseek-browser': 'https://chat.deepseek.com',
+        'chatgpt-browser': 'https://chatgpt.com',
+        'google-aistudio': 'https://aistudio.google.com/prompts/new_chat',
+        'gemini-browser': 'https://gemini.google.com/app?hl=vi',
+        'kimi-browser': 'https://www.kimi.com/',
+        'duckduckgo-browser': 'https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat&duckai=1',
+        'qwen-browser': 'https://chat.qwen.ai/',
+        'groq-browser': 'https://console.groq.com/playground',
+        'grok-browser': 'https://grok.com/',
+        'cohere-browser': 'https://dashboard.cohere.com/playground/chat',
+        'mistral-browser': 'https://console.mistral.ai/build/playground',
+        'perplexity-browser': 'https://www.perplexity.ai/',
+        'phind-browser': 'https://www.phind.com/',
+        'context7-browser': 'https://context7.com/chat',
+        'askcodi-browser': 'https://www.askcodi.com/chat',
+        'zai-browser': 'https://chat.z.ai/',
+        'huggingface-browser': 'https://huggingface.co/chat/',
+        'poe-browser': 'https://poe.com/',
+        'elicit-browser': 'https://elicit.com/',
+        'lmarena-browser': 'https://lmarena.ai/vi/c/new?mode=direct',
+      };
+
+      const electronApps: Record<string, string> = {
+        'claude-web': 'https://claude.ai',
+        'deepseek-electron': 'https://chat.deepseek.com',
+        'mistral-electron': 'https://console.mistral.ai/build/playground',
+        'kimi-electron': 'https://www.kimi.com/',
+        'chatgpt-electron': 'https://chatgpt.com',
+        'qwen-electron': 'https://chat.qwen.ai/',
+        'grok-electron': 'https://grok.com/',
+        'groq-electron': 'https://console.groq.com/playground',
+        'cohere-electron': 'https://dashboard.cohere.com/playground/chat',
+        'perplexity-electron': 'https://www.perplexity.ai/',
+        'phind-electron': 'https://www.phind.com/',
+        'gemini-electron': 'https://gemini.google.com/app?hl=vi',
+        'duckduckgo-electron': 'https://duckduckgo.com/?q=DuckDuckGo+AI+Chat&ia=chat&duckai=1',
+        'context7-electron': 'https://context7.com/chat',
+        'askcodi-electron': 'https://www.askcodi.com/chat',
+        'zai-electron': 'https://chat.z.ai/',
+        'huggingface-electron': 'https://huggingface.co/chat/',
+        'poe-electron': 'https://poe.com/',
+        'elicit-electron': 'https://elicit.com/',
+        'lmarena-electron': 'https://lmarena.ai/vi/c/new?mode=direct',
+      };
+
+      const targetUrl = customUrl || webApps[appName] || electronApps[appName];
+
+      if (targetUrl) {
+        return await launchBrowserViaCDP(targetUrl, appName);
+      }
+
+      // Check User Apps
+      const userApp = userAppStore.getAppById(appName);
+      if (userApp && userApp.url) {
+        return await launchBrowserViaCDP(userApp.url, userApp.id);
+      }
+
+      console.error(`[IPC] app:launch-cdp: No URL found for "${appName}"`);
+      return false;
+    },
+  );
 
   // App Launcher IPC
   ipcMain.handle(

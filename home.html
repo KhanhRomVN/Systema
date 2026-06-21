@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Phantoma — HTTPS Inspector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+@font-face {
+  font-family: 'Aeonik';
+  src: url('https://fonts.cdnfonts.com/css/aeonik') format('woff2');
+  font-weight: 400;
+}
+
+/* Fallback: use system sans that's close to Aeonik */
+:root {
+  --aeonik: 'Aeonik', 'DM Sans', 'Mona Sans', 'Helvetica Neue', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+
+  --bg: #06080c;
+  --bg1: #090c12;
+  --bg2: #0d1119;
+  --bg3: #111620;
+  --surface: #141a26;
+  --surface2: #1a2030;
+
+  --border: rgba(255,255,255,.06);
+  --border2: rgba(255,255,255,.1);
+  --border3: rgba(255,255,255,.16);
+
+  --text: #e8ecf4;
+  --text2: #8a97b0;
+  --text3: #4a5570;
+  --text4: #2d3550;
+
+  --cyan: #00d9f5;
+  --cyan2: #00a8bf;
+  --cyan-dim: rgba(0,217,245,.08);
+  --cyan-glow: rgba(0,217,245,.18);
+
+  --green: #00e87a;
+  --green-dim: rgba(0,232,122,.07);
+
+  --red: #ff4466;
+  --amber: #ffb830;
+
+  --accent: #00d9f5;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--aeonik);
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── NOISE GRAIN ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  opacity: .022;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 64px;
+  display: flex; align-items: center;
+  padding: 0 48px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(6,8,12,.82);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+}
+
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none;
+}
+.nav-logo-mark {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, var(--cyan), rgba(0,217,245,.3));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.nav-logo-mark::after {
+  content: '';
+  position: absolute; inset: 1px;
+  border-radius: 7px;
+  background: var(--bg);
+  z-index: 0;
+}
+.nav-logo-mark svg { position: relative; z-index: 1; width: 16px; height: 16px; }
+.nav-logo-text {
+  font-family: var(--aeonik);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.nav-logo-text span { color: var(--cyan); }
+
+.nav-links {
+  display: flex; align-items: center; gap: 32px;
+  margin-left: 56px;
+  list-style: none;
+}
+.nav-links a {
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 450;
+  letter-spacing: .01em;
+  transition: color .15s;
+}
+.nav-links a:hover { color: var(--text); }
+
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+.btn-ghost {
+  height: 36px; padding: 0 18px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--aeonik);
+  font-size: 14px; font-weight: 500;
+  border-radius: 8px; cursor: pointer;
+  text-decoration: none;
+  display: flex; align-items: center;
+  transition: all .15s;
+}
+.btn-ghost:hover { border-color: var(--border3); color: var(--text); background: rgba(255,255,255,.03); }
+
+.btn-primary {
+  height: 36px; padding: 0 20px;
+  background: var(--cyan);
+  color: #040608;
+  font-family: var(--aeonik);
+  font-size: 14px; font-weight: 600;
+  border-radius: 8px; cursor: pointer;
+  border: none; text-decoration: none;
+  display: flex; align-items: center; gap: 6px;
+  transition: all .15s;
+  letter-spacing: -.01em;
+}
+.btn-primary:hover { background: #1ae5ff; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,217,245,.25); }
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  padding: 0 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Grid background */
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,217,245,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,217,245,.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 80%);
+}
+
+/* Radial glow */
+.hero::after {
+  content: '';
+  position: absolute;
+  width: 900px; height: 600px;
+  top: -100px; left: 50%; transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(0,217,245,.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-inner {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding-top: 120px; padding-bottom: 80px;
+  position: relative; z-index: 2;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px 5px 8px;
+  border: 1px solid rgba(0,217,245,.2);
+  background: rgba(0,217,245,.06);
+  border-radius: 100px;
+  margin-bottom: 32px;
+  font-size: 12px; font-weight: 500;
+  color: var(--cyan);
+  font-family: var(--mono);
+  letter-spacing: .03em;
+  animation: fadeInUp .6s ease both;
+}
+.badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan);
+  animation: pulse-dot 1.8s ease infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,217,245,.6); }
+  50% { box-shadow: 0 0 0 5px rgba(0,217,245,0); }
+}
+
+.hero-title {
+  font-family: var(--aeonik);
+  font-size: clamp(52px, 6vw, 88px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -.04em;
+  color: var(--text);
+  max-width: 900px;
+  margin-bottom: 24px;
+  animation: fadeInUp .6s .1s ease both;
+}
+.hero-title .accent { color: var(--cyan); }
+.hero-title .dim { color: var(--text3); }
+
+.hero-sub {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text2);
+  max-width: 560px;
+  line-height: 1.65;
+  margin-bottom: 48px;
+  animation: fadeInUp .6s .2s ease both;
+}
+
+.hero-actions {
+  display: flex; align-items: center; gap: 14px;
+  animation: fadeInUp .6s .3s ease both;
+}
+.btn-hero {
+  height: 50px; padding: 0 28px;
+  background: var(--cyan);
+  color: #040608;
+  font-family: var(--aeonik);
+  font-size: 15px; font-weight: 600;
+  border-radius: 10px; cursor: pointer;
+  border: none; text-decoration: none;
+  display: flex; align-items: center; gap: 8px;
+  transition: all .2s;
+  letter-spacing: -.02em;
+}
+.btn-hero:hover { background: #1ae5ff; transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,217,245,.3); }
+.btn-hero-ghost {
+  height: 50px; padding: 0 24px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--aeonik);
+  font-size: 15px; font-weight: 500;
+  border-radius: 10px; cursor: pointer;
+  text-decoration: none;
+  display: flex; align-items: center; gap: 8px;
+  transition: all .2s;
+}
+.btn-hero-ghost:hover { border-color: var(--border3); color: var(--text); background: rgba(255,255,255,.03); }
+
+.hero-meta {
+  margin-top: 28px;
+  display: flex; align-items: center; gap: 24px;
+  font-size: 12.5px; color: var(--text3); font-family: var(--mono);
+  animation: fadeInUp .6s .4s ease both;
+}
+.hero-meta span { display: flex; align-items: center; gap: 6px; }
+.meta-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text4); }
+
+/* ── APP PREVIEW ── */
+.preview-wrap {
+  width: 100%; max-width: 1100px;
+  margin: 0 auto 0;
+  padding: 0 0 100px;
+  position: relative; z-index: 2;
+  animation: fadeInUp .8s .5s ease both;
+}
+
+.preview-frame {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  overflow: hidden;
+  background: var(--bg2);
+  box-shadow:
+    0 0 0 1px rgba(0,217,245,.08),
+    0 40px 80px rgba(0,0,0,.6),
+    0 80px 160px rgba(0,0,0,.4);
+  position: relative;
+}
+.preview-frame::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 70%, var(--bg) 100%);
+  z-index: 10; pointer-events: none;
+}
+
+.preview-bar {
+  height: 36px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 14px; gap: 8px;
+}
+.preview-dot { width: 10px; height: 10px; border-radius: 50%; }
+.preview-content {
+  display: flex; height: 400px;
+  font-family: var(--mono); font-size: 11px;
+}
+
+/* Sidebar */
+.prev-sidebar {
+  width: 200px; flex-shrink: 0;
+  background: var(--bg3);
+  border-right: 1px solid var(--border);
+  padding: 12px 0;
+}
+.prev-sb-item {
+  padding: 6px 14px;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10.5px; color: var(--text3);
+  cursor: pointer;
+}
+.prev-sb-item.active { background: var(--cyan-dim); color: var(--cyan); border-right: 2px solid var(--cyan); }
+.prev-sb-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.prev-sb-count { margin-left: auto; font-size: 9.5px; opacity: .7; }
+
+/* Table */
+.prev-table { flex: 1; overflow: hidden; }
+.prev-thead {
+  height: 28px; background: rgba(255,255,255,.02);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  font-size: 9.5px; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 0 8px;
+}
+.prev-row {
+  height: 28px; display: flex; align-items: center; padding: 0 8px;
+  border-bottom: 1px solid rgba(255,255,255,.025);
+  font-size: 10.5px;
+}
+.prev-row.sel { background: rgba(0,217,245,.05); border-left: 2px solid var(--cyan); }
+.prev-row.err { background: rgba(255,68,102,.03); }
+.prev-row.held { border-left: 2px solid var(--amber); background: rgba(255,184,48,.04); }
+.m-g { color: #4dc9ff; font-weight: 700; }
+.m-p { color: #00e87a; font-weight: 700; }
+.m-d { color: #ff4466; font-weight: 700; }
+.m-a { color: #ffb830; font-weight: 700; }
+.s2 { color: #00e87a; }
+.s3 { color: #ffb830; }
+.s4 { color: #ff4466; }
+.s5 { color: #a855f7; }
+.col1 { width: 32px; color: var(--text3); font-size: 10px; }
+.col2 { width: 52px; }
+.col3 { width: 160px; }
+.col4 { flex: 1; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col5 { width: 55px; }
+.col6 { width: 55px; color: var(--text3); }
+.col7 { width: 60px; text-align: right; color: var(--text2); }
+
+/* Inspector sidebar */
+.prev-inspector {
+  width: 220px; flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  padding: 10px;
+  background: var(--bg2);
+}
+.prev-insp-title {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--text3);
+  margin-bottom: 8px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.prev-kv { display: flex; gap: 6px; padding: 2.5px 0; font-size: 10px; }
+.prev-k { color: var(--text3); min-width: 60px; }
+.prev-v { color: var(--text2); }
+.prev-v-c { color: var(--cyan); }
+.prev-v-g { color: var(--green); }
+.prev-v-a { color: var(--amber); }
+.prev-v-r { color: var(--red); }
+
+.tag-badge {
+  display: inline-block; padding: 0 5px; height: 14px; line-height: 14px;
+  border-radius: 3px; font-size: 9px; font-weight: 700;
+}
+.tg-jwt { background: rgba(255,184,48,.12); color: var(--amber); border: 1px solid rgba(255,184,48,.3); }
+.tg-held { background: rgba(255,184,48,.15); color: var(--amber); border: 1px solid rgba(255,184,48,.4); }
+.tg-sec { background: rgba(255,68,102,.12); color: var(--red); border: 1px solid rgba(255,68,102,.3); }
+.tg-sse { background: rgba(0,217,245,.1); color: var(--cyan); border: 1px solid rgba(0,217,245,.25); }
+.tg-gql { background: rgba(244,114,182,.1); color: #f472b6; border: 1px solid rgba(244,114,182,.25); }
+
+/* ── LOGO STRIP ── */
+.logo-strip {
+  padding: 0 48px 80px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(to bottom, var(--bg2), var(--bg));
+}
+.logo-strip-label {
+  text-align: center; padding: 32px 0 28px;
+  font-size: 12px; font-weight: 500; color: var(--text3);
+  font-family: var(--mono); letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.logo-strip-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 48px; flex-wrap: wrap;
+}
+.logo-item {
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  color: var(--text4);
+  letter-spacing: .04em;
+  transition: color .2s;
+  cursor: default;
+}
+.logo-item:hover { color: var(--text2); }
+
+/* ── FEATURES ── */
+section { padding: 100px 48px; }
+
+.section-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--cyan); letter-spacing: .12em;
+  text-transform: uppercase; margin-bottom: 20px;
+}
+.section-label::before {
+  content: '';
+  width: 24px; height: 1px; background: var(--cyan);
+}
+
+.section-title {
+  font-family: var(--aeonik);
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 600; line-height: 1.1;
+  letter-spacing: -.03em; color: var(--text);
+  max-width: 640px; margin-bottom: 16px;
+}
+.section-sub {
+  font-size: 17px; color: var(--text2); line-height: 1.65;
+  max-width: 520px; margin-bottom: 64px;
+}
+
+/* Feature grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--border);
+}
+.feat-card {
+  background: var(--bg1);
+  padding: 36px 32px;
+  transition: background .2s;
+  position: relative;
+  overflow: hidden;
+}
+.feat-card:hover { background: var(--bg2); }
+.feat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,217,245,.3), transparent);
+  opacity: 0; transition: opacity .3s;
+}
+.feat-card:hover::before { opacity: 1; }
+.feat-icon {
+  width: 40px; height: 40px;
+  background: var(--cyan-dim);
+  border: 1px solid rgba(0,217,245,.15);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+}
+.feat-icon svg { width: 18px; height: 18px; color: var(--cyan); }
+.feat-name {
+  font-size: 16px; font-weight: 600;
+  letter-spacing: -.02em; color: var(--text);
+  margin-bottom: 10px;
+}
+.feat-desc {
+  font-size: 14px; color: var(--text2);
+  line-height: 1.65;
+}
+.feat-tag {
+  display: inline-block; margin-top: 16px;
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  color: var(--cyan); letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* ── BENTO SECTION ── */
+.bento-section { padding: 0 48px 100px; }
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto;
+  gap: 12px;
+}
+.bento-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px;
+  transition: border-color .2s;
+  overflow: hidden;
+  position: relative;
+}
+.bento-card:hover { border-color: var(--border2); }
+.bc-1 { grid-column: span 5; grid-row: span 2; }
+.bc-2 { grid-column: span 4; }
+.bc-3 { grid-column: span 3; }
+.bc-4 { grid-column: span 7; }
+.bc-5 { grid-column: span 5; }
+
+.bento-label {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  color: var(--text3); letter-spacing: .1em;
+  text-transform: uppercase; margin-bottom: 10px;
+}
+.bento-title {
+  font-size: 20px; font-weight: 600;
+  letter-spacing: -.025em; color: var(--text);
+  margin-bottom: 10px; line-height: 1.25;
+}
+.bento-desc {
+  font-size: 13.5px; color: var(--text2);
+  line-height: 1.65;
+}
+
+/* Big stat */
+.big-stat {
+  font-family: var(--mono); font-size: 52px; font-weight: 300;
+  color: var(--cyan); line-height: 1;
+  letter-spacing: -.04em; margin: 12px 0 4px;
+}
+.stat-label { font-size: 13px; color: var(--text3); }
+
+/* Mini code block */
+.mini-code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--cyan);
+  line-height: 1.75;
+  margin-top: 16px;
+}
+.mc-comment { color: var(--text3); }
+.mc-key { color: #7ec8e3; }
+.mc-val { color: #a3e6a0; }
+.mc-str { color: var(--amber); }
+
+/* Severity pills */
+.sev-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+.sev-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+}
+.sev-h { background: rgba(255,68,102,.12); color: var(--red); border: 1px solid rgba(255,68,102,.2); }
+.sev-m { background: rgba(255,184,48,.12); color: var(--amber); border: 1px solid rgba(255,184,48,.2); }
+.sev-l { background: rgba(0,217,245,.08); color: var(--cyan); border: 1px solid rgba(0,217,245,.15); }
+
+/* Protocol badges */
+.proto-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+.proto-badge {
+  padding: 4px 10px; border-radius: 5px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  background: var(--surface); border: 1px solid var(--border2);
+  color: var(--text2);
+}
+
+/* ── COMPARISON ── */
+.compare-section {
+  padding: 100px 48px;
+  background: linear-gradient(to bottom, var(--bg), var(--bg2));
+}
+.compare-table {
+  width: 100%; border-collapse: collapse;
+  margin-top: 48px;
+  border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+}
+.compare-table th {
+  padding: 16px 20px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 600; color: var(--text2);
+  text-align: left; letter-spacing: -.01em;
+}
+.compare-table th:first-child { width: 200px; }
+.compare-table th.hl {
+  color: var(--cyan);
+  background: rgba(0,217,245,.06);
+  position: relative;
+}
+.compare-table th.hl::after {
+  content: 'Phantoma';
+  position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-weight: 700; color: #040608;
+  background: var(--cyan); padding: 2px 8px; border-radius: 0 0 5px 5px;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.compare-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px; color: var(--text2);
+}
+.compare-table td:first-child { color: var(--text); font-weight: 500; font-size: 13px; }
+.compare-table td.hl-cell { background: rgba(0,217,245,.04); }
+.compare-table tr:last-child td { border-bottom: none; }
+.check-y { color: var(--green); font-size: 16px; }
+.check-n { color: var(--text4); font-size: 16px; }
+.check-c { color: var(--cyan); font-size: 16px; }
+
+/* ── TESTIMONIALS / SOCIAL PROOF ── */
+.social-section { padding: 80px 48px 100px; }
+.social-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px; margin-top: 48px;
+}
+.quote-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 28px 24px;
+  transition: border-color .2s;
+}
+.quote-card:hover { border-color: var(--border2); }
+.quote-stars {
+  display: flex; gap: 3px; margin-bottom: 14px;
+}
+.star { color: var(--amber); font-size: 13px; }
+.quote-text {
+  font-size: 14.5px; color: var(--text); line-height: 1.7;
+  margin-bottom: 20px; font-style: italic;
+}
+.quote-text em { color: var(--cyan); font-style: normal; font-weight: 500; }
+.quote-author {
+  display: flex; align-items: center; gap: 10px;
+}
+.quote-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  flex-shrink: 0;
+}
+.qa-1 { background: rgba(0,217,245,.15); color: var(--cyan); }
+.qa-2 { background: rgba(0,232,122,.12); color: var(--green); }
+.qa-3 { background: rgba(168,85,247,.12); color: #a855f7; }
+.quote-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.quote-role { font-size: 12px; color: var(--text3); }
+
+/* ── PRICING ── */
+.pricing-section { padding: 80px 48px 100px; }
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px; margin-top: 48px;
+  max-width: 960px; margin-left: auto; margin-right: auto;
+}
+.price-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px 28px;
+  transition: border-color .2s;
+  position: relative;
+}
+.price-card:hover { border-color: var(--border2); }
+.price-card.featured {
+  border-color: rgba(0,217,245,.3);
+  background: rgba(0,217,245,.04);
+}
+.price-badge {
+  position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  background: var(--cyan); color: #040608;
+  font-size: 10px; font-weight: 700;
+  padding: 3px 12px; border-radius: 0 0 7px 7px;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.price-tier {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--text3); letter-spacing: .1em;
+  text-transform: uppercase; margin-bottom: 16px;
+}
+.price-amount {
+  font-family: var(--aeonik);
+  font-size: 44px; font-weight: 600;
+  letter-spacing: -.04em; color: var(--text);
+  line-height: 1;
+}
+.price-period { font-size: 15px; color: var(--text3); font-weight: 400; }
+.price-desc { font-size: 13.5px; color: var(--text2); margin: 12px 0 24px; line-height: 1.55; }
+.price-cta {
+  display: block; width: 100%;
+  height: 42px;
+  border-radius: 8px; font-family: var(--aeonik);
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; text-decoration: none;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cta-main { background: var(--cyan); color: #040608; border: none; }
+.cta-main:hover { background: #1ae5ff; box-shadow: 0 8px 24px rgba(0,217,245,.25); }
+.cta-ghost { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
+.cta-ghost:hover { border-color: var(--border3); color: var(--text); background: rgba(255,255,255,.03); }
+.price-features { margin-top: 24px; display: flex; flex-direction: column; gap: 9px; }
+.pf-item { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--text2); }
+.pf-check { color: var(--cyan); margin-top: 1px; flex-shrink: 0; font-size: 14px; }
+.pf-x { color: var(--text4); margin-top: 1px; flex-shrink: 0; font-size: 14px; }
+
+/* ── CTA ── */
+.cta-section {
+  padding: 120px 48px;
+  text-align: center;
+  position: relative; overflow: hidden;
+}
+.cta-section::before {
+  content: '';
+  position: absolute;
+  width: 600px; height: 400px;
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: radial-gradient(ellipse, rgba(0,217,245,.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cta-title {
+  font-family: var(--aeonik);
+  font-size: clamp(36px, 4vw, 60px);
+  font-weight: 600; line-height: 1.1;
+  letter-spacing: -.04em; color: var(--text);
+  max-width: 700px; margin: 0 auto 20px;
+}
+.cta-sub {
+  font-size: 17px; color: var(--text2); margin-bottom: 48px;
+  max-width: 480px; margin-left: auto; margin-right: auto; margin-bottom: 48px;
+}
+.cta-actions { display: flex; align-items: center; justify-content: center; gap: 14px; }
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 56px 48px 40px;
+  background: var(--bg1);
+}
+.footer-top {
+  display: flex; gap: 80px; margin-bottom: 48px;
+}
+.footer-brand { flex: 1.5; }
+.footer-brand-name {
+  font-family: var(--aeonik);
+  font-size: 18px; font-weight: 600;
+  letter-spacing: -.02em; color: var(--text);
+  margin-bottom: 8px;
+}
+.footer-brand-name span { color: var(--cyan); }
+.footer-brand-desc { font-size: 13.5px; color: var(--text3); line-height: 1.65; max-width: 280px; }
+.footer-col h4 {
+  font-size: 12px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text3);
+  margin-bottom: 16px; font-family: var(--mono);
+}
+.footer-col a {
+  display: block; font-size: 14px; color: var(--text3);
+  text-decoration: none; margin-bottom: 9px;
+  transition: color .15s;
+}
+.footer-col a:hover { color: var(--text2); }
+.footer-bottom {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 24px; border-top: 1px solid var(--border);
+  font-size: 12.5px; color: var(--text4);
+  font-family: var(--mono);
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.reveal {
+  opacity: 0; transform: translateY(24px);
+  transition: opacity .7s ease, transform .7s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  nav { padding: 0 24px; }
+  .nav-links { display: none; }
+  .hero, section { padding-left: 24px; padding-right: 24px; }
+  .feature-grid { grid-template-columns: 1fr 1fr; }
+  .bento-grid { grid-template-columns: 1fr 1fr; }
+  .bc-1,.bc-2,.bc-3,.bc-4,.bc-5 { grid-column: span 1; }
+  .social-grid, .pricing-grid { grid-template-columns: 1fr; }
+  .footer-top { flex-direction: column; gap: 40px; }
+  .compare-section { padding-left: 24px; padding-right: 24px; overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00d9f5" stroke-width="1.6">
+        <path d="M12 2L2 7v10l10 5 10-5V7z"/>
+        <path d="M12 12L2 7M12 12v10M12 12l10-5"/>
+      </svg>
+    </div>
+    <span class="nav-logo-text">Phanto<span>ma</span></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#modules">Modules</a></li>
+    <li><a href="#compare">Compare</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#">Docs</a></li>
+  </ul>
+  <div class="nav-right">
+    <a href="#" class="btn-ghost">Sign in</a>
+    <a href="#pricing" class="btn-primary">
+      Download Free
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+    </a>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      v3.0 — Now with SSE streaming &amp; GraphQL Inspector
+    </div>
+    <h1 class="hero-title">
+      See everything<br/>
+      your app<br/>
+      <span class="accent">is saying.</span>
+    </h1>
+    <p class="hero-sub">
+      A professional HTTPS traffic inspector for developers and security engineers. Intercept, analyze, and manipulate any request — in real time.
+    </p>
+    <div class="hero-actions">
+      <a href="#pricing" class="btn-hero">
+        Download for macOS
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+      </a>
+      <a href="#features" class="btn-hero-ghost">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M6 5l2 3-2 3M10 5v6" opacity=".5"/></svg>
+        Watch demo
+      </a>
+    </div>
+    <div class="hero-meta">
+      <span>macOS · Windows · Linux</span>
+      <span class="meta-dot"></span>
+      <span>Electron · React</span>
+      <span class="meta-dot"></span>
+      <span>HTTP/1.1 · HTTP/2 · WebSocket · SSE</span>
+    </div>
+  </div>
+
+  <!-- App preview -->
+  <div class="preview-wrap">
+    <div class="preview-frame">
+      <div class="preview-bar">
+        <div class="preview-dot" style="background:#ff5f56"></div>
+        <div class="preview-dot" style="background:#ffbd2e"></div>
+        <div class="preview-dot" style="background:#27c93f"></div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-dot 1.8s ease infinite"></div>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">localhost:8888 — Intercepting</span>
+        </div>
+        <span style="font-family:var(--mono);font-size:9.5px;color:var(--text3)">84 requests</span>
+      </div>
+      <div class="preview-content">
+        <!-- Sidebar -->
+        <div class="prev-sidebar">
+          <div class="prev-sb-item active">
+            <span class="prev-sb-dot" style="background:var(--green)"></span>
+            All Traffic
+            <span class="prev-sb-count" style="background:rgba(0,232,122,.12);color:var(--green);padding:1px 5px;border-radius:3px;font-size:9px">84</span>
+          </div>
+          <div class="prev-sb-item">
+            <span class="prev-sb-dot" style="background:var(--cyan)"></span>
+            api.google.com
+            <span class="prev-sb-count">12</span>
+          </div>
+          <div class="prev-sb-item" style="color:var(--amber)">
+            <span class="prev-sb-dot" style="background:var(--amber)"></span>
+            checkout.stripe.com
+            <span class="prev-sb-count" style="color:var(--amber)">HELD</span>
+          </div>
+          <div class="prev-sb-item">
+            <span class="prev-sb-dot" style="background:#a855f7"></span>
+            graphql.github.com
+            <span class="prev-sb-count" style="color:var(--red)">500</span>
+          </div>
+          <div class="prev-sb-item">
+            <span class="prev-sb-dot" style="background:var(--green)"></span>
+            stream.openai.com
+            <span class="prev-sb-count" style="color:var(--cyan)">SSE</span>
+          </div>
+          <div style="height:1px;background:var(--border);margin:8px 0"></div>
+          <div style="padding:8px 14px">
+            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px">Proxy</div>
+            <div style="font-size:10px;color:var(--text2)">Port: <span style="color:var(--cyan)">8888</span></div>
+            <div style="font-size:10px;color:var(--text2);margin-top:2px">TLS: <span style="color:var(--green)">Active</span></div>
+          </div>
+        </div>
+        <!-- Table -->
+        <div class="prev-table">
+          <div class="prev-thead">
+            <div class="col1">#</div>
+            <div class="col2">Method</div>
+            <div class="col3">Host</div>
+            <div class="col4">Path</div>
+            <div class="col5">Status</div>
+            <div class="col6">Type</div>
+            <div class="col7">Time</div>
+          </div>
+          <div class="prev-row held">
+            <div class="col1">3</div>
+            <div class="col2"><span class="m-p">POST</span></div>
+            <div class="col3" style="color:var(--amber)">checkout.stripe.com</div>
+            <div class="col4">/v1/payment_intents &nbsp;<span class="tag-badge tg-held">⏸ HELD</span></div>
+            <div class="col5">—</div>
+            <div class="col6" style="color:var(--text3)">XHR</div>
+            <div class="col7">—</div>
+          </div>
+          <div class="prev-row sel">
+            <div class="col1">1</div>
+            <div class="col2"><span class="m-p">POST</span></div>
+            <div class="col3">api.google.com</div>
+            <div class="col4">/v1/auth/token &nbsp;<span class="tag-badge tg-jwt">JWT</span></div>
+            <div class="col5 s2">200</div>
+            <div class="col6" style="color:var(--text3)">XHR</div>
+            <div class="col7">142ms</div>
+          </div>
+          <div class="prev-row">
+            <div class="col1">2</div>
+            <div class="col2"><span class="m-g">GET</span></div>
+            <div class="col3">accounts.google.com</div>
+            <div class="col4">/o/oauth2/v2/auth &nbsp;<span class="tag-badge tg-sec">⚠ SEC</span></div>
+            <div class="col5 s3">302</div>
+            <div class="col6" style="color:var(--text3)">Doc</div>
+            <div class="col7">38ms</div>
+          </div>
+          <div class="prev-row">
+            <div class="col1">8</div>
+            <div class="col2"><span class="m-g">GET</span></div>
+            <div class="col3">stream.openai.com</div>
+            <div class="col4">/v1/chat/completions &nbsp;<span class="tag-badge tg-sse">SSE</span></div>
+            <div class="col5 s2">200</div>
+            <div class="col6" style="color:var(--text3)">XHR</div>
+            <div class="col7">∞</div>
+          </div>
+          <div class="prev-row err">
+            <div class="col1">10</div>
+            <div class="col2"><span class="m-p">POST</span></div>
+            <div class="col3">graphql.github.com</div>
+            <div class="col4">/graphql &nbsp;<span class="tag-badge tg-gql">GraphQL</span></div>
+            <div class="col5 s5">500</div>
+            <div class="col6" style="color:var(--text3)">XHR</div>
+            <div class="col7">834ms</div>
+          </div>
+          <div class="prev-row">
+            <div class="col1">4</div>
+            <div class="col2"><span class="m-g">GET</span></div>
+            <div class="col3">www.gstatic.com</div>
+            <div class="col4">/firebasejs/9.22.0/firebase-app.js</div>
+            <div class="col5 s2">200</div>
+            <div class="col6" style="color:var(--text3)">JS</div>
+            <div class="col7">291ms</div>
+          </div>
+          <div class="prev-row err">
+            <div class="col1">6</div>
+            <div class="col2"><span class="m-g">GET</span></div>
+            <div class="col3">api.example.com</div>
+            <div class="col4">/v3/users/profile/missing-resource</div>
+            <div class="col5 s4">404</div>
+            <div class="col6" style="color:var(--text3)">XHR</div>
+            <div class="col7">67ms</div>
+          </div>
+          <div class="prev-row">
+            <div class="col1">7</div>
+            <div class="col2"><span class="m-d">DELETE</span></div>
+            <div class="col3">api.example.com</div>
+            <div class="col4">/v3/sessions/abc123def456</div>
+            <div class="col5 s2">204</div>
+            <div class="col6" style="color:var(--text3)">XHR</div>
+            <div class="col7">29ms</div>
+          </div>
+          <div class="prev-row">
+            <div class="col1">11</div>
+            <div class="col2"><span class="m-p">POST</span></div>
+            <div class="col3">api.openai.com</div>
+            <div class="col4">/v1/embeddings</div>
+            <div class="col5 s2">200</div>
+            <div class="col6" style="color:var(--text3)">XHR</div>
+            <div class="col7">612ms</div>
+          </div>
+        </div>
+        <!-- Inspector -->
+        <div class="prev-inspector">
+          <div class="prev-insp-title">Inspector</div>
+          <div class="prev-kv"><span class="prev-k">Method</span><span class="prev-v" style="color:var(--green)">POST</span></div>
+          <div class="prev-kv"><span class="prev-k">Host</span><span class="prev-v-c">api.google.com</span></div>
+          <div class="prev-kv"><span class="prev-k">Status</span><span class="prev-v-g">200 OK</span></div>
+          <div class="prev-kv"><span class="prev-k">Protocol</span><span class="prev-v">HTTP/2</span></div>
+          <div class="prev-kv"><span class="prev-k">TLS</span><span class="prev-v-g">v1.3</span></div>
+          <div class="prev-kv"><span class="prev-k">Size</span><span class="prev-v">2.4 KB</span></div>
+          <div class="prev-kv"><span class="prev-k">Time</span><span class="prev-v-c">142ms</span></div>
+          <div style="height:1px;background:var(--border);margin:8px 0"></div>
+          <div class="prev-insp-title">Security</div>
+          <div style="background:rgba(255,68,102,.07);border:1px solid rgba(255,68,102,.18);border-radius:5px;padding:5px 8px;margin-bottom:4px">
+            <div style="font-size:9.5px;font-weight:700;color:var(--red)">HIGH · API Key Exposed</div>
+            <div style="font-size:9px;color:var(--text3)">x-goog-api-key header</div>
+          </div>
+          <div style="background:rgba(255,184,48,.06);border:1px solid rgba(255,184,48,.18);border-radius:5px;padding:5px 8px">
+            <div style="font-size:9.5px;font-weight:700;color:var(--amber)">MED · Missing CSP</div>
+            <div style="font-size:9px;color:var(--text3)">Content-Security-Policy</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── LOGO STRIP ── -->
+<div class="logo-strip">
+  <div class="logo-strip-label">Trusted by engineering teams at</div>
+  <div class="logo-strip-row">
+    <span class="logo-item">Vercel</span>
+    <span class="logo-item">Stripe</span>
+    <span class="logo-item">Linear</span>
+    <span class="logo-item">Raycast</span>
+    <span class="logo-item">Supabase</span>
+    <span class="logo-item">Clerk</span>
+    <span class="logo-item">Lemon Squeezy</span>
+  </div>
+</div>
+
+<!-- ── FEATURES ── -->
+<section id="features" style="padding: 100px 48px;">
+  <div class="reveal">
+    <div class="section-label">Core Capabilities</div>
+    <h2 class="section-title">Built for the<br/>full stack reality</h2>
+    <p class="section-sub">From REST endpoints to WebSocket frames, from JWT tokens to GraphQL mutations — Phantoma handles every layer of your stack.</p>
+  </div>
+
+  <div class="feature-grid reveal">
+    <!-- Feature 1 -->
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="5"/><path d="M8 3v1M8 12v1M3 8h1M12 8h1"/>
+        </svg>
+      </div>
+      <div class="feat-name">Real-time Capture</div>
+      <div class="feat-desc">Intercept all HTTPS traffic instantly. Color-coded methods, inline smart tags, live filter bar — everything at a glance.</div>
+      <div class="feat-tag">Capture · Filter · Inspect</div>
+    </div>
+    <!-- Feature 2 -->
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="5" fill="currentColor" opacity=".15"/>
+          <path d="M6 5l2 3-2 3M10 5v6"/>
+        </svg>
+      </div>
+      <div class="feat-name">Breakpoints</div>
+      <div class="feat-desc">Halt requests mid-flight. Edit headers, body, method — then forward or drop. Full in-flight control with the Composer editor.</div>
+      <div class="feat-tag">Intercept · Edit · Forward</div>
+    </div>
+    <!-- Feature 3 -->
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 1l5 2.5v5C13 11.5 10.5 14 8 15c-2.5-1-5-3.5-5-6.5v-5z"/>
+          <path d="M5.5 8l2 2 3-3"/>
+        </svg>
+      </div>
+      <div class="feat-name">Security Audit</div>
+      <div class="feat-desc">Automatic passive scanning of every request. Detects API key exposure, JWT leaks, weak CORS, missing security headers — instantly.</div>
+      <div class="feat-tag">HIGH · MED · LOW severity</div>
+    </div>
+    <!-- Feature 4 -->
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 8h4M10 8h4M6 5l4 3-4 3"/>
+        </svg>
+      </div>
+      <div class="feat-name">WebSocket Inspector</div>
+      <div class="feat-desc">Live WSS message streams with direction indicators, timestamps, and manual frame injection. Watch every ping, pong, and payload.</div>
+      <div class="feat-tag">WSS · Frame Injection · Live</div>
+    </div>
+    <!-- Feature 5 -->
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="3" width="8" height="10" rx="1.5"/>
+          <path d="M10 6l4-2v8l-4-2"/>
+        </svg>
+      </div>
+      <div class="feat-name">Auto Responder</div>
+      <div class="feat-desc">Mock any endpoint with local files or redirect to staging. Custom status codes, artificial delays, drag-and-drop response files.</div>
+      <div class="feat-tag">Mock · Redirect · Delay</div>
+    </div>
+    <!-- Feature 6 -->
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 4h10M5 8h6M7 12h2"/><path d="M13 6l2 2-2 2"/>
+        </svg>
+      </div>
+      <div class="feat-name">Match &amp; Replace</div>
+      <div class="feat-desc">Regex-based traffic rewriter. Inject debug headers, swap auth tokens, rewrite body JSON — on every request automatically.</div>
+      <div class="feat-tag">Regex · Headers · Body · URL</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── BENTO ── -->
+<div class="bento-section" id="modules">
+  <div class="reveal" style="margin-bottom:48px">
+    <div class="section-label">12 Modules</div>
+    <h2 class="section-title">Every tool you need,<br/>in one window</h2>
+  </div>
+
+  <div class="bento-grid reveal">
+    <!-- Card 1: Big - Protocol support -->
+    <div class="bento-card bc-1">
+      <div class="bento-label">Multi-Protocol</div>
+      <div class="bento-title">Beyond HTTPS — every protocol covered</div>
+      <div class="bento-desc">HTTP/1.1, HTTP/2, HTTP/3, WebSocket Secure, Server-Sent Events, WASM resources. Phantoma decrypts and inspects every byte.</div>
+      <div class="proto-row">
+        <span class="proto-badge">HTTP/1.1</span>
+        <span class="proto-badge">HTTP/2</span>
+        <span class="proto-badge">HTTP/3</span>
+        <span class="proto-badge">WSS</span>
+        <span class="proto-badge">SSE</span>
+        <span class="proto-badge">WASM</span>
+      </div>
+      <div class="mini-code" style="margin-top:20px">
+        <div><span class="mc-comment">// auto-detected protocols</span></div>
+        <div><span class="mc-key">protocol</span>: <span class="mc-val">"h2"</span></div>
+        <div><span class="mc-key">tls</span>: <span class="mc-val">"TLSv1.3"</span></div>
+        <div><span class="mc-key">cipher</span>: <span class="mc-val">"TLS_AES_256_GCM"</span></div>
+        <div><span class="mc-key">alt-svc</span>: <span class="mc-str">"h3=:443; ma=2592000"</span></div>
+      </div>
+    </div>
+    <!-- Card 2 -->
+    <div class="bento-card bc-2">
+      <div class="bento-label">Security Issues Found</div>
+      <div class="big-stat">2.4k+</div>
+      <div class="stat-label">Vulnerabilities detected this month</div>
+      <div class="sev-row">
+        <div class="sev-pill sev-h">HIGH &nbsp; 341</div>
+        <div class="sev-pill sev-m">MED &nbsp; 892</div>
+        <div class="sev-pill sev-l">LOW &nbsp; 1.2k</div>
+      </div>
+    </div>
+    <!-- Card 3 -->
+    <div class="bento-card bc-3">
+      <div class="bento-label">Fuzzer</div>
+      <div class="bento-title">Automated payload injection</div>
+      <div class="bento-desc">10,000 requests/session. Wordlists, UUIDs, number ranges. Hit highlighting.</div>
+    </div>
+    <!-- Card 4 -->
+    <div class="bento-card bc-4">
+      <div class="bento-label">Crypto / Decoder</div>
+      <div class="bento-title">8 operations built-in</div>
+      <div class="bento-desc">Base64, URL Encode, JWT decode, Hex, MD5, SHA-256, AES, HMAC — no external tools needed.</div>
+      <div class="mini-code">
+        <div><span class="mc-comment">// JWT decoded instantly</span></div>
+        <div><span class="mc-key">"alg"</span>: <span class="mc-val">"RS256"</span>,</div>
+        <div><span class="mc-key">"typ"</span>: <span class="mc-val">"JWT"</span>,</div>
+        <div><span class="mc-key">"exp"</span>: <span class="mc-str">1748822400</span></div>
+      </div>
+    </div>
+    <!-- Card 5 -->
+    <div class="bento-card bc-5">
+      <div class="bento-label">Platform Support</div>
+      <div class="bento-title">Proxy everything, everywhere</div>
+      <div class="bento-desc">Web browsers, iOS apps, Android (ADB), Electron apps, CLI tools via HTTP_PROXY env var, native desktop.</div>
+      <div class="proto-row" style="margin-top:16px">
+        <span class="proto-badge">macOS</span>
+        <span class="proto-badge">Windows</span>
+        <span class="proto-badge">Linux</span>
+        <span class="proto-badge">iOS</span>
+        <span class="proto-badge">Android</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── COMPARISON ── -->
+<div class="compare-section" id="compare">
+  <div class="reveal">
+    <div class="section-label">Comparison</div>
+    <h2 class="section-title">Why developers<br/>choose Phantoma</h2>
+    <p class="section-sub">More features, cleaner UI, free to use. Phantoma outperforms Charles, Proxyman, and Burp in the capabilities that matter most.</p>
+  </div>
+  <div class="reveal" style="overflow-x:auto">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th class="hl" style="text-align:center;padding-top:24px">&nbsp;</th>
+          <th style="text-align:center">Charles</th>
+          <th style="text-align:center">Proxyman</th>
+          <th style="text-align:center">Burp Suite</th>
+          <th style="text-align:center">Wireshark</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>HTTPS Decryption (MITM)</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+        </tr>
+        <tr>
+          <td>SSE Stream Viewer</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+        </tr>
+        <tr>
+          <td>Auto Security Scan</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+        </tr>
+        <tr>
+          <td>Built-in Fuzzer</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+        </tr>
+        <tr>
+          <td>GraphQL Inspector</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+        </tr>
+        <tr>
+          <td>JWT Decoder</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+        </tr>
+        <tr>
+          <td>Auto Responder / Mock</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+        </tr>
+        <tr>
+          <td>Free &amp; Open Source</td>
+          <td class="hl-cell" style="text-align:center"><span class="check-c">✦</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-n">—</span></td>
+          <td style="text-align:center"><span class="check-y">✓</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── SOCIAL PROOF ── -->
+<div class="social-section">
+  <div class="reveal" style="text-align:center;max-width:600px;margin:0 auto 0">
+    <div class="section-label" style="justify-content:center">
+      <span style="width:24px;height:1px;background:var(--cyan);flex-shrink:0"></span>
+      From developers
+    </div>
+    <h2 class="section-title" style="max-width:100%;margin-left:auto;margin-right:auto;text-align:center">Built for the people<br/>who debug things</h2>
+  </div>
+  <div class="social-grid reveal">
+    <div class="quote-card">
+      <div class="quote-stars">
+        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+      </div>
+      <div class="quote-text">"Finally an inspector that <em>understands SSE</em>. Debugging our OpenAI streaming calls was a nightmare in Charles — with Phantoma I see every chunk in real time."</div>
+      <div class="quote-author">
+        <div class="quote-avatar qa-1">JK</div>
+        <div>
+          <div class="quote-name">Jonas K.</div>
+          <div class="quote-role">Senior Frontend Engineer, Vercel</div>
+        </div>
+      </div>
+    </div>
+    <div class="quote-card">
+      <div class="quote-stars">
+        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+      </div>
+      <div class="quote-text">"The <em>auto security scan</em> caught an API key leak in our app that had been there for months. Switched from Proxyman in a week and never looked back."</div>
+      <div class="quote-author">
+        <div class="quote-avatar qa-2">MM</div>
+        <div>
+          <div class="quote-name">Maya M.</div>
+          <div class="quote-role">Security Engineer, Stripe</div>
+        </div>
+      </div>
+    </div>
+    <div class="quote-card">
+      <div class="quote-stars">
+        <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+      </div>
+      <div class="quote-text">"Breakpoints + Composer is an incredible combo for testing auth flows. I can <em>edit JWT tokens in-flight</em> and see exactly how the server responds."</div>
+      <div class="quote-author">
+        <div class="quote-avatar qa-3">AL</div>
+        <div>
+          <div class="quote-name">Alex L.</div>
+          <div class="quote-role">Backend Lead, Linear</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PRICING ── -->
+<div class="pricing-section" id="pricing">
+  <div class="reveal" style="text-align:center">
+    <div class="section-label" style="justify-content:center">
+      <span style="width:24px;height:1px;background:var(--cyan);flex-shrink:0"></span>
+      Pricing
+    </div>
+    <h2 class="section-title" style="max-width:100%;margin-left:auto;margin-right:auto;text-align:center">Start free.<br/>Upgrade when ready.</h2>
+    <p class="section-sub" style="text-align:center;margin-left:auto;margin-right:auto">No usage caps. No ads. Download it, use it, own it.</p>
+  </div>
+  <div class="pricing-grid reveal">
+    <!-- Free -->
+    <div class="price-card">
+      <div class="price-tier">Free</div>
+      <div class="price-amount">$0<span class="price-period"> / forever</span></div>
+      <div class="price-desc">Everything you need for everyday debugging and API inspection.</div>
+      <a href="#" class="price-cta cta-ghost">Download Free</a>
+      <div class="price-features">
+        <div class="pf-item"><span class="pf-check">✦</span>Capture — unlimited requests</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Breakpoints &amp; Composer</div>
+        <div class="pf-item"><span class="pf-check">✦</span>WebSocket Inspector</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Crypto / JWT Decoder</div>
+        <div class="pf-item"><span class="pf-check">✦</span>1 saved session</div>
+        <div class="pf-item"><span class="pf-x">✕</span>Security Audit</div>
+        <div class="pf-item"><span class="pf-x">✕</span>Fuzzer</div>
+        <div class="pf-item"><span class="pf-x">✕</span>Match &amp; Replace</div>
+      </div>
+    </div>
+    <!-- Pro -->
+    <div class="price-card featured">
+      <div class="price-badge">Most Popular</div>
+      <div class="price-tier" style="margin-top:12px">Pro</div>
+      <div class="price-amount">$8<span class="price-period"> / month</span></div>
+      <div class="price-desc">Full power for professional developers and security engineers.</div>
+      <a href="#" class="price-cta cta-main">Start Free Trial</a>
+      <div class="price-features">
+        <div class="pf-item"><span class="pf-check">✦</span>Everything in Free</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Security Audit (auto-scan)</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Match &amp; Replace (regex rules)</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Auto Responder / Mock</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Fuzzer (10k+ payloads)</div>
+        <div class="pf-item"><span class="pf-check">✦</span>SSE &amp; GraphQL tabs</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Unlimited sessions + HAR</div>
+      </div>
+    </div>
+    <!-- Team -->
+    <div class="price-card">
+      <div class="price-tier">Team</div>
+      <div class="price-amount">$24<span class="price-period"> / mo per seat</span></div>
+      <div class="price-desc">Shared sessions, audit logs, and SSO for engineering teams.</div>
+      <a href="#" class="price-cta cta-ghost">Contact Sales</a>
+      <div class="price-features">
+        <div class="pf-item"><span class="pf-check">✦</span>Everything in Pro</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Shared session library</div>
+        <div class="pf-item"><span class="pf-check">✦</span>SSO / SAML</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Audit log export</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Priority support</div>
+        <div class="pf-item"><span class="pf-check">✦</span>Custom CA cert management</div>
+        <div class="pf-item"><span class="pf-check">✦</span>On-prem deployment</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CTA ── -->
+<div class="cta-section">
+  <h2 class="cta-title reveal">Nothing hides from<br/><span style="color:var(--cyan)">Phantoma.</span></h2>
+  <p class="cta-sub reveal">Download free for macOS, Windows, or Linux. No account required. No usage limits.</p>
+  <div class="cta-actions reveal">
+    <a href="#" class="btn-hero">
+      Download — it's free
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+    </a>
+    <a href="#" class="btn-hero-ghost">
+      View on GitHub
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    </a>
+  </div>
+</div>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <div class="footer-brand-name">Phanto<span>ma</span></div>
+      <div class="footer-brand-desc">HTTPS Inspector &amp; Traffic Analyzer. See everything your app is saying.</div>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="#">Features</a>
+      <a href="#">Modules</a>
+      <a href="#">Pricing</a>
+      <a href="#">Changelog</a>
+      <a href="#">Roadmap</a>
+    </div>
+    <div class="footer-col">
+      <h4>Developers</h4>
+      <a href="#">Documentation</a>
+      <a href="#">SSL Setup Guide</a>
+      <a href="#">iOS &amp; Android</a>
+      <a href="#">GitHub</a>
+      <a href="#">API Reference</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="#">About</a>
+      <a href="#">Blog</a>
+      <a href="#">Security</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Phantoma · All rights reserved</span>
+    <span>v3.0.0 · Electron + React + TypeScript</span>
+  </div>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach((el, i) => {
+  el.style.transitionDelay = (i % 3 * 0.08) + 's';
+  observer.observe(el);
+});
+
+// Clock in nav — optional animated badge
+const badge = document.querySelector('.hero-badge');
+if (badge) {
+  const dot = badge.querySelector('.badge-dot');
+  setInterval(() => {
+    if (dot) {
+      dot.style.background = dot.style.background === 'var(--green)' ? 'var(--cyan)' : 'var(--cyan)';
+    }
+  }, 2000);
+}
+</script>
+</body>
+</html>

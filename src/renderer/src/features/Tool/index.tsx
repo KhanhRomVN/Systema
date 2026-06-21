@@ -257,10 +257,19 @@ export default function InspectorPage() {
     setRequests((prev) =>
       prev.map((req) => {
         if (req.id !== data.id) return req;
+        // Normalize size: CDP sends numeric bytes, proxy sends string like "1.5 KB"
+        let normalizedSize = req.size;
+        if (data.size !== undefined && data.size !== null) {
+          if (typeof data.size === 'number') {
+            normalizedSize = `${data.size} B`;
+          } else {
+            normalizedSize = String(data.size);
+          }
+        }
         const reqWithBody = {
           ...req,
           responseBody: data.body,
-          size: data.size || req.size,
+          size: normalizedSize,
           isBinary: data.isBinary,
           contentType: data.contentType,
         };
@@ -504,6 +513,20 @@ export default function InspectorPage() {
     }
     console.log('[Inspector] No active app, launching directly');
     await executeLaunchApp(appName, _proxyUrl, customUrl, mode);
+  };
+
+  const handleLaunchCdp = async (appName: string, customUrl?: string) => {
+    console.log(`[Inspector] handleLaunchCdp: appName="${appName}", url="${customUrl}"`);
+    try {
+      const launched = await window.api.invoke('app:launch-cdp', appName, customUrl);
+      if (launched) {
+        setSelectedApp(appName);
+        setTargetUrl(customUrl || 'CDP Mode');
+        setRequests([]);
+      }
+    } catch (error) {
+      console.error('[Inspector] Error launching via CDP:', error);
+    }
   };
 
   const handleConfirmSwitch = async () => {
@@ -816,6 +839,7 @@ export default function InspectorPage() {
       initialDiffTab,
       initialDiffSearch,
       onSelectApp: handleSelectApp,
+      onLaunchCdp: handleLaunchCdp,
       onStopSession: handleStopSession,
       onLoadProfile: handleLoadProfile,
       isConfirmSwitchOpen,
@@ -837,7 +861,7 @@ export default function InspectorPage() {
     activeSidebarTab, appName, emulatorSerial, selectedApp, platform,
     compareRequest1, compareRequest2, handleClearComparison,
     handleJumpToValue, handleCompareRequests, initialDiffTab, initialDiffSearch,
-    handleSelectApp, handleStopSession, handleLoadProfile,
+    handleSelectApp, handleLaunchCdp, handleStopSession, handleLoadProfile,
     isConfirmSwitchOpen, handleCloseConfirmSwitch, handleConfirmSwitch,
     currentAppName, pendingSwitchData?.appName, isConfirmStopOpen,
     handleCloseConfirmStop, handleConfirmStop, handleOpenStopConfirm, handleNodeClick,
@@ -1023,10 +1047,11 @@ export default function InspectorPage() {
       {(() => {
         const httpsCount = requests.filter((r) => r.protocol === 'https').length;
         const totalSize = requests.reduce((acc, r) => {
-          const n = parseFloat(r.size);
+          const sizeStr = String(r.size || '0');
+          const n = parseFloat(sizeStr);
           if (isNaN(n)) return acc;
-          if (r.size.toLowerCase().includes('kb')) return acc + n * 1024;
-          if (r.size.toLowerCase().includes('mb')) return acc + n * 1024 * 1024;
+          if (sizeStr.toLowerCase().includes('kb')) return acc + n * 1024;
+          if (sizeStr.toLowerCase().includes('mb')) return acc + n * 1024 * 1024;
           return acc + n;
         }, 0);
         const sizeStr = totalSize > 1024 * 1024

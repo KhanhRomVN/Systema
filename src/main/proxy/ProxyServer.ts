@@ -99,7 +99,7 @@ export class ProxyServer extends EventEmitter {
         this.emit('started', port);
         resolve();
       });
-      this.proxy.on('error', (err: any) => {
+      this.proxy.onError((err: any) => {
         console.error(`[ProxyServer] Error on proxy:`, err);
         reject(err);
       });
@@ -772,6 +772,25 @@ export class ProxyServer extends EventEmitter {
           delete req.headers['x-systema-initiator'];
         } catch (e) {
           // Ignore errors
+        }
+      }
+
+      // Sanitize: remove content-encoding from request headers as it's a response header,
+      // not a request header. Electron/Chromium may incorrectly add it when using proxy.
+      if (req.headers['content-encoding']) {
+        console.warn(
+          `[Proxy] Stripped invalid request header 'content-encoding: ${req.headers['content-encoding']}' from ${method} ${url}`,
+        );
+        delete req.headers['content-encoding'];
+      }
+
+      // Debug: Log any other suspicious response-only headers appearing in requests
+      const suspiciousRequestHeaders = ['content-encoding', 'transfer-encoding', 'content-disposition'];
+      for (const h of suspiciousRequestHeaders) {
+        if (req.headers[h]) {
+          console.debug(
+            `[Proxy] Suspicious request header '${h}: ${req.headers[h]}' in ${method} ${url}`,
+          );
         }
       }
 

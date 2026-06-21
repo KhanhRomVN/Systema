@@ -1,185 +1,235 @@
-import React, { useMemo, memo } from 'react';
+import React, { memo } from 'react';
 import { useTheme } from '../ThemeProvider';
 import { Drawer } from '../../../shared/components/ui/drawer';
-import { X, Moon, Sun, Palette } from 'lucide-react';
+import { X, Palette, Check, Moon, Sun } from 'lucide-react';
 import { PRESET_THEMES } from '../theme-loader';
 import { cn } from '../../../shared/lib/utils';
 
 interface ThemeDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  direction?: 'left' | 'right' | 'top' | 'bottom';
 }
 
-const ThemeDrawer: React.FC<ThemeDrawerProps> = memo(({ isOpen, onClose }) => {
-  const { theme, setTheme, applyPresetTheme } = useTheme();
+const ThemeDrawer: React.FC<ThemeDrawerProps> = memo(({ isOpen, onClose, direction = 'right' }) => {
+  const { applyPresetTheme, currentPreset } = useTheme();
 
-  // Filter to just Light and Dark
-  const themes = useMemo(
-    () => [
-      { value: 'light', label: 'Light', icon: Sun },
-      { value: 'dark', label: 'Dark', icon: Moon },
-    ],
-    [],
-  );
-
-  // Cast theme to 'light' | 'dark' safely since we removed system
-  const currentMode = theme === 'light' || theme === 'dark' ? theme : 'dark';
-
-  // Helper to convert space-separated RGB (from JSON) to valid CSS rgb()
   const resolveColor = (color: string) => {
     if (!color) return 'transparent';
-    // If it's already a standard hex or rgb, return as is
     if (color.startsWith('#') || color.startsWith('rgb')) return color;
-    // If it's space-separated "R G B", convert to rgb(R G B)
     if (color.includes(' ')) return `rgb(${color})`;
     return color;
   };
-
-  const renderPresetThemes = () => (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Palette className="h-5 w-5 text-primary" />
-        <h3 className="text-lg font-semibold text-foreground">Preset Themes</h3>
-      </div>
-      <div className="grid grid-cols-2 gap-4 pb-10">
-        {PRESET_THEMES[currentMode]?.map((preset, idx) => {
-          return (
-            <button
-              key={idx}
-              onClick={() => applyPresetTheme(preset)}
-              className="relative flex flex-col p-3 rounded-xl transition-all overflow-hidden bg-card border border-border hover:border-primary/50 hover:scale-[1.02] active:scale-[0.98] duration-200 group text-left shadow-sm"
-            >
-              {/* Skeleton UI Preview */}
-              <div
-                className="w-full h-32 rounded-lg overflow-hidden mb-3 relative border border-border/50 shadow-inner"
-                style={{ backgroundColor: resolveColor(preset.tailwind.background) }}
-              >
-                {/* Header skeleton */}
-                <div
-                  className="h-4 w-full border-b border-border/20"
-                  style={{ backgroundColor: resolveColor(preset.tailwind.sidebarBackground) }}
-                />
-
-                <div className="flex h-full">
-                  {/* Sidebar skeleton */}
-                  <div
-                    className="w-1/4 h-full border-r border-border/20 pt-2 px-1"
-                    style={{
-                      backgroundColor: resolveColor(preset.tailwind.sidebarBackground),
-                    }}
-                  >
-                    <div
-                      className="w-full h-1.5 rounded-full mb-1 opacity-20"
-                      style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
-                    />
-                    <div
-                      className="w-2/3 h-1.5 rounded-full mb-1 opacity-20"
-                      style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
-                    />
-                    <div
-                      className="w-3/4 h-1.5 rounded-full opacity-20"
-                      style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
-                    />
-                  </div>
-
-                  {/* Content skeleton */}
-                  <div className="flex-1 p-2 space-y-2">
-                    <div className="flex gap-2">
-                      <div
-                        className="h-10 flex-1 rounded-md opacity-40 shadow-sm"
-                        style={{ backgroundColor: resolveColor(preset.tailwind.cardBackground) }}
-                      />
-                      <div
-                        className="h-10 w-8 rounded-md opacity-40 shadow-sm"
-                        style={{ backgroundColor: resolveColor(preset.tailwind.cardBackground) }}
-                      />
-                    </div>
-                    <div
-                      className="w-full h-2 rounded-full opacity-30"
-                      style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
-                    />
-                    <div
-                      className="w-5/6 h-2 rounded-full opacity-20"
-                      style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
-                    />
-
-                    {/* Primary Button skeleton */}
-                    <div
-                      className="w-1/3 h-3 rounded-md mt-2 shadow-sm"
-                      style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
-                    />
-                  </div>
-                </div>
-
-                {/* Status Dot */}
-                <div className="absolute top-1.5 right-1.5 bg-background/80 backdrop-blur-sm p-0.5 rounded-full shadow-sm border border-border/50">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center w-full px-1">
-                <span className="font-bold text-sm block text-foreground tracking-tight">
-                  {preset.name.replace(/Light$|Dark$/, '')}
-                </span>
-                <div
-                  className="w-2 h-2 rounded-full ring-4 ring-background shadow-sm"
-                  style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
-                />
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 
   return (
     <Drawer
       isOpen={isOpen}
       onClose={onClose}
-      width="600px"
-      direction="right"
+      width={direction === 'bottom' || direction === 'top' ? undefined : '460px'}
+      height={direction === 'bottom' || direction === 'top' ? '70vh' : undefined}
+      direction={direction}
       className="!bg-drawer-background flex flex-col shadow-2xl"
     >
-      <div className="h-16 flex items-center justify-between px-6 border-b border-border shrink-0 bg-background/50 backdrop-blur-md sticky top-0 z-10">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Theme Settings</h2>
+      {/* Header */}
+      <div className="h-14 flex items-center justify-between px-5 border-b border-border shrink-0">
+        <div className="flex items-center gap-2.5">
+          <Palette className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">Themes</h2>
         </div>
-
-        <div className="flex items-center gap-3">
-          {/* Theme Mode Toggle in Header */}
-          <div className="flex items-center bg-muted/50 p-1 rounded-full border border-border mr-2">
-            {themes.map(({ value, icon: Icon }) => (
-              <button
-                key={value}
-                onClick={() => setTheme(value as any)}
-                className={cn(
-                  'p-1.5 rounded-full transition-all duration-200',
-                  theme === value
-                    ? 'bg-primary text-primary-foreground shadow-sm scale-110'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                )}
-                title={`${value.charAt(0).toUpperCase() + value.slice(1)} Mode`}
-              >
-                <Icon className="h-4 w-4" />
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 -mr-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all duration-200"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="p-2 -mr-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all duration-200"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
-        {renderPresetThemes()}
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 custom-scrollbar">
+        {PRESET_THEMES.map((preset) => {
+          const isSelected = currentPreset?.name === preset.name;
+          const isDark = preset.monaco.base === 'vs-dark';
+
+          return (
+            <button
+              key={preset.name}
+              onClick={() => applyPresetTheme(preset)}
+              className={cn(
+                'w-full group relative overflow-hidden rounded-2xl transition-all duration-300 text-left',
+                isSelected
+                  ? 'bg-primary/5 border-2 border-primary/40 shadow-lg shadow-primary/5'
+                  : 'bg-card border border-border hover:border-primary/25 hover:shadow-md hover:scale-[1.01]',
+              )}
+            >
+              {/* Skeleton Preview */}
+              <div className="p-3">
+                <div
+                  className="w-full h-28 rounded-xl overflow-hidden relative border border-border/40 shadow-inner"
+                  style={{ backgroundColor: resolveColor(preset.tailwind.background) }}
+                >
+                  {/* Top bar */}
+                  <div
+                    className="h-5 w-full flex items-center gap-1.5 px-2 border-b border-white/5"
+                    style={{ backgroundColor: resolveColor(preset.tailwind.tableHeaderBg) }}
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full opacity-40"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
+                    />
+                    <div
+                      className="w-2 h-2 rounded-full opacity-25"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.textSecondary) }}
+                    />
+                    <div
+                      className="w-2 h-2 rounded-full opacity-25"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.textSecondary) }}
+                    />
+                    <div
+                      className="flex-1 h-1.5 rounded-full mx-2 opacity-15"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                    />
+                  </div>
+
+                  <div className="flex" style={{ height: 'calc(100% - 20px)' }}>
+                    {/* Sidebar */}
+                    <div
+                      className="w-[30%] h-full flex flex-col gap-1.5 p-1.5 border-r border-white/5"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.sidebarBackground) }}
+                    >
+                      <div
+                        className="h-2 w-3/4 rounded-full opacity-25"
+                        style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                      />
+                      <div
+                        className="h-1.5 w-1/2 rounded-full opacity-15"
+                        style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                      />
+                      <div
+                        className="h-1.5 w-2/3 rounded-full opacity-15"
+                        style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                      />
+                      <div className="flex-1" />
+                      <div
+                        className="h-3 w-full rounded-md opacity-30"
+                        style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
+                      />
+                    </div>
+
+                    {/* Content area */}
+                    <div className="flex-1 p-2 flex flex-col gap-1.5">
+                      <div className="flex gap-1.5">
+                        <div
+                          className="h-5 flex-1 rounded-md opacity-30"
+                          style={{ backgroundColor: resolveColor(preset.tailwind.cardBackground) }}
+                        />
+                        <div
+                          className="h-5 w-6 rounded-md opacity-20"
+                          style={{ backgroundColor: resolveColor(preset.tailwind.cardBackground) }}
+                        />
+                      </div>
+                      <div
+                        className="h-1.5 w-full rounded-full opacity-15"
+                        style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                      />
+                      <div
+                        className="h-1.5 w-5/6 rounded-full opacity-10"
+                        style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                      />
+                      <div
+                        className="h-1.5 w-4/6 rounded-full opacity-10"
+                        style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                      />
+                      <div className="flex-1" />
+                      {/* Button skeleton */}
+                      <div className="flex gap-1.5">
+                        <div
+                          className="h-3.5 w-14 rounded-md opacity-40"
+                          style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
+                        />
+                        <div
+                          className="h-3.5 w-14 rounded-md opacity-15"
+                          style={{ backgroundColor: resolveColor(preset.tailwind.textSecondary) }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating primary dot */}
+                  <div className="absolute top-1.5 right-1.5 bg-background/70 backdrop-blur-sm p-[3px] rounded-full border border-border/30">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card footer */}
+              <div
+                className={cn(
+                  'px-3 pb-3 flex items-center gap-3',
+                  isSelected && 'border-t border-primary/10 pt-2.5 mx-3',
+                )}
+                style={!isSelected ? { borderTop: '1px solid transparent' } : {}}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-foreground">{preset.name}</span>
+                    <span
+                      className={cn(
+                        'shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border',
+                        isDark
+                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                      )}
+                    >
+                      {isDark ? (
+                        <Moon className="w-2.5 h-2.5" />
+                      ) : (
+                        <Sun className="w-2.5 h-2.5" />
+                      )}
+                      {isDark ? 'Dark' : 'Light'}
+                    </span>
+                  </div>
+                  {/* Color palette dots */}
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <div
+                      className="w-3 h-3 rounded-full border-2 border-background shadow-sm"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.primary) }}
+                      title="Primary"
+                    />
+                    <div
+                      className="w-3 h-3 rounded-full border-2 border-background shadow-sm"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.background) }}
+                      title="Background"
+                    />
+                    <div
+                      className="w-3 h-3 rounded-full border-2 border-background shadow-sm"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.textPrimary) }}
+                      title="Text"
+                    />
+                    <div
+                      className="w-3 h-3 rounded-full border-2 border-background shadow-sm"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.sidebarBackground) }}
+                      title="Sidebar"
+                    />
+                    <div
+                      className="w-3 h-3 rounded-full border-2 border-background shadow-sm"
+                      style={{ backgroundColor: resolveColor(preset.tailwind.border) }}
+                      title="Border"
+                    />
+                  </div>
+                </div>
+
+                {isSelected && (
+                  <div className="shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-md shadow-primary/30">
+                    <Check className="w-4 h-4 text-primary-foreground" strokeWidth={3} />
+                  </div>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </Drawer>
   );

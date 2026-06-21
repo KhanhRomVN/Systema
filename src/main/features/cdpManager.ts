@@ -30,44 +30,39 @@ export class CdpManager extends EventEmitter {
     console.log(`[CDP] Connecting to localhost:${port}... (Retries left: ${retries})`);
 
     try {
-      // Fetch the WebSocket debugger URL
-      const response = await fetch(`http://127.0.0.1:${port}/json/version`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      // Step 1: Fetch list of all debuggable targets (pages, workers, etc.)
+      const targetsResponse = await fetch(`http://127.0.0.1:${port}/json`);
+      if (!targetsResponse.ok) throw new Error(`HTTP ${targetsResponse.status}`);
 
-      const data = (await response.json()) as any;
-      const wsUrl = data.webSocketDebuggerUrl;
+      const targets = (await targetsResponse.json()) as any[];
+      console.log(`[CDP] Found ${targets.length} debuggable targets`);
 
-      if (!wsUrl) {
-        throw new Error('No webSocketDebuggerUrl found');
+      // Step 2: Find a "page" target (not background_page, worker, etc.)
+      let pageTarget = targets.find(
+        (t: any) => t.type === 'page' && t.url && !t.url.startsWith('devtools://')
+      );
+
+      // If no page with a real URL, fall back to any page target
+      if (!pageTarget) {
+        pageTarget = targets.find((t: any) => t.type === 'page');
       }
 
-      console.log(`[CDP] WebSocket URL: ${wsUrl}`);
+      if (!pageTarget) {
+        console.log('[CDP] No page target found, will connect to browser level and create a page');
+        // Connect to browser WebSocket and create a target
+        const versionResponse = await fetch(`http://127.0.0.1:${port}/json/version`);
+        if (!versionResponse.ok) throw new Error(`HTTP ${versionResponse.status}`);
+        const versionData = (await versionResponse.json()) as any;
+        const browserWsUrl = versionData.webSocketDebuggerUrl;
+        if (!browserWsUrl) throw new Error('No webSocketDebuggerUrl found');
 
-      return new Promise((resolve) => {
-        this.ws = new WebSocket(wsUrl);
+        return await this.connectToBrowserAndCreatePage(browserWsUrl);
+      }
 
-        this.ws.on('open', async () => {
-          console.log('[CDP] Connected via WebSocket');
-          this.isConnected = true;
-          await this.initializeNetwork();
-          resolve(true);
-        });
+      const wsUrl = pageTarget.webSocketDebuggerUrl;
+      console.log(`[CDP] Connecting to page: ${pageTarget.url} (${wsUrl})`);
 
-        this.ws.on('message', (data) => {
-          this.handleMessage(data.toString());
-        });
-
-        this.ws.on('error', (err) => {
-          console.error('[CDP] WebSocket error:', err);
-          if (!this.isConnected) resolve(false);
-        });
-
-        this.ws.on('close', () => {
-          console.log('[CDP] Disconnected');
-          this.isConnected = false;
-          this.ws = null;
-        });
-      });
+      return await this.connectToPage(wsUrl);
     } catch (error) {
       if (retries > 0) {
         console.log(`[CDP] Connection failed, retrying in ${delay}ms...`);
@@ -77,6 +72,141 @@ export class CdpManager extends EventEmitter {
       console.error('[CDP] Connection failed after retries:', error);
       return false;
     }
+  }
+
+  private async connectToPage(wsUrl: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.on('open', async () => {
+        console.log('[CDP] Connected to page WebSocket');
+        this.isConnected = true;
+        try {
+          await this.initializeNetwork();
+        } catch (e: any) {
+          console.error('[CDP] Failed to initialize Network domain:', e?.message || e);
+        }
+        resolve(true);
+      });
+
+      this.ws.on('message', (data) => {
+        this.handleMessage(data.toString());
+      });
+
+      this.ws.on('error', (err) => {
+        console.error('[CDP] WebSocket error:', err);
+        if (!this.isConnected) resolve(false);
+      });
+
+      this.ws.on('close', () => {
+        console.log('[CDP] Disconnected');
+        this.isConnected = false;
+        this.ws = null;
+      });
+    });
+  }
+
+  private async connectToBrowserAndCreatePage(browserWsUrl: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const browserWs = new WebSocket(browserWsUrl);
+      let targetAttached = false;
+
+      browserWs.on('open', () => {
+        console.log('[CDP] Connected to browser WebSocket, creating target...');
+        // Send Target.createTarget to open a new page (the browser already has one, 
+        // but let's just attach to the first available by listing targets via CDP)
+        const createTargetMsg = JSON.stringify({
+          id: 1,
+          method: 'Target.getTargets',
+        });
+        browserWs.send(createTargetMsg);
+      });
+
+      browserWs.on('message', (data: any) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          
+          if (msg.id === 1 && msg.result?.targetInfos) {
+            const pageTarget = msg.result.targetInfos.find(
+              (t: any) => t.type === 'page' && t.attached === false
+            );
+            if (pageTarget) {
+              console.log(`[CDP] Found page target: ${pageTarget.url}, attaching...`);
+              targetAttached = true;
+              const attachMsg = JSON.stringify({
+                id: 2,
+                method: 'Target.attachToTarget',
+                params: { targetId: pageTarget.targetId, flatten: true },
+              });
+              browserWs.send(attachMsg);
+            } else {
+              // All pages already attached or none exist
+              browserWs.close();
+              resolve(false);
+            }
+          } else if (msg.id === 2) {
+            if (msg.result?.sessionId) {
+              console.log(`[CDP] Attached to target, sessionId: ${msg.result.sessionId}`);
+              // We're attached via flatten mode, events will arrive on browser WebSocket
+              // with sessionId. But for simplicity, let's close and re-connect directly to the page.
+              // Actually, with flatten=true, Network events come directly on this connection!
+              this.ws = browserWs;
+              this.isConnected = true;
+              try {
+                // Enable Network on the attached target
+                const enableMsg = JSON.stringify({
+                  id: 3,
+                  method: 'Network.enable',
+                  params: {
+                    maxTotalBufferSize: 10000000,
+                    maxResourceBufferSize: 5000000,
+                    maxPostDataSize: 5000000,
+                  },
+                  sessionId: msg.result.sessionId,
+                });
+                browserWs.send(enableMsg);
+              } catch (e: any) {
+                console.error('[CDP] Failed to enable Network:', e?.message || e);
+              }
+              console.log('[CDP] Network domain enabled via Target.attachToTarget');
+              resolve(true);
+            } else if (msg.error) {
+              console.error('[CDP] Failed to attach to target:', msg.error);
+              browserWs.close();
+              resolve(false);
+            }
+          } else if (msg.id === 3) {
+            if (msg.error) {
+              console.error('[CDP] Network.enable failed:', msg.error);
+            } else {
+              console.log('[CDP] Network domain enabled on attached target');
+            }
+          } else if (msg.method === 'Network.requestWillBeSent' || 
+                     msg.method === 'Network.responseReceived' ||
+                     msg.method === 'Network.loadingFinished' ||
+                     msg.method === 'Network.loadingFailed') {
+            // Flattened events come directly
+            this.handleNetworkEvent(msg.method, msg.params);
+          } else if (msg.method === 'Target.attachedToTarget') {
+            console.log(`[CDP] Target attached: ${msg.params.targetInfo?.url}`);
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      });
+
+      browserWs.on('error', (err) => {
+        console.error('[CDP] Browser WebSocket error:', err);
+        if (!targetAttached) resolve(false);
+      });
+
+      browserWs.on('close', () => {
+        console.log('[CDP] Browser WebSocket closed');
+        this.isConnected = false;
+        if (this.ws === browserWs) this.ws = null;
+        if (!targetAttached) resolve(false);
+      });
+    });
   }
 
   private async initializeNetwork() {
@@ -181,13 +311,17 @@ export class CdpManager extends EventEmitter {
 
       this.sendToRenderer('cdp:response-body', {
         id: requestId,
-        body: body, // Ensure frontend handles base64 if base64Encoded is true
+        body: body,
         isBinary: base64Encoded,
-        size: encodedDataLength, // Approximate
+        size: encodedDataLength,
       });
-    } catch (e) {
-      console.error(`[CDP] Failed to get body for ${requestId}:`, e);
-      // Could be because it's a redirect or empty?
+    } catch (e: any) {
+      // Silently ignore - body was already discarded by browser (redirect, preflight, etc.)
+      const msg = e?.message || '';
+      if (msg.includes('No resource') || msg.includes('No data found')) {
+        return;
+      }
+      console.error(`[CDP] Failed to get body for ${requestId}:`, msg || e);
     }
   }
 

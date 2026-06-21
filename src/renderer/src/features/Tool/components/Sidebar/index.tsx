@@ -2,7 +2,7 @@ import { useState, useEffect, memo, useCallback, useRef } from 'react';
 import { HomePanel } from './Agent/HomePanel';
 import { ChatPanel } from './Agent/ChatPanel';
 import AgentSettingsPanel from './Agent/SettingsPanel';
-import { SettingsPanel as AppSettingsPanel } from './Settings/SettingsPanel';
+import { SettingsPanel as AppSettingsPanel } from './Settings';
 import { InspectorFilter } from '../RequestDetails/Filter';
 import { NetworkRequest } from '../../../../types/inspector';
 import { SourcesPanel } from './Source';
@@ -75,6 +75,7 @@ export interface InspectorContext {
     customUrl?: string,
     mode?: 'browser' | 'electron' | 'native',
   ) => Promise<void>;
+  onLaunchCdp?: (appName: string, customUrl?: string) => Promise<void>;
   onStopSession?: () => Promise<void>;
   onLoadProfile?: (profile: any) => void;
   // Confirm switch drawer
@@ -196,6 +197,7 @@ export function ChatContainerInner({ inspectorContext }: ChatContainerProps) {
           activeAppId={inspectorContext.appId || ''}
           activeAppName={inspectorContext.targetApp || ''}
           onSelectApp={inspectorContext.onSelectApp || (async () => {})}
+          onLaunchCdp={inspectorContext.onLaunchCdp}
           onStopSession={inspectorContext.onStopSession || (async () => {})}
           onLoadProfile={inspectorContext.onLoadProfile || (() => {})}
           platform={
